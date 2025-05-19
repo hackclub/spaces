@@ -7,3 +7,56 @@ __pycache__
 *.pyd
 .Python
 .DS_Store
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# IDE specific files
+.idea
+.vscode
+*.swp
+*.swo
+
+# Environment variables
+.env
+.env.example
+
+# Docker specific
+Dockerfile
+.dockerignore
+
+# Local development
+attached_assets/
+/data/
+migrations/
+
+# Dependencies
+node_modules/
+
+# Large/binary files
+*.pdf
+*.zip
+*.tar.gz
