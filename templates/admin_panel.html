@@ -674,6 +674,14 @@
             <div class="section-header">
                 <h2><i class="fas fa-cogs"></i> Admin Settings</h2>
                 <p>Configure platform settings and preferences</p>
+                <div class="section-actions" style="margin-top: 15px;">
+                    <a href="/api/admin/logs" class="btn-primary" download>
+                        <i class="fas fa-download"></i> Download System Logs
+                    </a>
+                    <button onclick="clearSystemLogs()" class="btn-warning">
+                        <i class="fas fa-trash-alt"></i> Clear System Logs
+                    </button>
+                </div>
             </div>
 
             <div class="settings-container">
@@ -704,27 +712,6 @@
                         </div>
                         
                         <button class="btn-primary" onclick="saveLeaderAccessCode()">Update Access Code</button>
-                        
-                        <hr style="margin: 1.5rem 0;">
-                        
-                        <div class="form-group">
-                            <label>BetterStack Logging</label>
-                            <p class="text-muted">Configure BetterStack error logging settings</p>
-                            <div class="form-switch">
-                                <input type="checkbox" id="betterStackEnabled" class="toggle-switch">
-                                <label for="betterStackEnabled">Enable BetterStack Logging</label>
-                            </div>
-                            <div class="input-group" style="margin-top: 10px;">
-                                <span class="input-label">Log Level</span>
-                                <select id="betterStackLogLevel" class="settings-input">
-                                    <option value="1">Level 1 - Everything (Debug and above)</option>
-                                    <option value="2" selected>Level 2 - Warnings and Errors</option>
-                                    <option value="3">Level 3 - Errors Only</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <button class="btn-primary" onclick="saveBetterStackSettings()">Update BetterStack Settings</button>
                     </div>
                 </div>
             </div>
@@ -2633,7 +2620,6 @@ document.addEventListener('DOMContentLoaded', function() {
     loadRecentActivities();
     updateAnalytics('day');
     loadLeaderAccessCode();
-    loadBetterStackSettings();
 });
 
 async function loadSystemStatus() {
@@ -3058,48 +3044,29 @@ function saveLeaderAccessCode() {
     });
 }
 
-// Load BetterStack settings
-function loadBetterStackSettings() {
-    fetch('/api/admin/settings/betterstack')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('betterStackEnabled').checked = data.enabled;
-                document.getElementById('betterStackLogLevel').value = data.log_level;
-            }
-        })
-        .catch(error => {
-            console.error('Error loading BetterStack settings:', error);
-            showToast('error', 'Failed to load BetterStack settings');
-        });
-}
-
-// Save BetterStack settings
-function saveBetterStackSettings() {
-    const enabled = document.getElementById('betterStackEnabled').checked;
-    const logLevel = document.getElementById('betterStackLogLevel').value;
+function clearSystemLogs() {
+    if (!confirm('Are you sure you want to clear all system logs?')) {
+        return;
+    }
     
-    fetch('/api/admin/settings/betterstack', {
+    fetch('/api/admin/logs', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ 
-            enabled: enabled,
-            log_level: logLevel
-        })
+        body: JSON.stringify({ action: 'clear' })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showToast('success', data.message || 'BetterStack settings updated successfully');
+            showToast('success', data.message || 'Logs cleared successfully');
         } else {
-            showToast('error', data.message || 'Failed to update BetterStack settings');
+            showToast('error', data.message || 'Failed to clear logs');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showToast('error', 'Failed to update BetterStack settings');
+        showToast('error', 'Failed to clear logs');
     });
 }
 

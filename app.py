@@ -5,7 +5,6 @@ import json
 import hashlib
 import requests
 import jinja2
-import logging
 import werkzeug.exceptions
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
@@ -41,7 +40,6 @@ from slack_auth import slack_auth_bp
 from routes.hackatime_routes import hackatime_bp
 from routes.pizza_grants_routes import pizza_grants_bp
 from groq import Groq
-from better_stack_logger import setup_betterstack_logging, BetterStackHandler
 
 load_dotenv()
 
@@ -60,13 +58,6 @@ app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Set up CSRF protection
 csrf = CSRFProtect(app)
-
-# Setup BetterStack logging
-if os.getenv('BETTERSTACK_TOKEN') and os.getenv('BETTERSTACK_URL'):
-    # Default to level 2 (warnings and errors)
-    default_level = logging.WARNING
-    betterstack_handler = setup_betterstack_logging(app, default_level)
-    app.logger.info(f"BetterStack logging initialized with source ID: {os.getenv('BETTERSTACK_SOURCE_ID', 'spaces_prod')}")
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_size': 20,
     'pool_recycle': 1800,  # Recycle connections every 30 minutes
@@ -253,7 +244,12 @@ def log_request_info():
 
     # Log only for specific error-prone endpoints or in debug mode
     if app.debug or 'admin' in request.path or request.method != 'GET':
-        app.logger.debug('Request: %s %s', request.method, request.path)
+        log_message = f'Request: {request.method} {request.path}'
+        app.logger.debug(log_message)
+        
+        # Also store in our logs manager
+        from utils.logs_util import logs_manager
+        logs_manager.add_log(log_message, level="DEBUG", source="request")
 
 
 @app.after_request
@@ -261,8 +257,12 @@ def log_response_info(response):
     """Log information about error responses only."""
     # Only log non-successful responses
     if response.status_code >= 400:
-        app.logger.warning('Response: %s %s → %d', request.method,
-                           request.path, response.status_code)
+        log_message = f'Response: {request.method} {request.path} → {response.status_code}'
+        app.logger.warning(log_message)
+        
+        # Also store in our logs manager
+        from utils.logs_util import logs_manager
+        logs_manager.add_log(log_message, level="WARNING", source="response")
     return response
 
 
@@ -2350,126 +2350,6 @@ def update_leader_access_code():
             'message': 'Failed to update access code'
         }), 500
 
-@app.route('/api/admin/settings/betterstack', methods=['GET'])
-@login_required
-@admin_required
-def get_betterstack_settings():
-    """Get current BetterStack logging settings"""
-    try:
-        with db.engine.connect() as conn:
-            # Check if settings exist
-            result = conn.execute(
-                db.text("SELECT value FROM system_settings WHERE key = 'betterstack_enabled'")
-            )
-            enabled = result.fetchone()
-            enabled = enabled[0] if enabled else 'false'
-            
-            result = conn.execute(
-                db.text("SELECT value FROM system_settings WHERE key = 'betterstack_log_level'")
-            )
-            log_level = result.fetchone()
-            log_level = log_level[0] if log_level else '2'  # Default to level 2
-            
-            return jsonify({
-                'success': True,
-                'enabled': enabled.lower() == 'true',
-                'log_level': log_level
-            })
-    except Exception as e:
-        app.logger.error(f'Error retrieving BetterStack settings: {str(e)}')
-        return jsonify({
-            'success': False,
-            'message': 'Failed to retrieve BetterStack settings'
-        }), 500
-
-@app.route('/api/admin/settings/betterstack', methods=['POST'])
-@login_required
-@admin_required
-def update_betterstack_settings():
-    """Update BetterStack logging settings"""
-    try:
-        data = request.get_json()
-        enabled = data.get('enabled', False)
-        log_level = data.get('log_level', '2')  # Default to level 2
-        
-        # Validate log level
-        valid_levels = ['1', '2', '3']
-        if log_level not in valid_levels:
-            return jsonify({
-                'success': False,
-                'message': f'Invalid log level. Must be one of: {", ".join(valid_levels)}'
-            }), 400
-            
-        with db.engine.connect() as conn:
-            # Update enabled setting
-            conn.execute(
-                db.text("""
-                    INSERT INTO system_settings (key, value) 
-                    VALUES ('betterstack_enabled', :enabled) 
-                    ON CONFLICT (key) DO UPDATE SET value = :enabled
-                """),
-                {"enabled": str(enabled).lower()}
-            )
-            
-            # Update log level setting
-            conn.execute(
-                db.text("""
-                    INSERT INTO system_settings (key, value) 
-                    VALUES ('betterstack_log_level', :level) 
-                    ON CONFLICT (key) DO UPDATE SET value = :level
-                """),
-                {"level": log_level}
-            )
-                
-            conn.commit()
-            
-        # Map level string to actual log level
-        level_mapping = {
-            "1": logging.DEBUG,      # Level 1: Everything
-            "2": logging.WARNING,    # Level 2: Warnings and errors
-            "3": logging.ERROR       # Level 3: Errors only
-        }
-        logger_level = level_mapping.get(log_level, logging.WARNING)
-        
-        # Update logger if it exists
-        for handler in app.logger.handlers:
-            if isinstance(handler, BetterStackHandler):
-                handler.setLevel(logger_level)
-                if enabled:
-                    handler.enabled = True
-                    app.logger.info(f"BetterStack logging enabled with level: {log_level}")
-                    # Test log based on level
-                    if log_level == "1":
-                        app.logger.debug(f"BetterStack test log (DEBUG) at {datetime.utcnow().isoformat()}")
-                    if log_level in ["1", "2"]:
-                        app.logger.warning(f"BetterStack test log (WARNING) at {datetime.utcnow().isoformat()}")
-                    app.logger.error(f"BetterStack test log (ERROR) at {datetime.utcnow().isoformat()}")
-                else:
-                    handler.enabled = False
-                    app.logger.info("BetterStack logging disabled")
-        
-        # Record this admin action
-        activity = UserActivity(
-            activity_type="admin_action",
-            message=f"Admin {{username}} {enabled and 'enabled' or 'disabled'} BetterStack logging with level {log_level}",
-            username=current_user.username,
-            user_id=current_user.id
-        )
-        db.session.add(activity)
-        db.session.commit()
-            
-        return jsonify({
-            'success': True,
-            'message': f'BetterStack logging {enabled and "enabled" or "disabled"} with level {log_level} successfully'
-        })
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f'Error updating BetterStack settings: {str(e)}')
-        return jsonify({
-            'success': False,
-            'message': 'Failed to update BetterStack settings'
-        }), 500
-
 
 @app.route('/api/admin/search/users')
 @login_required
@@ -3396,6 +3276,42 @@ def toggle_staff_status(user_id):
             'success': False,
             'message': f'Failed to update staff status: {str(e)}'
         }), 500
+
+@app.route('/api/admin/logs', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_logs():
+    """Get or clear logs for admin"""
+    from utils.logs_util import logs_manager
+    
+    if request.method == 'POST':
+        action = request.json.get('action')
+        if action == 'clear':
+            logs_manager.clear_logs()
+            return jsonify({'success': True, 'message': 'Logs cleared successfully'})
+        return jsonify({'success': False, 'message': 'Invalid action'})
+    
+    # GET request - return logs as JSON file download
+    logs = logs_manager.get_logs()
+    
+    # Add information about auto-clearing to the logs metadata
+    metadata = {
+        "logs_count": len(logs),
+        "last_cleared": logs_manager.last_cleared.isoformat(),
+        "auto_clear_interval": "30 minutes",
+        "generated_at": datetime.utcnow().isoformat()
+    }
+    
+    response_data = {
+        "metadata": metadata,
+        "logs": logs
+    }
+    
+    return Response(
+        json.dumps(response_data, indent=2),
+        mimetype='application/json',
+        headers={'Content-Disposition': f'attachment;filename=logs_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.json'}
+    )
 
 @app.route('/api/admin/export-users', methods=['POST'])
 @login_required

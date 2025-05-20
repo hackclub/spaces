@@ -3,10 +3,8 @@ import logging
 import subprocess
 import signal
 import atexit
-import socket
 from flask import render_template
 from app import app, db
-from better_stack_logger import setup_betterstack_logging
 
 # Configure logging - reduced verbosity
 logging.basicConfig(
@@ -24,35 +22,6 @@ console_handler.setFormatter(formatter)
 # Add the handlers to the logger
 app.logger.addHandler(console_handler)
 app.logger.setLevel(logging.WARNING)
-
-# Setup BetterStack logging if enabled
-if os.environ.get('BETTERSTACK_TOKEN') and os.environ.get('BETTERSTACK_URL'):
-    # Check if BetterStack is enabled in system settings
-    with app.app_context():
-        try:
-            with db.engine.connect() as conn:
-                result = conn.execute(
-                    db.text("SELECT value FROM system_settings WHERE key = 'betterstack_enabled'")
-                )
-                enabled = result.fetchone()
-                if enabled and enabled[0].lower() == 'true':
-                    result = conn.execute(
-                        db.text("SELECT value FROM system_settings WHERE key = 'betterstack_log_level'")
-                    )
-                    log_level = result.fetchone()
-                    log_level = log_level[0] if log_level else 'WARNING'
-                    log_level_int = getattr(logging, log_level)
-                    
-                    # Setup BetterStack logging
-                    betterstack_handler = setup_betterstack_logging(app, log_level_int)
-                    
-                    # Log startup information
-                    hostname = socket.gethostname()
-                    ip_address = socket.gethostbyname(hostname)
-                    app.logger.warning(f"Application starting on {hostname} ({ip_address})")
-        except Exception as e:
-            print(f"Error setting up BetterStack logging: {str(e)}")
-            # Continue without BetterStack logging
 
 # Global variable to store the Hackatime service process
 hackatime_process = None
@@ -105,6 +74,15 @@ def support():
 
 if __name__ == '__main__':
     app.logger.info("Starting Hack Club Spaces application")
+
+    # Clear and initialize logs
+    try:
+        from utils.logs_util import logs_manager
+        logs_manager.clear_logs()
+        logs_manager.add_log("Application started", level="INFO", source="system")
+        app.logger.info("Logs system initialized")
+    except Exception as e:
+        app.logger.warning(f"Logs initialization error: {e}")
 
     # Initialize database
     try:
