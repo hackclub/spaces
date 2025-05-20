@@ -5,6 +5,7 @@ import json
 import hashlib
 import requests
 import jinja2
+import logging
 import werkzeug.exceptions
 from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
@@ -40,6 +41,7 @@ from slack_auth import slack_auth_bp
 from routes.hackatime_routes import hackatime_bp
 from routes.pizza_grants_routes import pizza_grants_bp
 from groq import Groq
+from better_stack_logger import setup_betterstack_logging, BetterStackHandler
 
 load_dotenv()
 
@@ -58,6 +60,13 @@ app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Set up CSRF protection
 csrf = CSRFProtect(app)
+
+# Setup BetterStack logging
+if os.getenv('BETTERSTACK_TOKEN') and os.getenv('BETTERSTACK_URL'):
+    # Default to level 2 (warnings and errors)
+    default_level = logging.WARNING
+    betterstack_handler = setup_betterstack_logging(app, default_level)
+    app.logger.info(f"BetterStack logging initialized with source ID: {os.getenv('BETTERSTACK_SOURCE_ID', 'spaces_prod')}")
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_size': 20,
     'pool_recycle': 1800,  # Recycle connections every 30 minutes
@@ -196,41 +205,6 @@ def handle_error(error):
 
     context = get_error_context(error)
     app.logger.error(f'Unhandled Exception: {context}')
-    
-    # Send to BetterStack
-    try:
-        import requests
-        betterstack_token = os.environ.get('BETTERSTACK_TOKEN', '5d1y4HBT11qEa7sp3YL69oEB')
-        betterstack_url = os.environ.get('BETTERSTACK_URL', 'https://s1315397.eu-nbg-2.betterstackdata.com/')
-        
-        payload = {
-            'dt': datetime.utcnow().isoformat(),
-            'message': f"Server Error: {str(error)}",
-            'level': 'error',
-            'error': {
-                'type': context.get('error_type', 'Server Error'),
-                'message': str(error),
-                'status_code': code,
-                'file': context.get('file_name'),
-                'line': context.get('line_number'),
-                'traceback': context.get('traceback'),
-                'url': request.path,
-                'method': request.method,
-                'user_id': current_user.id if not current_user.is_anonymous else None
-            }
-        }
-        
-        requests.post(
-            betterstack_url,
-            headers={
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {betterstack_token}'
-            },
-            json=payload,
-            timeout=3
-        )
-    except Exception as bs_error:
-        app.logger.warning(f'Failed to send error to BetterStack: {str(bs_error)}')
 
     return render_template('errors/generic.html', **context), code
 
@@ -262,31 +236,6 @@ def report_error():
 
         app.logger.error(
             f'Client Error Report: {json.dumps(error_log, indent=2)}')
-            
-        # Send to BetterStack
-        try:
-            import requests
-            betterstack_token = os.environ.get('BETTERSTACK_TOKEN', '5d1y4HBT11qEa7sp3YL69oEB')
-            betterstack_url = os.environ.get('BETTERSTACK_URL', 'https://s1315397.eu-nbg-2.betterstackdata.com/')
-            
-            payload = {
-                'dt': datetime.utcnow().isoformat(),
-                'message': f"Client Error: {error_data.get('message')}",
-                'level': 'error',
-                'error': error_log
-            }
-            
-            requests.post(
-                betterstack_url,
-                headers={
-                    'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {betterstack_token}'
-                },
-                json=payload,
-                timeout=3
-            )
-        except Exception as bs_error:
-            app.logger.warning(f'Failed to send error to BetterStack: {str(bs_error)}')
 
         return jsonify({'status': 'success'}), 200
     except Exception as e:
@@ -305,37 +254,6 @@ def log_request_info():
     # Log only for specific error-prone endpoints or in debug mode
     if app.debug or 'admin' in request.path or request.method != 'GET':
         app.logger.debug('Request: %s %s', request.method, request.path)
-
-# Send startup/shutdown events to BetterStack
-def log_app_lifecycle_to_betterstack(event_type, message):
-    """Log application lifecycle events to BetterStack."""
-    try:
-        import requests
-        betterstack_token = os.environ.get('BETTERSTACK_TOKEN', '5d1y4HBT11qEa7sp3YL69oEB')
-        betterstack_url = os.environ.get('BETTERSTACK_URL', 'https://s1315397.eu-nbg-2.betterstackdata.com/')
-        
-        payload = {
-            'dt': datetime.utcnow().isoformat(),
-            'message': message,
-            'level': 'info',
-            'event': {
-                'type': event_type,
-                'timestamp': datetime.utcnow().isoformat(),
-                'hostname': os.environ.get('HOSTNAME', 'spaces-app')
-            }
-        }
-        
-        requests.post(
-            betterstack_url,
-            headers={
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {betterstack_token}'
-            },
-            json=payload,
-            timeout=3
-        )
-    except Exception as bs_error:
-        app.logger.warning(f'Failed to send lifecycle event to BetterStack: {str(bs_error)}')
 
 
 @app.after_request
@@ -2430,6 +2348,126 @@ def update_leader_access_code():
         return jsonify({
             'success': False,
             'message': 'Failed to update access code'
+        }), 500
+
+@app.route('/api/admin/settings/betterstack', methods=['GET'])
+@login_required
+@admin_required
+def get_betterstack_settings():
+    """Get current BetterStack logging settings"""
+    try:
+        with db.engine.connect() as conn:
+            # Check if settings exist
+            result = conn.execute(
+                db.text("SELECT value FROM system_settings WHERE key = 'betterstack_enabled'")
+            )
+            enabled = result.fetchone()
+            enabled = enabled[0] if enabled else 'false'
+            
+            result = conn.execute(
+                db.text("SELECT value FROM system_settings WHERE key = 'betterstack_log_level'")
+            )
+            log_level = result.fetchone()
+            log_level = log_level[0] if log_level else '2'  # Default to level 2
+            
+            return jsonify({
+                'success': True,
+                'enabled': enabled.lower() == 'true',
+                'log_level': log_level
+            })
+    except Exception as e:
+        app.logger.error(f'Error retrieving BetterStack settings: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Failed to retrieve BetterStack settings'
+        }), 500
+
+@app.route('/api/admin/settings/betterstack', methods=['POST'])
+@login_required
+@admin_required
+def update_betterstack_settings():
+    """Update BetterStack logging settings"""
+    try:
+        data = request.get_json()
+        enabled = data.get('enabled', False)
+        log_level = data.get('log_level', '2')  # Default to level 2
+        
+        # Validate log level
+        valid_levels = ['1', '2', '3']
+        if log_level not in valid_levels:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid log level. Must be one of: {", ".join(valid_levels)}'
+            }), 400
+            
+        with db.engine.connect() as conn:
+            # Update enabled setting
+            conn.execute(
+                db.text("""
+                    INSERT INTO system_settings (key, value) 
+                    VALUES ('betterstack_enabled', :enabled) 
+                    ON CONFLICT (key) DO UPDATE SET value = :enabled
+                """),
+                {"enabled": str(enabled).lower()}
+            )
+            
+            # Update log level setting
+            conn.execute(
+                db.text("""
+                    INSERT INTO system_settings (key, value) 
+                    VALUES ('betterstack_log_level', :level) 
+                    ON CONFLICT (key) DO UPDATE SET value = :level
+                """),
+                {"level": log_level}
+            )
+                
+            conn.commit()
+            
+        # Map level string to actual log level
+        level_mapping = {
+            "1": logging.DEBUG,      # Level 1: Everything
+            "2": logging.WARNING,    # Level 2: Warnings and errors
+            "3": logging.ERROR       # Level 3: Errors only
+        }
+        logger_level = level_mapping.get(log_level, logging.WARNING)
+        
+        # Update logger if it exists
+        for handler in app.logger.handlers:
+            if isinstance(handler, BetterStackHandler):
+                handler.setLevel(logger_level)
+                if enabled:
+                    handler.enabled = True
+                    app.logger.info(f"BetterStack logging enabled with level: {log_level}")
+                    # Test log based on level
+                    if log_level == "1":
+                        app.logger.debug(f"BetterStack test log (DEBUG) at {datetime.utcnow().isoformat()}")
+                    if log_level in ["1", "2"]:
+                        app.logger.warning(f"BetterStack test log (WARNING) at {datetime.utcnow().isoformat()}")
+                    app.logger.error(f"BetterStack test log (ERROR) at {datetime.utcnow().isoformat()}")
+                else:
+                    handler.enabled = False
+                    app.logger.info("BetterStack logging disabled")
+        
+        # Record this admin action
+        activity = UserActivity(
+            activity_type="admin_action",
+            message=f"Admin {{username}} {enabled and 'enabled' or 'disabled'} BetterStack logging with level {log_level}",
+            username=current_user.username,
+            user_id=current_user.id
+        )
+        db.session.add(activity)
+        db.session.commit()
+            
+        return jsonify({
+            'success': True,
+            'message': f'BetterStack logging {enabled and "enabled" or "disabled"} with level {log_level} successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'Error updating BetterStack settings: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': 'Failed to update BetterStack settings'
         }), 500
 
 
@@ -6370,43 +6408,13 @@ def bulk_delete_sites():
         app.logger.error(f"Error in bulk delete: {str(e)}")
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
-# Register signal handlers for graceful shutdown
-def setup_shutdown_handlers():
-    import signal
-    import sys
-    
-    def signal_handler(sig, frame):
-        app.logger.info(f"Received signal {sig}, shutting down...")
-        app.logger.info("=== Application stopping ===")
-        # Log shutdown event to BetterStack
-        log_app_lifecycle_to_betterstack('app_shutdown', f'Application stopping (signal {sig})')
-        sys.exit(0)
-    
-    # Register handlers for common termination signals
-    signal.signal(signal.SIGINT, signal_handler)  # Ctrl+C
-    signal.signal(signal.SIGTERM, signal_handler) # Termination request
-    
-    # Register shutdown function with Flask
-    @app.teardown_appcontext
-    def teardown_db(exception=None):
-        app.logger.info("Cleaning up database connections")
-        db.session.remove()
-
 if __name__ == '__main__':
     # Configure more detailed logging
     import logging
     logging.basicConfig(level=logging.INFO,
                         format='[%(asctime)s] [%(levelname)s] %(message)s',
                         datefmt='%Y-%m-%d %H:%M:%S')
-    
-    app.logger.info("=== Application starting ===")
     app.logger.info("Starting server directly from app.py")
-    
-    # Log startup event to BetterStack
-    log_app_lifecycle_to_betterstack('app_startup', 'Application starting')
-    
-    # Setup handlers for graceful shutdown
-    setup_shutdown_handlers()
 
     try:
         app.logger.info("Initializing database...")
@@ -6414,11 +6422,6 @@ if __name__ == '__main__':
         app.logger.info("Database initialization complete")
     except Exception as e:
         app.logger.warning(f"Database initialization error: {e}")
-    
-    # Log BetterStack configuration
-    betterstack_token = os.environ.get('BETTERSTACK_TOKEN', '5d1y4HBT11qEa7sp3YL69oEB')
-    betterstack_url = os.environ.get('BETTERSTACK_URL', 'https://s1315397.eu-nbg-2.betterstackdata.com/')
-    app.logger.info(f"BetterStack logging configured: URL={betterstack_url[:30]}...")
-    
+        
     app.logger.info("Server running on http://0.0.0.0:3000")
     app.run(host='0.0.0.0', port=3000, debug=True)

@@ -23,7 +23,7 @@
 <body class="{% block body_class %}{% endblock %}">
     <div id="toast-container"></div>
     <div class="background-animation"></div>
-
+    
     <!-- Mobile Warning Modal -->
     <div id="mobileWarningModal" class="mobile-warning-modal">
         <div class="mobile-warning-content">
@@ -88,11 +88,9 @@
 
     {% block content %}{% endblock %}
 
+    <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/mobile-detection.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/toast.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/betterstack-logger.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/error-handler.js') }}"></script>
 
 </body>
 </html>
