@@ -56,6 +56,17 @@ function handleError(errorInfo) {
     }
 
     updateErrorModal(modal, errorInfo);
+    
+    // Log to BetterStack if available
+    if (window.betterStackLogger) {
+        window.betterStackLogger.error(`Client Error: ${errorInfo.message}`, {
+            error_type: errorInfo.type,
+            file: errorInfo.file,
+            line: errorInfo.line,
+            column: errorInfo.column,
+            stack: errorInfo.stack
+        });
+    }
 
     modal.style.display = 'block';
 }
@@ -421,6 +432,18 @@ if (!isClubDashboard) {
         if (errorInfo.message && errorInfo.message !== 'Script error.') {
             console.error('Caught error:', errorInfo);
             
+            // Send error to BetterStack if available
+            if (window.betterStackLogger) {
+                window.betterStackLogger.error(`JavaScript Error: ${errorInfo.message}`, {
+                    error_type: errorInfo.type,
+                    file: errorInfo.file,
+                    line: errorInfo.line,
+                    column: errorInfo.column,
+                    stack: errorInfo.stack,
+                    url: window.location.href
+                });
+            }
+            
             // Send error to server
             fetch('/api/log-error', {
                 method: 'POST',
@@ -453,6 +476,15 @@ if (!isClubDashboard) {
         // Only log if we have a meaningful message
         if (errorInfo.message) {
             console.error('Unhandled promise rejection:', errorInfo);
+            
+            // Send error to BetterStack if available
+            if (window.betterStackLogger) {
+                window.betterStackLogger.error(`Promise Rejection: ${errorInfo.message}`, {
+                    error_type: errorInfo.type,
+                    stack: errorInfo.stack,
+                    url: window.location.href
+                });
+            }
             
             // Send error to server
             fetch('/api/log-error', {
