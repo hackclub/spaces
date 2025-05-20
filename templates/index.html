@@ -26,7 +26,7 @@
         <div class="nav-content">
             <a href="/" class="logo">
                 <img src="{{ url_for('static', filename='images/logo-rounded.png') }}" alt="Hack Club" class="logo-img">
-                <span class="logo-text">Spaces</span>
+                <span class="logo-text">Spaces V2</span>
             </a>
             
             <div class="nav-links" id="navLinks">
@@ -83,7 +83,7 @@
         <section class="hero">
             <div class="hero-content">
                 <h1>Make anything you can imagine!</h1>
-                <p class="subtitle" style="color: #1f2d3d;">Free beginner friendly all-in-one platform to create, host and collaborate with on web-apps & other projects.</p>
+                <p class="subtitle" style="color: #1f2d3d;">Free beginner friendly all-in-one platform to create, host and collaborate in our web IDE with over 500 supported languages and a variety of templates to use.</p>
                 <div class="cta-buttons">
                     {% if current_user.is_authenticated %}
                         <a href="{{ url_for('welcome') }}" class="btn primary">Go to Dashboard &#160;<i class="fas fa-arrow-right"></i></a>
