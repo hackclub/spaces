@@ -39,6 +39,7 @@ from slack_routes import slack_bp
 from slack_auth import slack_auth_bp
 from routes.hackatime_routes import hackatime_bp
 from routes.pizza_grants_routes import pizza_grants_bp
+from routes.cdn_routes import cdn_bp
 from groq import Groq
 
 load_dotenv()
@@ -69,6 +70,19 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
 app.config['PREFERRED_URL_SCHEME'] = 'https'
 app.config['EXPLAIN_TEMPLATE_LOADING'] = True
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+
+# Get custom APP_URL from environment variables or fall back to Replit URL
+custom_app_url = os.environ.get('APP_URL')
+if custom_app_url:
+    app.config['APP_URL'] = custom_app_url
+else:
+    # Fall back to Replit URL
+    replit_url = os.environ.get('REPL_SLUG')
+    if replit_url:
+        app.config['APP_URL'] = f"https://{replit_url}.replit.dev"
+    else:
+        # For local development
+        app.config['APP_URL'] = 'http://0.0.0.0:3000'
 
 
 def get_error_context(error):
@@ -309,23 +323,23 @@ class RateLimiter:
         self.requests = {}
         self.limits = {
             'default': {
-                'requests': 300,
+                'requests': 4500,
                 'window': 60
             },
             'api_run': {
-                'requests': 50,
+                'requests': 750,
                 'window': 60
             },
             'login': {
-                'requests': 25,
+                'requests': 375,
                 'window': 60
             },
             'signup': {
-                'requests': 5,
+                'requests': 75,
                 'window': 60
             },
             'orphy': {
-                'requests': 1,
+                'requests': 15,
                 'window': 0.5
             }
         }
@@ -504,6 +518,7 @@ app.register_blueprint(slack_bp)
 app.register_blueprint(slack_auth_bp)
 app.register_blueprint(hackatime_bp)
 app.register_blueprint(pizza_grants_bp)
+app.register_blueprint(cdn_bp)
 
 
 def check_db_connection():

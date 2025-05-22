@@ -1,0 +1,99 @@
+
+{% extends "base.html" %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/cdn.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container cdn-container">
+    <div class="page-header">
+        <h1>Personal CDN</h1>
+        <p>Upload and manage your files with Hack Club CDN</p>
+    </div>
+
+    <div class="upload-section">
+        <h2>Upload Files</h2>
+        <form id="uploadForm" class="upload-form" enctype="multipart/form-data">
+            <div class="file-input-container">
+                <input type="file" id="fileInput" multiple>
+                <div class="file-input-label">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <span>Choose files or drag & drop</span>
+                </div>
+            </div>
+            <div id="selected-files" class="selected-files"></div>
+            <button type="submit" class="upload-btn" disabled style="opacity: 0.5; cursor: not-allowed;">
+                <i class="fas fa-upload"></i> Upload Files
+            </button>
+        </form>
+    </div>
+
+    <div class="upload-progress" id="uploadProgress" style="display: none;">
+        <div class="progress-bar">
+            <div class="progress-bar-fill" id="progressBarFill"></div>
+        </div>
+        <div class="progress-text" id="progressText">Uploading...</div>
+    </div>
+
+    <div class="files-section">
+        <h2>Your Files</h2>
+        <div class="files-container" id="filesContainer">
+            <div class="files-header">
+                <div class="file-header-name">Filename</div>
+                <div class="file-header-size">Size</div>
+                <div class="file-header-date">Upload Date</div>
+                <div class="file-header-actions">Actions</div>
+            </div>
+            <div id="filesList" class="files-list">
+                <div class="loading-files">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Loading your files...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="copyModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Copy URL</h2>
+            <span class="close-modal">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Use this URL to access your file:</p>
+            <div class="copy-url-container">
+                <input type="text" id="copyUrlInput" readonly>
+                <button id="copyUrlBtn" class="copy-btn">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+            </div>
+            <div class="url-preview">
+                <h3>HTML Usage:</h3>
+                <code id="htmlUsage"></code>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/cdn.js') }}"></script>
+{% endblock %}
+
+
+<div id="deleteModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Confirm Delete</h2>
+            <span class="close-modal" id="closeDeleteModal">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete "<span id="fileToDelete"></span>"?</p>
+            <p class="warning-text">This action cannot be undone.</p>
+            <div class="modal-actions">
+                <button id="cancelDeleteBtn" class="btn-secondary">Cancel</button>
+                <button id="confirmDeleteBtn" class="btn-danger">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>

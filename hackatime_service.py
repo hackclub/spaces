@@ -147,8 +147,8 @@ class RateLimiter:
     def __init__(self):
         self.requests = {}
         self.limits = {
-            'default': {'requests': 300, 'window': 60},  # 300 requests per minute
-            'heartbeat': {'requests': 200, 'window': 60}  # 200 heartbeats per minute
+            'default': {'requests': 4500, 'window': 60},  # 4500 requests per minute
+            'heartbeat': {'requests': 3000, 'window': 60}  # 3000 heartbeats per minute
         }
 
     def is_rate_limited(self, key, limit_type='default'):

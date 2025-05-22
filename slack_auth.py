@@ -213,7 +213,7 @@ def slack_callback():
         # User exists, log them in
         login_user(existing_user)
         existing_user.last_login = db.func.now()
-        existing_user.slack_user_id = slack_user_id
+        existing_user.slack_id = slack_user_id
 
         # Record login activity
         activity = UserActivity(
@@ -248,7 +248,7 @@ def slack_callback():
         new_user = User(
             username=username,
             email=slack_email,
-            slack_user_id=slack_user_id,
+            slack_id=slack_user_id,
             preview_code_verified=True
         )
 
