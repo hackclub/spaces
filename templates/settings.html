@@ -21,7 +21,7 @@
                 </a>
             </div>
         </div>
-        
+
         <div class="settings-card integrations-card">
             <div class="card-icon"><i class="fas fa-plug"></i></div>
             <div class="integrations-header-section">
@@ -271,6 +271,8 @@
 
         try {
             const formData = new FormData(form);
+             //include csrf_token
+            formData.append('csrf_token', '{{ csrf_token }}');
             const response = await fetch('/settings', {
                 method: 'POST',
                 body: formData
@@ -301,6 +303,8 @@
 
         try {
             const formData = new FormData(form);
+            //include csrf_token
+            formData.append('csrf_token', '{{ csrf_token }}');
             const response = await fetch('/settings', {
                 method: 'POST',
                 body: formData

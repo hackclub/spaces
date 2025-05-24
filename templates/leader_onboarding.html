@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -20,13 +19,13 @@
             --font-heading: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             --font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: var(--font-body);
             line-height: 1.6;
@@ -36,19 +35,19 @@
             position: relative;
             overflow-x: hidden;
         }
-        
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
         }
-        
+
         .header {
             text-align: center;
             margin-bottom: 3rem;
             position: relative;
         }
-        
+
         .header-bg {
             position: absolute;
             top: -100px;
@@ -59,9 +58,9 @@
             transform: skewY(-5deg);
             z-index: -1;
         }
-        
-        
-        
+
+
+
         h1 {
             font-size: 3rem;
             color: white;
@@ -70,15 +69,15 @@
             font-weight: 700;
             letter-spacing: -0.02em;
         }
-        
+
         .subtitle {
             font-size: 1.25rem;
             color: rgba(255, 255, 255, 0.9);
             margin-bottom: 2rem;
         }
-        
-        
-        
+
+
+
         .welcome-card {
             background: white;
             border-radius: 16px;
@@ -88,7 +87,7 @@
             position: relative;
             overflow: hidden;
         }
-        
+
         .welcome-card::after {
             content: '';
             position: absolute;
@@ -100,7 +99,7 @@
             border-radius: 0 0 0 100%;
             z-index: 0;
         }
-        
+
         .welcome-card h2 {
             font-size: 2rem;
             color: var(--primary);
@@ -109,7 +108,7 @@
             position: relative;
             z-index: 1;
         }
-        
+
         .welcome-card p {
             margin-bottom: 1.5rem;
             color: var(--text);
@@ -118,14 +117,14 @@
             position: relative;
             z-index: 1;
         }
-        
+
         .features-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 2rem;
             margin-bottom: 3rem;
         }
-        
+
         .feature-card {
             background: white;
             border-radius: 12px;
@@ -135,12 +134,12 @@
             position: relative;
             overflow: hidden;
         }
-        
+
         .feature-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
         }
-        
+
         .feature-icon {
             display: inline-flex;
             align-items: center;
@@ -153,24 +152,24 @@
             background: rgba(236, 55, 80, 0.1);
             color: var(--primary);
         }
-        
+
         .feature-card h3 {
             font-size: 1.5rem;
             margin-bottom: 1rem;
             color: var(--text);
             font-family: var(--font-heading);
         }
-        
+
         .feature-card p {
             color: var(--text-light);
             font-size: 1rem;
             margin-bottom: 1.5rem;
         }
-        
+
         .steps-container {
             margin-bottom: 3rem;
         }
-        
+
         .step {
             display: flex;
             align-items: flex-start;
@@ -180,7 +179,7 @@
             padding: 2rem;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
         }
-        
+
         .step-number {
             flex-shrink: 0;
             width: 40px;
@@ -195,44 +194,44 @@
             font-size: 1.25rem;
             margin-right: 1.5rem;
         }
-        
+
         .step-content {
             flex: 1;
         }
-        
+
         .step-content h3 {
             font-size: 1.5rem;
             margin-bottom: 1rem;
             color: var(--text);
             font-family: var(--font-heading);
         }
-        
+
         .step-content p {
             color: var(--text-light);
             margin-bottom: 1rem;
         }
-        
+
         .step-content ul {
             margin-left: 1.5rem;
             margin-bottom: 1.5rem;
         }
-        
+
         .step-content li {
             margin-bottom: 0.5rem;
         }
-        
+
         .cta-section {
             text-align: center;
             margin: 4rem 0;
         }
-        
+
         .cta-section h2 {
             font-size: 2.5rem;
             margin-bottom: 1.5rem;
             color: var(--text);
             font-family: var(--font-heading);
         }
-        
+
         .cta-section p {
             color: var(--text-light);
             margin-bottom: 2rem;
@@ -241,7 +240,7 @@
             margin-left: auto;
             margin-right: auto;
         }
-        
+
         .btn {
             display: inline-flex;
             align-items: center;
@@ -256,7 +255,7 @@
             cursor: pointer;
             font-size: 1rem;
         }
-        
+
         .btn-primary {
             background: var(--primary);
             color: white;
@@ -264,16 +263,16 @@
             font-weight: bold;
             letter-spacing: 0.02em;
         }
-        
+
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(236, 55, 80, 0.3);
         }
-        
+
         .btn i {
             margin-right: 0.5rem;
         }
-        
+
         .copy-code {
             background: var(--light-bg);
             border-radius: 8px;
@@ -284,7 +283,7 @@
             font-size: 1.1rem;
             overflow: hidden;
         }
-        
+
         .code-header {
             position: absolute;
             top: 0;
@@ -297,49 +296,49 @@
             border-radius: 0 8px 0 8px;
             transition: all 0.2s ease;
         }
-        
+
         .code-header:hover {
             background: rgba(0, 0, 0, 0.1);
         }
-        
+
         footer {
             text-align: center;
             padding: 3rem 0;
             color: var(--text-light);
             font-size: 0.9rem;
         }
-        
+
         .resources-list {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 1.5rem;
             margin-top: 2rem;
         }
-        
+
         .resource-card {
             background: var(--light-bg);
             border-radius: 8px;
             padding: 1.5rem;
             transition: all 0.2s ease;
         }
-        
+
         .resource-card:hover {
             transform: translateY(-3px);
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
         }
-        
+
         .resource-card h4 {
             font-size: 1.2rem;
             margin-bottom: 0.5rem;
             color: var(--text);
         }
-        
+
         .resource-card p {
             color: var(--text-light);
             font-size: 0.9rem;
             margin-bottom: 1rem;
         }
-        
+
         .resource-card a {
             color: var(--primary);
             font-weight: 500;
@@ -347,16 +346,16 @@
             display: inline-flex;
             align-items: center;
         }
-        
+
         .resource-card a i {
             margin-left: 0.25rem;
             font-size: 0.8rem;
         }
-        
+
         .resource-card a:hover {
             text-decoration: underline;
         }
-        
+
         .tip-box {
             background: rgba(51, 214, 166, 0.1);
             border-left: 4px solid var(--success);
@@ -364,7 +363,7 @@
             margin: 1.5rem 0;
             border-radius: 0 8px 8px 0;
         }
-        
+
         .tip-box h4 {
             display: flex;
             align-items: center;
@@ -372,15 +371,15 @@
             margin-bottom: 0.5rem;
             color: var(--success);
         }
-        
+
         .tip-box h4 i {
             margin-right: 0.5rem;
         }
-        
+
         .tip-box p {
             color: var(--text);
         }
-        
+
         .warning-box {
             background: rgba(255, 140, 55, 0.1);
             border-left: 4px solid var(--warning);
@@ -388,7 +387,7 @@
             margin: 1.5rem 0;
             border-radius: 0 8px 8px 0;
         }
-        
+
         .warning-box h4 {
             display: flex;
             align-items: center;
@@ -396,15 +395,15 @@
             margin-bottom: 0.5rem;
             color: var(--warning);
         }
-        
+
         .warning-box h4 i {
             margin-right: 0.5rem;
         }
-        
+
         .warning-box p {
             color: var(--text);
         }
-        
+
         .join-code-display {
             background: var(--light-bg);
             border-radius: 8px;
@@ -418,7 +417,7 @@
             font-weight: 600;
             color: var(--primary);
         }
-        
+
         .join-code-label {
             position: absolute;
             top: -10px;
@@ -430,28 +429,28 @@
             color: var(--text-light);
             border-radius: 4px;
         }
-        
+
         @media (max-width: 768px) {
             .container {
                 padding: 1rem;
             }
-            
+
             h1 {
                 font-size: 2.5rem;
             }
-            
+
             .welcome-card {
                 padding: 2rem;
             }
-            
+
             .features-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .step {
                 flex-direction: column;
             }
-            
+
             .step-number {
                 margin-bottom: 1rem;
                 margin-right: 0;
@@ -468,13 +467,13 @@
         <h1>Congratulations, Leader!</h1>
         <p class="subtitle">Let's make something amazing together!</p>
     </div>
-    
+
     <div class="container">
         <div class="welcome-card">
             <h2><i class="fas fa-trophy"></i> You're now a Hack Club Leader!</h2>
             <p>Congratulations on becoming a club leader! You now have access to a suite of powerful tools to manage your club, engage your members, and create amazing coding experiences together.</p>
             <p>Your leadership journey starts here, and we're excited to see the incredible things you and your club will build.</p>
-            
+
             {% if club %}
             <div class="join-code-display">
                 <span class="join-code-label">Your Club Join Code</span>
@@ -482,7 +481,7 @@
             </div>
             <p>Share this code with your club members so they can join your club. Members will use this code on their Spaces dashboard to join your club.</p>
             {% endif %}
-            
+
             <div class="cta-section" style="text-align: center; margin: 2rem 0;">
                 {% if current_user.is_authenticated %}
                 <button id="goDashboardBtn" class="btn btn-primary">
@@ -494,7 +493,7 @@
                 </a>
                 {% endif %}
             </div>
-            
+
             {% if current_user.is_authenticated %}
             <script>
                 document.getElementById('goDashboardBtn').addEventListener('click', function() {
@@ -530,9 +529,9 @@
             </script>
             {% endif %}
         </div>
-        
+
         <h2 style="text-align: center; margin-bottom: 2rem; color: var(--text);">What You Can Do With Your Club Dashboard</h2>
-        
+
         <div class="features-grid">
             <div class="feature-card">
                 <div class="feature-icon">
@@ -541,7 +540,7 @@
                 <h3>Manage Members</h3>
                 <p>Invite students to join your club, assign roles, and build your coding community.</p>
             </div>
-            
+
             <div class="feature-card">
                 <div class="feature-icon">
                     <i class="fas fa-calendar-alt"></i>
@@ -549,7 +548,7 @@
                 <h3>Schedule Meetings</h3>
                 <p>Plan and organize club meetings, set agendas, and keep your members informed.</p>
             </div>
-            
+
             <div class="feature-card">
                 <div class="feature-icon">
                     <i class="fas fa-tasks"></i>
@@ -557,7 +556,7 @@
                 <h3>Create Assignments</h3>
                 <p>Assign coding challenges and projects to your members to enhance their skills.</p>
             </div>
-            
+
             <div class="feature-card">
                 <div class="feature-icon">
                     <i class="fas fa-stream"></i>
@@ -565,7 +564,7 @@
                 <h3>Activity Stream</h3>
                 <p>Share announcements, updates, and keep everyone in the loop with what's happening.</p>
             </div>
-            
+
             <div class="feature-card">
                 <div class="feature-icon">
                     <i class="fas fa-code"></i>
@@ -573,7 +572,7 @@
                 <h3>Showcase Projects</h3>
                 <p>Feature and highlight outstanding projects created by your club members.</p>
             </div>
-            
+
             <div class="feature-card">
                 <div class="feature-icon">
                     <i class="fas fa-pizza-slice"></i>
@@ -582,10 +581,10 @@
                 <p>Apply for pizza grants to fuel your club meetings with delicious food.</p>
             </div>
         </div>
-        
+
         <div class="steps-container">
             <h2 style="text-align: center; margin-bottom: 2rem; color: var(--text);">Getting Started: Step by Step</h2>
-            
+
             <div class="step">
                 <div class="step-number">1</div>
                 <div class="step-content">
@@ -610,13 +609,13 @@
                     {% endif %}
                 </div>
             </div>
-            
+
             <div class="step">
                 <div class="step-number">2</div>
                 <div class="step-content">
                     <h3>Invite Members to Your Club</h3>
                     <p>Share your unique club join code with your members to grow your community:</p>
-                    
+
                     {% if club %}
                     <div class="copy-code">
                         {{ club.join_code }}
@@ -627,21 +626,21 @@
                     {% else %}
                     <p>Your join code will be available once you create your club.</p>
                     {% endif %}
-                    
+
                     <p>When members receive your code, they should:</p>
                     <ol>
                         <li>Log in to their Hack Club Spaces account (or create one)</li>
                         <li>Navigate to the Club section in their dashboard</li>
                         <li>Click "Join a Club" and enter your join code</li>
                     </ol>
-                    
+
                     <div class="tip-box">
                         <h4><i class="fas fa-lightbulb"></i> Pro Tip</h4>
                         <p>You can also add Co-Leaders to help you manage your club. Co-Leaders have similar privileges to Club Leaders, allowing them to manage members, create assignments, and more.</p>
                     </div>
                 </div>
             </div>
-            
+
             <div class="step">
                 <div class="step-number">3</div>
                 <div class="step-content">
@@ -656,7 +655,7 @@
                     <p>Your members will receive notifications about the upcoming meeting, ensuring good attendance.</p>
                 </div>
             </div>
-            
+
             <div class="step">
                 <div class="step-number">4</div>
                 <div class="step-content">
@@ -673,11 +672,11 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="welcome-card">
             <h2><i class="fas fa-user-plus"></i> Helping New Members Get Started</h2>
             <p>For club members who don't have a Spaces account yet, here's a simple guide to help them join:</p>
-            
+
             <div class="steps-container">
                 <div class="step">
                     <div class="step-number">1</div>
@@ -691,7 +690,7 @@
                         </ul>
                     </div>
                 </div>
-                
+
                 <div class="step">
                     <div class="step-number">2</div>
                     <div class="step-content">
@@ -709,7 +708,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="step">
                     <div class="step-number">3</div>
                     <div class="step-content">
@@ -726,7 +725,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="cta-section">
             <h2>Ready to Start Your Coding Adventure?</h2>
             <p>Your club dashboard is ready with all the tools you need to lead an amazing Hack Club. Dive in and start exploring!</p>
@@ -734,30 +733,30 @@
                 <i class="fas fa-tachometer-alt"></i> Go to My Club Dashboard
             </a>
         </div>
-        
+
         <div class="welcome-card">
             <h2><i class="fas fa-book"></i> Additional Resources</h2>
             <p>Here are some helpful resources to support you in leading your Hack Club:</p>
-            
+
             <div class="resources-list">
                 <div class="resource-card">
                     <h4>Hack Club Workshops</h4>
                     <p>Ready-to-use coding workshops for your club meetings.</p>
                     <a href="https://workshops.hackclub.com" target="_blank">Explore Workshops <i class="fas fa-external-link-alt"></i></a>
                 </div>
-                
+
                 <div class="resource-card">
                     <h4>Hack Club Slack</h4>
                     <p>Connect with other club leaders and get support.</p>
                     <a href="https://hackclub.com/slack" target="_blank">Join Slack <i class="fas fa-external-link-alt"></i></a>
                 </div>
-                
+
                 <div class="resource-card">
                     <h4>Leader's Handbook</h4>
                     <p>Tips and guidance for running successful club meetings.</p>
                     <a href="https://hackclub.com/leadership" target="_blank">Read Handbook <i class="fas fa-external-link-alt"></i></a>
                 </div>
-                
+
                 <div class="resource-card">
                     <h4>Spaces Documentation</h4>
                     <p>Learn how to make the most of Hack Club Spaces.</p>
@@ -766,11 +765,11 @@
             </div>
         </div>
     </div>
-    
+
     <footer>
         <p>&copy; 2025 Hack Club. Made with <i class="fas fa-heart" style="color: var(--primary);"></i> by the Hack Club community.</p>
     </footer>
-    
+
     <script>
         // Copy join code to clipboard
         function copyJoinCode() {
@@ -779,7 +778,7 @@
             navigator.clipboard.writeText(joinCode).then(() => {
                 const codeHeader = document.querySelector('.code-header');
                 codeHeader.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                
+
                 setTimeout(() => {
                     codeHeader.innerHTML = '<i class="fas fa-copy"></i> Copy';
                 }, 2000);

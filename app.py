@@ -12,7 +12,7 @@ from functools import wraps
 from dotenv import load_dotenv
 from flask import Flask, render_template, redirect, flash, request, jsonify, url_for, abort, session, Response, current_app
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from flask_wtf.csrf import CSRFProtect, generate_csrf
+from flask_wtf.csrf import CSRFProtect
 from models import db, User, Site, SitePage, UserActivity, Club, ClubMembership, ClubFeaturedProject, ClubAssignment
 
 
@@ -57,8 +57,8 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev')
 app.config['REDIRECT_PYTHON_TO_CODE'] = True
 app.config['SQLALCHEMY_DATABASE_URI'] = get_database_url()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-# Set up CSRF protection
-csrf = CSRFProtect(app)
+# CSRF protection removed
+csrf = None
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_size': 20,
     'pool_recycle': 1800,  # Recycle connections every 30 minutes
@@ -313,8 +313,8 @@ def add_security_headers(response):
 
 @app.context_processor
 def inject_csrf_token():
-    """Inject CSRF token into template context"""
-    return dict(csrf_token=generate_csrf)
+    """Inject empty CSRF token into template context"""
+    return dict(csrf_token="")
 
 
 class RateLimiter:
@@ -576,6 +576,8 @@ def leader_onboarding():
     """Show the leader onboarding page with access code verification"""
     # Check for access code in session or form submission
     if request.method == 'POST':
+        # CSRF validation removed
+            
         access_code = request.form.get('access_code')
         if access_code:
             # Verify the code against database
@@ -753,11 +755,7 @@ def signup():
     from_leader_onboarding = request.args.get('from_leader_onboarding') == 'true'
 
     if request.method == 'POST':
-        # Validate CSRF token
-        if not csrf.validate_csrf(request.form.get('csrf_token')):
-            app.logger.warning(f"CSRF attack detected from IP: {request.remote_addr}")
-            flash('Invalid form submission. Please try again.', 'error')
-            return render_template('signup.html', from_leader_onboarding=from_leader_onboarding), 400
+        # CSRF validation removed
             
         username = request.form.get('username')
         email = request.form.get('email')
@@ -875,12 +873,52 @@ def welcome():
     language_icons = {}
     for lang in PistonService.get_languages():
         language_icons[lang] = PistonService.get_language_icon(lang)
+        
+    # Check for join_code in request args
+    join_code = request.args.get('join_code')
+    join_message = None
+    
+    if join_code:
+        # Try to join the club with the provided code
+        club = Club.query.filter_by(join_code=join_code).first()
+        if club:
+            # Check if user is already a member
+            existing_membership = ClubMembership.query.filter_by(
+                user_id=current_user.id, club_id=club.id).first()
+            
+            if existing_membership:
+                # If already a member, redirect directly to the club dashboard
+                flash(f"Welcome back to {club.name}!", 'info')
+                return redirect(url_for('club_dashboard', club_id=club.id))
+            else:
+                # Add user to the club
+                new_membership = ClubMembership(
+                    user_id=current_user.id,
+                    club_id=club.id,
+                    role='member'
+                )
+                db.session.add(new_membership)
+                
+                # Log activity
+                log_activity(current_user.id, f"Joined club {club.name}")
+                
+                try:
+                    db.session.commit()
+                    flash(f"You have successfully joined {club.name}!", 'success')
+                    # Redirect to the club dashboard
+                    return redirect(url_for('club_dashboard', club_id=club.id))
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f"Error joining club: {str(e)}", 'error')
+        else:
+            flash(f"Invalid join code: {join_code}", 'error')
 
     return render_template('welcome.html',
                            sites=sites,
                            club_memberships=club_memberships,
                            max_sites=max_sites,
-                           language_icons=language_icons)
+                           language_icons=language_icons,
+                           join_message=join_message)
 
 
 @app.route('/edit/<int:site_id>')
@@ -914,7 +952,6 @@ def edit_site(site_id):
 
 @app.route('/api/execute', methods=['POST'])
 @login_required
-@csrf.exempt
 def execute_command():
     """Execute a command in the console."""
     try:
@@ -971,7 +1008,6 @@ def execute_command():
 @app.route('/api/sites/<int:site_id>/run', methods=['POST'])
 @login_required
 @rate_limit('api_run')
-@csrf.exempt
 def run_code(site_id):
     try:
         site = Site.query.get_or_404(site_id)
@@ -6177,7 +6213,6 @@ def integrations():
 @app.route('/api/run/<int:site_id>', methods=['POST'])
 @login_required
 @rate_limit('api_run')
-@csrf.exempt
 def run_piston_code(site_id):
     """Run code using the Piston API for any supported language"""
     try:
@@ -6236,7 +6271,6 @@ def run_piston_code(site_id):
 @app.route('/api/format/<int:site_id>', methods=['POST'])
 @login_required
 @rate_limit('api_run')
-@csrf.exempt
 def format_code(site_id):
     """Format code using language-specific formatters"""
     try:
@@ -6356,3 +6390,35 @@ if __name__ == '__main__':
         
     app.logger.info("Server running on http://0.0.0.0:3000")
     app.run(host='0.0.0.0', port=3000, debug=True)
+
+
+@app.route('/api/admin/error-lookup/<error_id>', methods=['GET'])
+@login_required
+@admin_required
+def lookup_error_by_id(error_id):
+    """Look up an error by its ID"""
+    try:
+        # Get the error details from logs
+        from utils.logs_util import logs_manager
+        logs = logs_manager.get_logs()
+        
+        # Find errors with matching ID
+        matching_errors = [log for log in logs if error_id in log.get('message', '')]
+        
+        if not matching_errors:
+            return jsonify({
+                'success': False,
+                'message': f'No error found with ID {error_id}'
+            }), 404
+            
+        return jsonify({
+            'success': True,
+            'errors': matching_errors
+        })
+    except Exception as e:
+        app.logger.error(f"Error looking up error ID: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error looking up error: {str(e)}'
+        }), 500
+

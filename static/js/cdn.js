@@ -412,26 +412,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 const fileToDelete = document.getElementById('fileToDelete');
                 const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
 
-                fileToDelete.textContent = fileName;
-                deleteModal.style.display = 'flex';
+                // Check if elements exist before using them
+                if (deleteModal && fileToDelete && confirmDeleteBtn) {
+                    fileToDelete.textContent = fileName;
+                    deleteModal.style.display = 'flex';
 
-                // Confirm delete button
-                confirmDeleteBtn.onclick = function() {
-                    deleteFile(fileId, fileElement);
-                    deleteModal.style.display = 'none';
-                };
-
-                // Cancel delete button
-                document.getElementById('cancelDeleteBtn').onclick = function() {
-                    deleteModal.style.display = 'none';
-                };
-
-                // Close when clicking outside
-                window.onclick = function(e) {
-                    if (e.target === deleteModal) {
+                    // Confirm delete button
+                    confirmDeleteBtn.onclick = function() {
+                        deleteFile(fileId, fileElement);
                         deleteModal.style.display = 'none';
+                    };
+
+                    // Cancel delete button
+                    const cancelBtn = document.getElementById('cancelDeleteBtn');
+                    if (cancelBtn) {
+                        cancelBtn.onclick = function() {
+                            deleteModal.style.display = 'none';
+                        };
                     }
-                };
+
+                    // Close when clicking outside
+                    window.onclick = function(e) {
+                        if (e.target === deleteModal) {
+                            deleteModal.style.display = 'none';
+                        }
+                    };
+                } else {
+                    // Fallback to direct deletion if modal elements don't exist
+                    if (confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) {
+                        deleteFile(fileId, fileElement);
+                    }
+                }
             });
         });
     }

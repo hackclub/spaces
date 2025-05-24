@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>Spaces - Create. Test. Deploy.</title>
-    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/unified.css') }}">
@@ -23,7 +23,7 @@
 <body class="{% block body_class %}{% endblock %}">
     <div id="toast-container"></div>
     <div class="background-animation"></div>
-    
+
     <!-- Mobile Warning Modal -->
     <div id="mobileWarningModal" class="mobile-warning-modal">
         <div class="mobile-warning-content">
