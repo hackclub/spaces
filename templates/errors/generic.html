@@ -195,6 +195,9 @@
 <div class="error-details">
   <p id="error-code">Error ID: {{ error_id|default(range(1000, 9999)|random, true) }}</p>
   <p>Time: <span id="errorTime"></span></p>
+  {% if error_id %}
+  <p class="error-reference">Please provide this error ID to support: <strong>{{ error_id }}</strong></p>
+  {% endif %}
 
   <div class="helpful-links">
     <h4>Helpful Links</h4>

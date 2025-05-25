@@ -56,6 +56,9 @@
 <div class="error-details">
   <p id="error-code">Error Code: 500</p>
   <p>Time: <span id="errorTime"></span></p>
+  {% if error_id %}
+  <p class="error-reference">Please provide this error ID to support: <strong>{{ error_id }}</strong></p>
+  {% endif %}
 
   {% if traceback and config.DEBUG %}
   <h4>Stack Trace:</h4>
