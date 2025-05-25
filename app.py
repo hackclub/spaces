@@ -598,10 +598,47 @@ def join_club_redirect():
     if not join_code:
         flash('Invalid QR code', 'error')
         return redirect(url_for('welcome'))
-    
+
     if current_user.is_authenticated:
-        # Redirect to API endpoint to join the club
-        return redirect(url_for('welcome', join_code=join_code))
+        # Process join directly instead of just passing the code via redirect
+        try:
+            club = Club.query.filter_by(join_code=join_code).first()
+            if not club:
+                flash('Invalid join code', 'error')
+                return redirect(url_for('welcome'))
+
+            # Check if user is already a member
+            existing_membership = ClubMembership.query.filter_by(
+                user_id=current_user.id, club_id=club.id).first()
+
+            if existing_membership:
+                flash(f"You are already a member of {club.name}", 'info')
+                return redirect(url_for('club_dashboard', club_id=club.id))
+
+            # Add user to the club
+            new_membership = ClubMembership(
+                user_id=current_user.id,
+                club_id=club.id,
+                role='member'
+            )
+            db.session.add(new_membership)
+
+            activity = UserActivity(
+                activity_type="club_join",
+                message=f"User {{username}} joined club {club.name}",
+                username=current_user.username,
+                user_id=current_user.id
+            )
+            db.session.add(activity)
+            db.session.commit()
+
+            flash(f"You have successfully joined {club.name}!", 'success')
+            return redirect(url_for('club_dashboard', club_id=club.id))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error joining club: {str(e)}")
+            flash(f"Error joining club: {str(e)}", 'error')
+            return redirect(url_for('welcome'))
     else:
         # Redirect to login page with join code in session
         session['pending_join_code'] = join_code
