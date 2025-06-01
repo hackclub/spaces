@@ -11,6 +11,7 @@ A simple web platform that allows users to create, test and host static websites
 - Real-time code editing
 - Automatic deployments
 - Custom domain support
+- AI Integration
 - HCB Integration
 - Hackatime Integration
 
