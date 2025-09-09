@@ -7,10 +7,12 @@ import requests
 import json
 import logging
 from typing import Dict, List, Optional, Any, Union
+import os
 
 logger = logging.getLogger(__name__)
 
-PISTON_API_BASE = "http://compute.hackclub.space/api/v2"
+PISTON_API_BASE = os.environ.get('PISTON_API_BASE', 'https://emkc.org/api/v2/piston')
+print(PISTON_API_BASE)
 RUNTIMES_ENDPOINT = f"{PISTON_API_BASE}/runtimes"
 EXECUTE_ENDPOINT = f"{PISTON_API_BASE}/execute"
 

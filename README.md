@@ -1,7 +1,7 @@
 
 # Hack Club Spaces & Club Dashboard
 
-A simple web platform that allows users to create, test and host static websites and Python scripts. Built with Python Flask and PostgreSQL. Made by Ethan Canterbury and Hack Club ❤️
+A simple web platform that allows users to create, test and host static websites and Python scripts. Built with Python Flask and PostgreSQL. Made by Ethan Canterbury, and Hack Club
 
 ## Features
 
@@ -37,6 +37,9 @@ A simple web platform that allows users to create, test and host static websites
    
    # Groq API key for AI chat functionality (required for Orphy chat)
    GROQ_API_KEY=your-groq-api-key-here
+
+   # Pison API URL (Will default to public piston server is left empty)
+   PISTON_API_BASE=your-piston-api-url
    ```
    
    **Important**: Never commit your `.env` file to version control. It's already included in `.gitignore`.
@@ -70,8 +73,8 @@ You MUST have a db created with the correct tables or it will NOT work!! If even
 
 This project is part of HackClub and follows HackClub's licensing terms. Contributing and socializing on this project is subject to the Hack Club Code of Conduct
 
-For support, create an issue or go to #spaces on slack! Need private help? @ecanterbury. Club help? @jps
+For support, create an issue or go to #spaces on slack! Need private help? @Charmunk. Club help? @jps.
 
 ## Management 
 
-This project is managed and lead by Ethan Canterbury
+This project is managed by Ivie Fonner.
