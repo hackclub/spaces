@@ -93,32 +93,6 @@
                 </button>
             </form>
         </div>
-        <div class="settings-card club-card">
-            <div class="card-icon"><i class="fas fa-users"></i></div>
-            <h2>Club Membership</h2>
-            <div id="club-membership-list">
-                {% for membership in current_user.club_memberships %}
-                <div class="club-membership-item">
-                    <div class="club-info">
-                        <h3>{{ membership.club.name }}</h3>
-                        <span class="role-badge {% if membership.role == 'co-leader' %}role-badge-leader{% endif %}">
-                            {{ membership.role|capitalize }}
-                        </span>
-                    </div>
-                    <button class="btn-danger leave-club-btn" onclick="leaveClub({{ membership.id }})">
-                        <i class="fas fa-sign-out-alt"></i> Leave
-                    </button>
-                </div>
-                {% endfor %}
-            </div>
-            <div class="join-club-section">
-                <h3>Join a Club</h3>
-                <form class="join-code-form">
-                    <input type="text" id="joinClubCode" class="settings-input" placeholder="Enter join code">
-                    <button type="button" onclick="showClubWarningModal()" class="btn-gradient">Join</button>
-                </form>
-            </div>
-        </div>
     </div>
 </div>
 

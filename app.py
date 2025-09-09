@@ -591,61 +591,6 @@ def check_request():
         ), 503
 
 
-@app.route('/join-club')
-def join_club_redirect():
-    """Handle redirects from QR code scans"""
-    join_code = request.args.get('code')
-    if not join_code:
-        flash('Invalid QR code', 'error')
-        return redirect(url_for('welcome'))
-
-    if current_user.is_authenticated:
-        # Process join directly instead of just passing the code via redirect
-        try:
-            club = Club.query.filter_by(join_code=join_code).first()
-            if not club:
-                flash('Invalid join code', 'error')
-                return redirect(url_for('welcome'))
-
-            # Check if user is already a member
-            existing_membership = ClubMembership.query.filter_by(
-                user_id=current_user.id, club_id=club.id).first()
-
-            if existing_membership:
-                flash(f"You are already a member of {club.name}", 'info')
-                return redirect(url_for('club_dashboard', club_id=club.id))
-
-            # Add user to the club
-            new_membership = ClubMembership(
-                user_id=current_user.id,
-                club_id=club.id,
-                role='member'
-            )
-            db.session.add(new_membership)
-
-            activity = UserActivity(
-                activity_type="club_join",
-                message=f"User {{username}} joined club {club.name}",
-                username=current_user.username,
-                user_id=current_user.id
-            )
-            db.session.add(activity)
-            db.session.commit()
-
-            flash(f"You have successfully joined {club.name}!", 'success')
-            return redirect(url_for('club_dashboard', club_id=club.id))
-        except Exception as e:
-            db.session.rollback()
-            app.logger.error(f"Error joining club: {str(e)}")
-            flash(f"Error joining club: {str(e)}", 'error')
-            return redirect(url_for('welcome'))
-    else:
-        # Redirect to login page with join code in session
-        session['pending_join_code'] = join_code
-        flash('Please log in or sign up to join the club', 'info')
-        return redirect(url_for('login'))
-
-
 @app.route('/leader-onboarding', methods=['GET', 'POST'])
 def leader_onboarding():
     """Show the leader onboarding page with access code verification"""
@@ -734,47 +679,6 @@ def index():
     return render_template('index.html')
 
 
-@app.route('/login', methods=['GET', 'POST'])
-@rate_limit('login')
-def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('welcome'))
-
-    if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-
-        # Validate email format
-        import re
-        if not email or not re.match(
-                r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
-            flash('Please enter a valid email address', 'error')
-            return render_template('login.html')
-
-        user = User.query.filter_by(email=email).first()
-        if user and user.check_password(password):
-            # If the password hash starts with 'scrypt', rehash it with pbkdf2
-            if user.password_hash.startswith('scrypt:'):
-                app.logger.info(f"Rehashing password for user {user.id}")
-                user.set_password(password)  # This will use the new pbkdf2 method
-            
-            login_user(user)
-            user.last_login = datetime.utcnow()
-
-            activity = UserActivity(activity_type="user_login",
-                                    message="User {username} logged in",
-                                    username=user.username,
-                                    user_id=user.id)
-            db.session.add(activity)
-            db.session.commit()
-
-            flash(f'Welcome back, {user.username}!', 'success')
-            return redirect(url_for('welcome'))
-
-        flash('Invalid email or password', 'error')
-
-    return render_template('login.html')
-
 
 @app.route('/club-setup', methods=['GET', 'POST'])
 @login_required
@@ -820,180 +724,8 @@ def club_setup():
     return render_template('club_setup.html', club=club)
 
 
-@app.route('/signup', methods=['GET', 'POST'])
-@rate_limit('signup')
-def signup():
-    if current_user.is_authenticated:
-        return redirect(url_for('welcome'))
-
-    # Check if user is coming from leader onboarding
-    from_leader_onboarding = request.args.get('from_leader_onboarding') == 'true'
-
-    if request.method == 'POST':
-        # CSRF validation removed
-            
-        username = request.form.get('username')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        is_leader = request.form.get('is_leader') == 'true'
-
-        # Additional validation
-        if not username or not email or not password:
-            flash('All fields are required', 'error')
-            return render_template('signup.html', from_leader_onboarding=from_leader_onboarding), 400
-            
-        # Simple username validation
-        if len(username) < 3 or len(username) > 30:
-            flash('Username must be between 3 and 30 characters', 'error')
-            return render_template('signup.html', from_leader_onboarding=from_leader_onboarding), 400
-            
-        # Email validation
-        import re
-        if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
-            flash('Please enter a valid email address', 'error')
-            return render_template('signup.html', from_leader_onboarding=from_leader_onboarding), 400
-            
-        # Password validation
-        if len(password) < 6:
-            flash('Password must be at least 6 characters long', 'error')
-            return render_template('signup.html', from_leader_onboarding=from_leader_onboarding), 400
-
-        if User.query.filter_by(email=email).first():
-            flash('Email already registered', 'error')
-            return render_template('signup.html', from_leader_onboarding=from_leader_onboarding)
-
-        if User.query.filter_by(username=username).first():
-            flash('Username already taken', 'error')
-            return render_template('signup.html', from_leader_onboarding=from_leader_onboarding)
-
-        # Create user with automatic access
-        user = User(username=username, email=email, preview_code_verified=True)
-        user.set_password(password)
-
-        db.session.add(user)
-        db.session.flush()  # Flush to get the user ID without committing
-
-        activity = UserActivity(activity_type="user_registration",
-                                message="New user registered: {username}",
-                                username=username,
-                                user_id=user.id)
-        db.session.add(activity)
-        
-        # If user is registering from leader onboarding, make them a club leader
-        if is_leader or from_leader_onboarding:
-            # First commit the user to get a valid user ID
-            db.session.commit()
-            
-            # Create a new club with this user as leader
-            from models import Club
-            club = Club(
-                name=f"{username}'s Club",
-                description="A new Hack Club - edit your club details in the dashboard",
-                leader_id=user.id
-            )
-            club.generate_join_code()
-            db.session.add(club)
-            # Commit to get the club ID
-            db.session.commit()
-            
-            # Add a club membership for the leader too
-            from models import ClubMembership
-            membership = ClubMembership(
-                user_id=user.id,
-                club_id=club.id,
-                role='co-leader'
-            )
-            db.session.add(membership)
-            
-            # Record the activity
-            club_activity = UserActivity(
-                activity_type="club_creation",
-                message=f'Club "{club.name}" created by {{username}}',
-                username=username,
-                user_id=user.id
-            )
-            db.session.add(club_activity)
-            
-            # Login the user automatically
-            db.session.commit()
-            user.last_login = datetime.utcnow()
-            db.session.commit()
-            
-            login_user(user)
-            
-            # Redirect to club setup instead of dashboard
-            flash(f'Welcome, {username}! Let\'s set up your club.', 'success')
-            return redirect(url_for('club_setup'))
-        
-        db.session.commit()
-
-        flash('Successfully registered! Please log in.', 'success')
-        return redirect(url_for('login'))
-
-    return render_template('signup.html', from_leader_onboarding=from_leader_onboarding)
 
 
-@app.route('/welcome')
-@login_required
-def welcome():
-    sites = Site.query.filter_by(user_id=current_user.id).all()
-    max_sites = get_max_sites_per_user()
-
-    # Get club memberships
-    club_memberships = db.session.query(ClubMembership).filter_by(
-        user_id=current_user.id).all()
-    
-    # Get language icons for code spaces
-    from piston_service import PistonService
-    language_icons = {}
-    for lang in PistonService.get_languages():
-        language_icons[lang] = PistonService.get_language_icon(lang)
-        
-    # Check for join_code in request args
-    join_code = request.args.get('join_code')
-    join_message = None
-    
-    if join_code:
-        # Try to join the club with the provided code
-        club = Club.query.filter_by(join_code=join_code).first()
-        if club:
-            # Check if user is already a member
-            existing_membership = ClubMembership.query.filter_by(
-                user_id=current_user.id, club_id=club.id).first()
-            
-            if existing_membership:
-                # If already a member, redirect directly to the club dashboard
-                flash(f"Welcome back to {club.name}!", 'info')
-                return redirect(url_for('club_dashboard', club_id=club.id))
-            else:
-                # Add user to the club
-                new_membership = ClubMembership(
-                    user_id=current_user.id,
-                    club_id=club.id,
-                    role='member'
-                )
-                db.session.add(new_membership)
-                
-                # Log activity
-                log_activity(current_user.id, f"Joined club {club.name}")
-                
-                try:
-                    db.session.commit()
-                    flash(f"You have successfully joined {club.name}!", 'success')
-                    # Redirect to the club dashboard
-                    return redirect(url_for('club_dashboard', club_id=club.id))
-                except Exception as e:
-                    db.session.rollback()
-                    flash(f"Error joining club: {str(e)}", 'error')
-        else:
-            flash(f"Invalid join code: {join_code}", 'error')
-
-    return render_template('welcome.html',
-                           sites=sites,
-                           club_memberships=club_memberships,
-                           max_sites=max_sites,
-                           language_icons=language_icons,
-                           join_message=join_message)
 
 
 @app.route('/edit/<int:site_id>')
@@ -1599,42 +1331,6 @@ def documentation():
     return render_template('documentation.html')
 
 
-@app.route('/support')
-def support():
-    """Render the support page with help resources."""
-    return render_template('support.html')
-
-@app.route('/api/admin/gallery/feature/<int:entry_id>', methods=['POST'])
-@login_required
-def toggle_gallery_feature(entry_id):
-    if not current_user.is_admin:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-        
-    try:
-        from models import GalleryEntry
-        entry = GalleryEntry.query.get_or_404(entry_id)
-        
-        # Toggle featured status
-        entry.is_featured = not entry.is_featured
-        db.session.commit()
-        
-        activity = UserActivity(
-            activity_type="admin_action",
-            message=f'Admin {{username}} {"featured" if entry.is_featured else "unfeatured"} gallery entry "{entry.title}"',
-            username=current_user.username,
-            user_id=current_user.id
-        )
-        db.session.add(activity)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True, 
-            'is_featured': entry.is_featured
-        })
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f'Error toggling gallery feature: {str(e)}')
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/gallery/entry/<int:entry_id>/remove', methods=['POST'])
 @login_required
@@ -3606,6 +3302,7 @@ def get_admin_sites_list():
 # Removed duplicate save_site_content function
 
 
+
 @app.route('/site/update/<int:site_id>', methods=['POST'])
 @login_required
 def update_site_form(site_id):
@@ -4814,98 +4511,7 @@ def public_profile(username):
     )
 
 
-@app.route('/club-dashboard')
-@app.route('/club-dashboard/<int:club_id>')
-@login_required
-def club_dashboard(club_id=None):
-    """Club dashboard for club leaders to manage their clubs."""
-    from models import Club, ClubMembership, ClubChatChannel
-    
-    # If no club ID is provided, try to find user's club
-    if club_id is None:
-        # Check if user is a club leader
-        club = Club.query.filter_by(leader_id=current_user.id).first()
-        
-        # If not a leader, check if they belong to any clubs
-        if not club:
-            club_memberships = ClubMembership.query.filter_by(user_id=current_user.id).all()
-            
-            if not club_memberships:
-                # User doesn't have any club associations, show join code interface
-                return render_template('club_dashboard.html', 
-                                    club=None, 
-                                    show_join_modal=True)
-                
-            if len(club_memberships) == 1:
-                # If user is a member of only one club, show that club
-                club = club_memberships[0].club
-                club_id = club.id
-            else:
-                # If user belongs to multiple clubs, show club selection interface
-                return render_template('club_dashboard.html', 
-                                      club=None, 
-                                      memberships=club_memberships)
-    else:
-        # Club ID was provided, show that specific club
-        club = Club.query.get_or_404(club_id)
-        
-        # Verify user is a member or leader of this club
-        if club.leader_id != current_user.id:
-            membership = ClubMembership.query.filter_by(
-                user_id=current_user.id,
-                club_id=club_id
-            ).first()
-            
-            if not membership:
-                flash('You are not a member of this club.', 'error')
-                return render_template('club_dashboard.html', 
-                                    club=None, 
-                                    show_join_modal=True)
-    
-    # Get all memberships for the club
-    memberships = []
-    if club:
-        memberships = ClubMembership.query.filter_by(club_id=club.id).all()
-        
-        # Get the default chat channel
-        default_channel = ClubChatChannel.query.filter_by(
-            club_id=club.id,
-            name='general'
-        ).first()
-        
-        # If no general channel exists, create it
-        if not default_channel:
-            default_channel = ClubChatChannel(
-                club_id=club.id,
-                name='general',
-                description='General discussions',
-                created_by=club.leader_id
-            )
-            db.session.add(default_channel)
-            db.session.commit()
-    
-    # Check if user is a leader or co-leader
-    is_leader = (club and club.leader_id == current_user.id)
-    is_co_leader = False
-    
-    if club and not is_leader:
-        membership = ClubMembership.query.filter_by(
-            user_id=current_user.id,
-            club_id=club.id,
-            role='co-leader'
-        ).first()
-        
-        is_co_leader = (membership is not None)
-    
-    # Get ImgBB API key from environment variables
-    imgbb_api_key = os.environ.get('IMGBB_API_KEY', '')
-    
-    return render_template('club_dashboard.html',
-                           club=club,
-                           memberships=memberships,
-                           is_leader=is_leader,
-                           is_co_leader=is_co_leader,
-                           imgbb_api_key=imgbb_api_key)
+
 
 
 # Club API routes

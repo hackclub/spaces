@@ -55,7 +55,6 @@
                 <div class="mobile-auth">
                     {% if current_user.is_authenticated %}
                         <a href="{{ url_for('welcome') }}" class="nav-button">Dashboard</a>
-                        <a href="{{ url_for('club_dashboard') }}" class="nav-button">Clubs</a>
                         {% if current_user.is_authenticated and current_user.is_admin %}
                         <a href="{{ url_for('admin_panel') }}" class="nav-button">Admin</a>
                         {% endif %}
@@ -69,7 +68,6 @@
             <div class="nav-auth desktop-auth">
                 {% if current_user.is_authenticated %}
                     <a href="{{ url_for('welcome') }}" class="nav-button">Dashboard</a>
-                    <a href="{{ url_for('club_dashboard') }}" class="nav-button">Clubs</a>
                     {% if current_user.is_authenticated and current_user.is_admin %}
                     <a href="{{ url_for('admin_panel') }}" class="nav-button">Admin</a>
                     {% endif %}
