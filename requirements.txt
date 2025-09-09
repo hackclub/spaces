@@ -5,6 +5,7 @@ Flask-SQLAlchemy==3.0.3
 Flask-Login==0.6.2
 Flask-WTF==1.1.1
 email-validator==2.0.0
+psycopg2-binary==2.9.6
 bcrypt==4.0.1
 gunicorn==20.1.0
 cryptography==41.0.1
@@ -19,4 +20,3 @@ Flask-Session==0.8.0
 PyGithub==2.1.1
 aiohttp>=3.9.0
 sqlalchemy>=2.0.0
-psycopg2-binary==2.9.6
