@@ -3364,16 +3364,6 @@ def update_site_form(site_id):
 
 
 
-@app.route('/api/godot/<int:site_id>/load', methods=['GET'])
-@login_required
-def load_godot_content(site_id):
-    try:
-        site = Site.query.get_or_404(site_id)
-
-        return jsonify({'success': True, 'content': site.language_content})
-    except Exception as e:
-        app.logger.error(f'Error loading Godot content for site {site_id}: {str(e)}')
-        return jsonify({'success': False, 'error': 'Failed to load content'}), 500
 
 @app.route('/api/site/<int:site_id>/save', methods=['POST'])
 @login_required
@@ -3383,29 +3373,7 @@ def save_site_content(site_id):
 
         if site.user_id != current_user.id and not current_user.is_admin:
             # Check if user is a collaborator
-      @app.route('/api/godot/<int:site_id>/save', methods=['POST'])
-@login_required
-def save_godot_content(site_id):
-    try:
-        data = request.get_json()
-        content = data.get('content')
-
-
-        # Find the site by ID
-        site = Site.query.get_or_404(site_id)
-
-        if site.secret_key != data.get('secret_key'):
-            return jsonify({'success': False, 'error': 'Permission denied'}), 403
-
-
-        # Save the content to the site
-        site.language_content = str(content)
-        db.session.commit()
-
-        return jsonify({'success': True})
-    except Exception as e:
-        app.logger.error(f'Error saving Godot content for site {site_id}: {str(e)}')
-        return jsonify({'success': False, 'error': 'Failed to save content'}), 500      collab = Collaborator.query.filter_by(site_id=site_id, user_id=current_user.id).first()
+            collab = Collaborator.query.filter_by(site_id=site_id, user_id=current_user.id).first()
             if not collab or not collab.can_edit:
                 return jsonify({'success': False, 'error': 'Permission denied'}), 403
 
@@ -3521,6 +3489,7 @@ def save_godot_content(site_id):
         db.session.rollback()
         app.logger.error(f'Error saving site content: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 
 @app.route('/api/admin/users-list')
