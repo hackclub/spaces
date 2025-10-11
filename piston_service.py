@@ -100,6 +100,7 @@ class PistonService:
             excluded_languages = ["brainfuck"]
             filtered_languages = [lang for lang in cls._runtimes_by_language.keys() 
                                 if lang.lower() not in excluded_languages]
+            filtered_languages.append("godot")
             return sorted(filtered_languages)
         return []
     

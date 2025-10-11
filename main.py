@@ -319,7 +319,6 @@ def welcome():
     max_sites = get_max_sites_per_user()
 
 
-    # Get language icons for code spaces
     from piston_service import PistonService
     language_icons = {}
     for lang in PistonService.get_languages():

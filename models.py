@@ -303,6 +303,7 @@ class Site(db.Model):
     language = db.Column(db.String(50), nullable=True)
     language_version = db.Column(db.String(20), nullable=True)
     language_content = db.Column(db.Text, nullable=True)
+    secret_key = db.Column(db.Text, nullable=True)
     is_public = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime,

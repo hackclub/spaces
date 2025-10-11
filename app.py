@@ -10,10 +10,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timedelta
 from functools import wraps
 from dotenv import load_dotenv
-from flask import Flask, render_template, redirect, flash, request, jsonify, url_for, abort, session, Response, current_app
+from flask import Flask, render_template, send_from_directory, redirect, flash, request, jsonify, url_for, abort, session, Response, current_app
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf.csrf import CSRFProtect
 from models import db, User, Site, SitePage, UserActivity, Club, ClubMembership, ClubFeaturedProject, ClubAssignment
+from pathlib import Path
+from static_server import static_server_bp
+import secrets
+import string
 
 
 def slugify(text):
@@ -324,7 +328,7 @@ def add_security_headers(response):
 
     csp = """
         default-src 'self';
-        script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://webring.hackclub.com;
+        script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com https://webring.hackclub.com;
         style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com;
         img-src 'self' data: https: http:;
         font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com;
@@ -545,6 +549,7 @@ def orphy_chat_proxy():
         app.logger.error(f"Error in Orphy proxy: {str(e)}")
         return jsonify({'error': str(e), 'provider': 'error'}), 500
 
+app.config["STATIC_ROOT"] = Path(__file__).parent / "static/godot"
 
 db.init_app(app)
 login_manager = LoginManager()
@@ -557,7 +562,7 @@ app.register_blueprint(slack_auth_bp)
 app.register_blueprint(hackatime_bp)
 app.register_blueprint(pizza_grants_bp)
 app.register_blueprint(cdn_bp)
-
+app.register_blueprint(static_server_bp)
 
 def check_db_connection():
     try:
@@ -755,6 +760,10 @@ def edit_site(site_id):
     except Exception as e:
         app.logger.error(f'Error in edit_site: {str(e)}')
         abort(500)
+
+
+
+
 
 
 @app.route('/api/execute', methods=['POST'])
@@ -1167,8 +1176,10 @@ def create_code_site():
         # Import the PistonService
         from piston_service import PistonService
         
-        # Get the latest version for the language
-        language_version = PistonService.get_latest_version(language)
+        if language == 'godot':
+            language_version = '4.5'
+        else:
+            language_version = PistonService.get_latest_version(language)
         if not language_version:
             return jsonify({'message': f'Language {language} is not supported'}), 400
             
@@ -1177,6 +1188,9 @@ def create_code_site():
         
         # Get proper extension for this language
         ext = PistonService.get_language_extension(language)
+
+        chars = string.ascii_letters + string.digits
+        secret_key = random_string = ''.join(secrets.choice(chars) for _ in range(16))
         
         # Create the site with necessary info
         site = Site(name=name,
@@ -1184,7 +1198,8 @@ def create_code_site():
                     site_type='code',
                     language=language,
                     language_version=language_version,
-                    language_content=language_content)
+                    language_content=language_content,
+                    secret_key=secret_key)
         
         # Ensure the slug has the correct extension
         if ext and ext != 'txt':
@@ -1223,7 +1238,12 @@ def get_languages():
         languages = PistonService.get_languages()
         
         # Format the response with additional metadata
-        language_data = []
+        language_data = [{
+            'name': 'godot',
+            'display_name': 'Godot',
+            'latest_version': 4.5,
+            'versions': [4.5],
+        }]
         for lang in languages:
             versions = PistonService.get_language_versions(lang)
             language_data.append({
@@ -1233,7 +1253,6 @@ def get_languages():
                 'versions': versions,
                 'icon': PistonService.get_language_icon(lang)
             })
-            
         return jsonify({
             'languages': language_data
         })
@@ -1270,6 +1289,9 @@ def code_editor(site_id):
                 abort(403)
 
         app.logger.info(f'User {current_user.id} editing code site {site_id}')
+
+        if site.language == 'godot':
+            return redirect('/godot?id=' + str(site_id) + "&secret=" + site.secret_key, code=302)
 
         # Import the PistonService to get the language icon
         try:
@@ -3341,6 +3363,18 @@ def update_site_form(site_id):
     return jsonify({'success': True})
 
 
+
+@app.route('/api/godot/<int:site_id>/load', methods=['GET'])
+@login_required
+def load_godot_content(site_id):
+    try:
+        site = Site.query.get_or_404(site_id)
+
+        return jsonify({'success': True, 'content': site.language_content})
+    except Exception as e:
+        app.logger.error(f'Error loading Godot content for site {site_id}: {str(e)}')
+        return jsonify({'success': False, 'error': 'Failed to load content'}), 500
+
 @app.route('/api/site/<int:site_id>/save', methods=['POST'])
 @login_required
 def save_site_content(site_id):
@@ -3349,7 +3383,29 @@ def save_site_content(site_id):
 
         if site.user_id != current_user.id and not current_user.is_admin:
             # Check if user is a collaborator
-            collab = Collaborator.query.filter_by(site_id=site_id, user_id=current_user.id).first()
+      @app.route('/api/godot/<int:site_id>/save', methods=['POST'])
+@login_required
+def save_godot_content(site_id):
+    try:
+        data = request.get_json()
+        content = data.get('content')
+
+
+        # Find the site by ID
+        site = Site.query.get_or_404(site_id)
+
+        if site.secret_key != data.get('secret_key'):
+            return jsonify({'success': False, 'error': 'Permission denied'}), 403
+
+
+        # Save the content to the site
+        site.language_content = str(content)
+        db.session.commit()
+
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f'Error saving Godot content for site {site_id}: {str(e)}')
+        return jsonify({'success': False, 'error': 'Failed to save content'}), 500      collab = Collaborator.query.filter_by(site_id=site_id, user_id=current_user.id).first()
             if not collab or not collab.can_edit:
                 return jsonify({'success': False, 'error': 'Permission denied'}), 403
 
