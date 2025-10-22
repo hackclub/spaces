@@ -1,7 +1,7 @@
 
 # Hack Club Spaces & Club Dashboard
 
-A simple web platform that allows users to create, test and host static websites and Python scripts. Built with Python Flask and PostgreSQL. Made by Ethan Canterbury, and Hack Club
+A simple web platform that allows users to create, test and host static websites and Python scripts. Built with Python Flask and PostgreSQL. Made by Ethan Canterbury, Ivie Fonner, and Hack Club
 
 ## Features
 
