@@ -2789,6 +2789,100 @@ def clear_site_analytics(site_id):
 
 
 @app.route('/api/sites/<int:site_id>/files', methods=['GET', 'POST'])
+@login_required
+def handle_site_files(site_id):
+    """Handle GET and POST requests for site files."""
+    try:
+        site = Site.query.get_or_404(site_id)
+        
+        # Check if user owns the site
+        if site.user_id != current_user.id and not current_user.is_admin:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        if request.method == 'GET':
+            # Return list of files for the site
+            with db.engine.connect() as conn:
+                result = conn.execute(
+                    db.text("SELECT * FROM site_page WHERE site_id = :site_id"),
+                    {"site_id": site_id})
+                files = [{
+                    "filename": row[2],
+                    "content": row[3],
+                    "file_type": row[4],
+                    "created_at": row[5].isoformat() if row[5] else None,
+                    "updated_at": row[6].isoformat() if row[6] else None
+                } for row in result]
+            
+            return jsonify({'files': files})
+        
+        elif request.method == 'POST':
+            # Create a new file
+            data = request.get_json()
+            
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+            
+            filename = data.get('filename')
+            content = data.get('content', '')
+            file_type = data.get('file_type')
+            
+            if not filename:
+                return jsonify({'error': 'Filename is required'}), 400
+            
+            if not file_type:
+                return jsonify({'error': 'File type is required'}), 400
+            
+            # Validate filename (basic validation)
+            if not filename.strip():
+                return jsonify({'error': 'Invalid filename'}), 400
+            
+            # Check if file already exists
+            with db.engine.connect() as conn:
+                result = conn.execute(
+                    db.text("SELECT id FROM site_page WHERE site_id = :site_id AND filename = :filename"),
+                    {"site_id": site_id, "filename": filename})
+                existing_file = result.fetchone()
+            
+            if existing_file:
+                return jsonify({'error': f'File {filename} already exists'}), 409
+            
+            # Create the new file
+            with db.engine.connect() as conn:
+                conn.execute(
+                    db.text("""
+                        INSERT INTO site_page (site_id, filename, content, file_type)
+                        VALUES (:site_id, :filename, :content, :file_type)
+                    """), {
+                        "site_id": site_id,
+                        "filename": filename,
+                        "content": content,
+                        "file_type": file_type
+                    })
+                conn.commit()
+            
+            # Log the activity
+            activity = UserActivity(
+                activity_type='file_create',
+                message=f'Created file "{filename}" in site "{site.name}"',
+                username=current_user.username,
+                user_id=current_user.id,
+                site_id=site.id
+            )
+            db.session.add(activity)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'File {filename} created successfully',
+                'filename': filename,
+                'file_type': file_type
+            })
+    
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'Error handling site files: {str(e)}')
+        return jsonify({'error': 'Failed to process request'}), 500
+
 
 @app.route('/api/admin/users-stats', methods=['GET'])
 @login_required

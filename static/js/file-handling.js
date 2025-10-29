@@ -83,13 +83,40 @@ function createNewFile(filename, fileType) {
     return response.json();
   })
   .then(data => {
-    addFileTab(filename, extension);
+    // Update the fileContents object used by editor-core.js
+    if (typeof fileContents !== 'undefined') {
+      fileContents[filename] = defaultContent;
+    }
+    
+    // Add the file tab using the same logic as editor-core.js
+    if (!document.querySelector(`.file-tab[data-filename="${filename}"]`)) {
+      addFileTab(filename, extension);
+    }
+    
     showToast('File created successfully', 'success');
 
-    switchToFile(filename);
+    // Switch to the new file if switchToFile function is available
+    if (typeof switchToFile === 'function') {
+      switchToFile(filename);
+    }
 
+    // Fallback: if editor-core.js has fetchSitePages, call it to refresh the file list
+    if (typeof fetchSitePages === 'function') {
+      setTimeout(() => {
+        fetchSitePages();
+      }, 100);
+    }
+
+    // Setup context menu for the new tab
     const tab = document.querySelector(`.file-tab[data-filename="${filename}"]`);
     if (tab) {
+      // Add context menu listener
+      tab.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        showTabContextMenu(filename, e.clientX, e.clientY);
+      });
+      
+      // Add close button functionality if it exists
       const closeBtn = tab.querySelector('.file-close');
       if (closeBtn) {
         closeBtn.addEventListener('click', (e) => {
@@ -124,9 +151,21 @@ function addFileTab(filename, filetype) {
   const newTab = document.createElement('button');
   newTab.className = 'file-tab';
   newTab.setAttribute('data-filename', filename);
-  newTab.setAttribute('data-filetype', filetype || getFileType(filename));
+  newTab.setAttribute('data-filetype', filetype || getFileTypeFromName(filename));
 
-  newTab.textContent = filename;
+  // Create icon similar to editor-core.js
+  const icon = document.createElement('span');
+  icon.className = `file-extension-icon ${filetype || getFileTypeFromName(filename)}-icon`;
+  newTab.appendChild(icon);
+  
+  // Add filename as text node
+  newTab.appendChild(document.createTextNode(filename));
+  
+  // Add close button like in editor-core.js
+  const closeBtn = document.createElement('span');
+  closeBtn.className = 'file-close';
+  closeBtn.textContent = '×';
+  newTab.appendChild(closeBtn);
 
   newTab.addEventListener('contextmenu', function(e) {
     e.preventDefault();
@@ -136,7 +175,19 @@ function addFileTab(filename, filetype) {
   fileTabsContainer.insertBefore(newTab, addButton);
 
   newTab.addEventListener('click', function() {
-    switchToFile(this.getAttribute('data-filename'));
+    if (typeof switchToFile === 'function') {
+      switchToFile(this.getAttribute('data-filename'));
+    }
+  });
+
+  // Add close button functionality
+  closeBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (typeof removeFile === 'function') {
+      removeFile(filename);
+    } else {
+      deleteFile(filename);
+    }
   });
 }
 

@@ -9,6 +9,9 @@ let completionActive = false;
 
 let currentFilename = 'index.html';
 
+// Make fileContents available globally for file-handling.js
+window.fileContents = fileContents;
+
 function initEditor(initialContent, type) {
     siteType = type;
     siteId = document.getElementById('site-id').value;
@@ -219,6 +222,9 @@ function fetchSitePages() {
         .catch(error => console.error("Error fetching site pages:", error));
 }
 
+// Make fetchSitePages available globally for file-handling.js
+window.fetchSitePages = fetchSitePages;
+
 function setupFileTabListeners() {
     document.querySelectorAll('.file-tab').forEach(tab => {
         tab.addEventListener('click', function() {
@@ -266,6 +272,9 @@ function switchToFile(filename) {
 
     updateFileSize();
 }
+
+// Make switchToFile available globally for file-handling.js
+window.switchToFile = switchToFile;
 
 function setEditorMode(filename) {
     const extension = filename.split('.').pop().toLowerCase();
