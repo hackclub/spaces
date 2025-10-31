@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  spaces-app:
+    build: .
+    privileged: true  # Required for Docker-in-Docker
+    ports:
+      - "80:80"      # Nginx proxy
+      - "3000:3000"  # Backend API
+      - "5173:5173"  # Frontend
+      - "2376:2376"  # Docker daemon API
+    volumes:
+      - docker-data:/var/lib/docker  # Docker storage volume
+    environment:
+      - NODE_ENV=development
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - DOCKER_TLS_CERTDIR=""
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Enable access to Docker host ports
+
+volumes:
+  docker-data:

@@ -1,0 +1,7 @@
+.env
+node_modules
+dist
+build
+.github
+.vscode
+.DS_Store
