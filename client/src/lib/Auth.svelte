@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { API_BASE, ERROR_MESSAGES } from '../config.js';
   
   const dispatch = createEventDispatcher();
   
@@ -10,8 +11,6 @@
   let error = '';
   let loading = false;
   let message = '';
-  
-  const API_BASE = 'http://localhost:5678/api/v1';
   
   async function sendVerificationCode() {
     error = '';
@@ -36,7 +35,7 @@
         error = data.message || 'Failed to send verification code';
       }
     } catch (err) {
-      error = 'Network error. Please try again.';
+      error = ERROR_MESSAGES.NETWORK_ERROR;
     } finally {
       loading = false;
     }
@@ -67,7 +66,7 @@
         error = data.message || 'Login failed';
       }
     } catch (err) {
-      error = 'Network error. Please try again.';
+      error = ERROR_MESSAGES.NETWORK_ERROR;
     } finally {
       loading = false;
     }
@@ -98,7 +97,7 @@
         error = data.message || 'Signup failed';
       }
     } catch (err) {
-      error = 'Network error. Please try again.';
+      error = ERROR_MESSAGES.NETWORK_ERROR;
     } finally {
       loading = false;
     }

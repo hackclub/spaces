@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher } from 'svelte';
+  import { API_BASE, ERROR_MESSAGES } from '../config.js';
   
   export let spaces = [];
   export let authorization = '';
@@ -13,8 +14,7 @@
   let error = '';
   let loading = false;
   let actionLoading = {};
-  
-  const API_BASE = 'http://localhost:5678/api/v1';
+  let actionError = {};
   
   const spaceTypes = [
     { value: 'code-server', label: 'VS Code Server', description: 'Web-based code editor' },
@@ -46,10 +46,10 @@
         newSpacePassword = '';
         await loadSpaces();
       } else {
-        error = data.error || 'Failed to create space';
+        error = data.error || ERROR_MESSAGES.CREATE_FAILED;
       }
     } catch (err) {
-      error = 'Network error. Please try again.';
+      error = ERROR_MESSAGES.NETWORK_ERROR;
     } finally {
       loading = false;
     }
@@ -75,7 +75,9 @@
   
   async function startSpace(spaceId) {
     actionLoading[spaceId] = 'starting';
+    actionError[spaceId] = '';
     actionLoading = actionLoading;
+    actionError = actionError;
     
     try {
       const response = await fetch(`${API_BASE}/spaces/start/${spaceId}`, {
@@ -90,10 +92,12 @@
       if (response.ok) {
         await loadSpaces();
       } else {
-        alert(data.error || 'Failed to start space');
+        actionError[spaceId] = data.error || ERROR_MESSAGES.START_FAILED;
+        actionError = actionError;
       }
     } catch (err) {
-      alert('Network error. Please try again.');
+      actionError[spaceId] = ERROR_MESSAGES.NETWORK_ERROR;
+      actionError = actionError;
     } finally {
       delete actionLoading[spaceId];
       actionLoading = actionLoading;
@@ -102,7 +106,9 @@
   
   async function stopSpace(spaceId) {
     actionLoading[spaceId] = 'stopping';
+    actionError[spaceId] = '';
     actionLoading = actionLoading;
+    actionError = actionError;
     
     try {
       const response = await fetch(`${API_BASE}/spaces/stop/${spaceId}`, {
@@ -117,10 +123,12 @@
       if (response.ok) {
         await loadSpaces();
       } else {
-        alert(data.error || 'Failed to stop space');
+        actionError[spaceId] = data.error || ERROR_MESSAGES.STOP_FAILED;
+        actionError = actionError;
       }
     } catch (err) {
-      alert('Network error. Please try again.');
+      actionError[spaceId] = ERROR_MESSAGES.NETWORK_ERROR;
+      actionError = actionError;
     } finally {
       delete actionLoading[spaceId];
       actionLoading = actionLoading;
@@ -129,7 +137,9 @@
   
   async function refreshStatus(spaceId) {
     actionLoading[spaceId] = 'refreshing';
+    actionError[spaceId] = '';
     actionLoading = actionLoading;
+    actionError = actionError;
     
     try {
       const response = await fetch(`${API_BASE}/spaces/status/${spaceId}`, {
@@ -143,10 +153,12 @@
       if (response.ok) {
         await loadSpaces();
       } else {
-        alert(data.error || 'Failed to get status');
+        actionError[spaceId] = data.error || ERROR_MESSAGES.STATUS_FAILED;
+        actionError = actionError;
       }
     } catch (err) {
-      alert('Network error. Please try again.');
+      actionError[spaceId] = ERROR_MESSAGES.NETWORK_ERROR;
+      actionError = actionError;
     } finally {
       delete actionLoading[spaceId];
       actionLoading = actionLoading;
@@ -258,6 +270,10 @@
                 {/if}
                 <p><strong>Created:</strong> {new Date(space.created_at).toLocaleString()}</p>
               </div>
+              
+              {#if actionError[space.space_id]}
+                <div class="error small">{actionError[space.space_id]}</div>
+              {/if}
               
               <div class="space-actions">
                 {#if actionLoading[space.space_id]}
@@ -434,6 +450,11 @@
     border: 1px solid rgba(239, 68, 68, 0.3);
     border-radius: 8px;
     color: #ef4444;
+  }
+  
+  .error.small {
+    padding: 0.5rem;
+    font-size: 0.875rem;
   }
   
   .spaces-list h3 {

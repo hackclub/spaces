@@ -2,12 +2,11 @@
   import { onMount } from 'svelte';
   import Auth from './lib/Auth.svelte';
   import Dashboard from './lib/Dashboard.svelte';
+  import { API_BASE } from './config.js';
 
   let isAuthenticated = false;
   let user = null;
   let spaces = [];
-
-  const API_BASE = 'http://localhost:5678/api/v1';
 
   // Check for stored auth token on mount
   onMount(() => {
