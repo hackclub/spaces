@@ -1,63 +1,111 @@
 <script>
-  import { onMount } from 'svelte'
-  
-  import svelteLogo from './assets/svelte.svg'
-  import Emojis from './lib/Emojis.svelte'
+  import { onMount } from 'svelte';
+  import Auth from './lib/Auth.svelte';
+  import Dashboard from './lib/Dashboard.svelte';
 
-  let emojisList;
+  let isAuthenticated = false;
+  let user = null;
+  let spaces = [];
 
-  onMount(async () => {
-    const response = await fetch('http://localhost:5678/api/v1/emojis');
-    const { emojis } = await response.json();
+  const API_BASE = 'http://localhost:5678/api/v1';
 
-    emojisList = emojis;
-
-    console.log(emojisList)
-
+  // Check for stored auth token on mount
+  onMount(() => {
+    const storedAuth = localStorage.getItem('auth_token');
+    const storedUser = localStorage.getItem('user_data');
+    
+    if (storedAuth && storedUser) {
+      try {
+        isAuthenticated = true;
+        user = JSON.parse(storedUser);
+        loadSpaces();
+      } catch (err) {
+        // Invalid stored data, clear it
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_data');
+      }
+    }
   });
 
+  function handleAuthenticated(event) {
+    const { authorization, username, email } = event.detail;
+    
+    user = {
+      authorization,
+      username,
+      email
+    };
+    
+    // Store auth data
+    localStorage.setItem('auth_token', authorization);
+    localStorage.setItem('user_data', JSON.stringify(user));
+    
+    isAuthenticated = true;
+    loadSpaces();
+  }
 
+  async function loadSpaces() {
+    if (!user) return;
+    
+    try {
+      const response = await fetch(`${API_BASE}/spaces/list`, {
+        headers: {
+          'Authorization': user.authorization,
+        },
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        spaces = data.spaces;
+      }
+    } catch (err) {
+      console.error('Failed to load spaces:', err);
+    }
+  }
+
+  async function handleSignOut() {
+    if (user) {
+      try {
+        await fetch(`${API_BASE}/users/signout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ authorization: user.authorization }),
+        });
+      } catch (err) {
+        console.error('Sign out error:', err);
+      }
+    }
+    
+    // Clear local state
+    isAuthenticated = false;
+    user = null;
+    spaces = [];
+    
+    // Clear stored data
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_data');
+  }
 </script>
 
 <main>
-  <div>
-    <a href="https://vitejs.dev" target="_blank" rel="noreferrer"> 
-      <img src="/vite.svg" class="logo" alt="Vite Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank" rel="noreferrer"> 
-      <img src={svelteLogo} class="logo svelte" alt="Svelte Logo" />
-    </a>
-  </div>
-  <h1>Vite + Svelte</h1>
-
-  {#if emojisList}
-    <div class="card">
-      <Emojis emojis={emojisList} />
-    </div>
+  {#if isAuthenticated && user}
+    <Dashboard 
+      bind:spaces={spaces}
+      authorization={user.authorization}
+      username={user.username}
+      on:signout={handleSignOut}
+    />
+  {:else}
+    <Auth on:authenticated={handleAuthenticated} />
   {/if}
-
-  <p>
-    Check out <a href="https://github.com/sveltejs/kit#readme" target="_blank" rel="noreferrer">SvelteKit</a>, the official Svelte app framework powered by Vite!
-  </p>
-
-  <p class="read-the-docs">
-    Click on the Vite and Svelte logos to learn more
-  </p>
 </main>
 
 <style>
-  .logo {
-    height: 6em;
-    padding: 1.5em;
-    will-change: filter;
-  }
-  .logo:hover {
-    filter: drop-shadow(0 0 2em #646cffaa);
-  }
-  .logo.svelte:hover {
-    filter: drop-shadow(0 0 2em #ff3e00aa);
-  }
-  .read-the-docs {
-    color: #888;
+  main {
+    width: 100%;
+    min-height: 100vh;
   }
 </style>
