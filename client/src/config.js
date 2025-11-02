@@ -1,4 +1,4 @@
-export const API_BASE = process.env.API_URL || 'http://localhost:3000/api/v1';
+export const API_BASE = process.env.API_URL || 'https://t0080w08wcockgs44ws8w880.b.selfhosted.hackclub.com/api/v1';
 
 export const ERROR_MESSAGES = {
   NETWORK_ERROR: 'Network error. Please try again.',
