@@ -77,6 +77,10 @@ export const createContainer = async (password, type, authorization) => {
       })
       .returning(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url']);
 
+    if (process.env.DOCKER === 'true') {
+      newSpace.access_url = `http://${process.env.SERVER_URL}/ports/${newSpace.port}`;
+    }
+
     return {
       message: "Container created successfully",
       spaceId: newSpace.id,
