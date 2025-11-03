@@ -1,22 +1,23 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { API_BASE, ERROR_MESSAGES } from '../config.js';
-  
+
   const dispatch = createEventDispatcher();
-  
-  let mode = 'login'; // 'login', 'signup', or 'verify'
+
+  let mode = 'login';
   let email = '';
   let username = '';
   let verificationCode = '';
   let error = '';
   let loading = false;
   let message = '';
-  
+  let displayMode = 'login';
+
   async function sendVerificationCode() {
     error = '';
     message = '';
     loading = true;
-    
+
     try {
       const response = await fetch(`${API_BASE}/users/send`, {
         method: 'POST',
@@ -25,9 +26,9 @@
         },
         body: JSON.stringify({ email }),
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         message = 'Verification code sent to your email!';
         mode = 'verify';
@@ -40,11 +41,11 @@
       loading = false;
     }
   }
-  
+
   async function handleLogin() {
     error = '';
     loading = true;
-    
+
     try {
       const response = await fetch(`${API_BASE}/users/login`, {
         method: 'POST',
@@ -53,9 +54,9 @@
         },
         body: JSON.stringify({ email, verificationCode: parseInt(verificationCode) }),
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         dispatch('authenticated', {
           authorization: data.data.authorization,
@@ -71,11 +72,11 @@
       loading = false;
     }
   }
-  
+
   async function handleSignup() {
     error = '';
     loading = true;
-    
+
     try {
       const response = await fetch(`${API_BASE}/users/signup`, {
         method: 'POST',
@@ -84,9 +85,9 @@
         },
         body: JSON.stringify({ email, username, verificationCode: parseInt(verificationCode) }),
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         dispatch('authenticated', {
           authorization: data.data.authorization,
@@ -102,232 +103,122 @@
       loading = false;
     }
   }
-  
+
   function switchMode(newMode) {
-    mode = newMode;
     error = '';
     message = '';
     verificationCode = '';
+    setTimeout(() => {
+      mode = newMode;
+    }, 400);
+    setTimeout(() => {
+      displayMode = newMode;
+    }, 800);
   }
 </script>
 
-<div class="auth-container">
-  <div class="auth-card">
-    <h2>Hack Club Spaces</h2>
-    
-    {#if mode === 'login' || mode === 'signup'}
-      <div class="tabs">
-        <button 
-          class:active={mode === 'login'}
-          on:click={() => switchMode('login')}
-        >
-          Login
-        </button>
-        <button 
-          class:active={mode === 'signup'}
-          on:click={() => switchMode('signup')}
-        >
-          Sign Up
-        </button>
+<svelte:head>
+  <link rel="stylesheet" href="/src/styles/auth.css" />
+</svelte:head>
+
+<a href="https://hackclub.com/">
+  <img class="flag-banner" src="https://assets.hackclub.com/flag-orpheus-top.svg" alt="Hack Club"/>
+</a>
+
+<div class="auth-container" class:signup-mode={mode === 'signup'}>
+  <div class="auth-panel auth-form-panel">
+    <div class="auth-form-content">
+      <div class="auth-header">
+        <img class="auth-logo" src="https://icons.hackclub.com/api/icons/ec3750/clubs" alt="Hack Club" />
+        <h2 class="auth-title">{displayMode === 'signup' ? 'Join Hack Club Spaces' : 'Welcome Back'}</h2>
+        <p class="auth-subtitle">Lorem ipsum dolor sit amet</p>
       </div>
-      
-      <form on:submit|preventDefault={sendVerificationCode}>
-        <div class="form-group">
-          <label for="email">Email</label>
-          <input
-            id="email"
-            type="email"
-            bind:value={email}
-            required
-            placeholder="your@email.com"
-          />
-        </div>
-        
-        {#if mode === 'signup'}
+
+      {#if mode === 'login' || mode === 'signup'}
+        <form on:submit|preventDefault={sendVerificationCode}>
           <div class="form-group">
-            <label for="username">Username</label>
+            <label class="form-label" for="email">Email</label>
             <input
+              class="form-input"
+              id="email"
+              type="email"
+              bind:value={email}
+              required
+              placeholder="your@email.com"
+            />
+          </div>
+
+          <div class="form-group username-field" class:show={mode === 'signup'}>
+            <label class="form-label" for="username">Username</label>
+            <input
+              class="form-input"
               id="username"
               type="text"
               bind:value={username}
-              required
+              required={mode === 'signup'}
               maxlength="100"
               placeholder="Choose a username"
             />
           </div>
-        {/if}
-        
-        {#if error}
-          <div class="error">{error}</div>
-        {/if}
-        
-        {#if message}
-          <div class="success">{message}</div>
-        {/if}
-        
-        <button type="submit" disabled={loading || !email}>
-          {loading ? 'Sending...' : 'Send Verification Code'}
-        </button>
-      </form>
-    {:else if mode === 'verify'}
-      <p class="info">Check your email for the verification code</p>
-      
-      <form on:submit|preventDefault={mode === 'login' ? handleLogin : handleSignup}>
-        <div class="form-group">
-          <label for="code">Verification Code</label>
-          <input
-            id="code"
-            type="text"
-            bind:value={verificationCode}
-            required
-            placeholder="Enter code from email"
-          />
+
+          {#if error}
+            <div class="error-message">{error}</div>
+          {/if}
+
+          {#if message}
+            <div class="success-message">{message}</div>
+          {/if}
+
+          <button class="primary-button" type="submit" disabled={loading || !email}>
+            {loading ? 'Sending...' : 'Send Verification Code'}
+          </button>
+        </form>
+
+        <div class="auth-mode-switch">
+          {#if mode === 'login'}
+            Don't have an account? <span class="auth-mode-link" on:click={() => switchMode('signup')} on:keypress={(e) => e.key === 'Enter' && switchMode('signup')} role="button" tabindex="0">Sign up</span>
+          {:else}
+            Already have an account? <span class="auth-mode-link" on:click={() => switchMode('login')} on:keypress={(e) => e.key === 'Enter' && switchMode('login')} role="button" tabindex="0">Log in</span>
+          {/if}
         </div>
-        
-        {#if error}
-          <div class="error">{error}</div>
-        {/if}
-        
-        <button type="submit" disabled={loading || !verificationCode}>
-          {loading ? 'Verifying...' : mode === 'signup' ? 'Complete Sign Up' : 'Login'}
-        </button>
-        
-        <button type="button" class="secondary" on:click={() => switchMode(mode)}>
-          Resend Code
-        </button>
-      </form>
-    {/if}
+      {:else if mode === 'verify'}
+        <p class="info-message">Check your email for the verification code</p>
+
+        <form on:submit|preventDefault={mode === 'login' ? handleLogin : handleSignup}>
+          <div class="form-group">
+            <label class="form-label" for="code">Verification Code</label>
+            <input
+              class="form-input"
+              id="code"
+              type="text"
+              bind:value={verificationCode}
+              required
+              placeholder="Enter code from email"
+            />
+          </div>
+
+          {#if error}
+            <div class="error-message">{error}</div>
+          {/if}
+
+          <button class="primary-button" type="submit" disabled={loading || !verificationCode}>
+            {loading ? 'Verifying...' : mode === 'signup' ? 'Complete Sign Up' : 'Login'}
+          </button>
+
+          <button class="secondary-button" type="button" on:click={() => switchMode(mode)}>
+            Resend Code
+          </button>
+        </form>
+      {/if}
+    </div>
+  </div>
+
+  <div class="auth-panel auth-image-panel">
+    <div class="auth-image-content">
+      <img class="auth-image" src="/group-photo.jpg" alt="Hack Club Shipwrecked" />
+      <div class="image-caption">
+        Hackers at <a href="https://shipwrecked.hackclub.com" target="_blank" rel="noopener noreferrer">Shipwrecked</a>, 2025
+      </div>
+    </div>
   </div>
 </div>
-
-<style>
-  .auth-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    padding: 2rem;
-  }
-  
-  .auth-card {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 2rem;
-    width: 100%;
-    max-width: 400px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
-  
-  h2 {
-    text-align: center;
-    margin-bottom: 2rem;
-    color: #ec3750;
-  }
-  
-  .tabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-  }
-  
-  .tabs button {
-    flex: 1;
-    padding: 0.75rem;
-    background: transparent;
-    border: 1px solid #646cff;
-    color: #646cff;
-    cursor: pointer;
-    transition: all 0.3s;
-  }
-  
-  .tabs button.active {
-    background: #646cff;
-    color: white;
-  }
-  
-  .form-group {
-    margin-bottom: 1.5rem;
-  }
-  
-  label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-  }
-  
-  input {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #444;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    color: inherit;
-    font-size: 1rem;
-    box-sizing: border-box;
-  }
-  
-  input:focus {
-    outline: none;
-    border-color: #646cff;
-  }
-  
-  button[type="submit"], .secondary {
-    width: 100%;
-    padding: 0.75rem;
-    margin-top: 0.5rem;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s;
-  }
-  
-  button[type="submit"] {
-    background: #646cff;
-    border: none;
-    color: white;
-  }
-  
-  button[type="submit"]:hover:not(:disabled) {
-    background: #535bf2;
-  }
-  
-  button[type="submit"]:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  
-  .secondary {
-    background: transparent;
-    border: 1px solid #646cff;
-    color: #646cff;
-  }
-  
-  .secondary:hover {
-    background: rgba(100, 108, 255, 0.1);
-  }
-  
-  .error {
-    padding: 0.75rem;
-    margin-bottom: 1rem;
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: 8px;
-    color: #ef4444;
-  }
-  
-  .success {
-    padding: 0.75rem;
-    margin-bottom: 1rem;
-    background: rgba(34, 197, 94, 0.1);
-    border: 1px solid rgba(34, 197, 94, 0.3);
-    border-radius: 8px;
-    color: #22c55e;
-  }
-  
-  .info {
-    text-align: center;
-    margin-bottom: 1.5rem;
-    color: #888;
-  }
-</style>
