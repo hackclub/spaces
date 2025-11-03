@@ -1,13 +1,13 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { API_BASE, ERROR_MESSAGES } from '../config.js';
-  
+
   export let spaces = [];
   export let authorization = '';
   export let username = '';
-  
+
   const dispatch = createEventDispatcher();
-  
+
   let showCreateForm = false;
   let newSpaceType = 'code-server';
   let newSpacePassword = '';
@@ -15,17 +15,19 @@
   let loading = false;
   let actionLoading = {};
   let actionError = {};
-  
+  let dropdownOpen = false;
+  let showPassword = false;
+
   const spaceTypes = [
     { value: 'code-server', label: 'VS Code Server', description: 'Web-based code editor' },
     { value: 'blender', label: 'Blender 3D', description: '3D modeling and animation' },
     { value: 'kicad', label: 'KiCad', description: 'PCB design software' }
   ];
-  
+
   async function createSpace() {
     error = '';
     loading = true;
-    
+
     try {
       const response = await fetch(`${API_BASE}/spaces/create`, {
         method: 'POST',
@@ -33,14 +35,14 @@
           'Content-Type': 'application/json',
           'Authorization': authorization,
         },
-        body: JSON.stringify({ 
-          password: newSpacePassword, 
-          type: newSpaceType 
+        body: JSON.stringify({
+          password: newSpacePassword,
+          type: newSpaceType
         }),
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         showCreateForm = false;
         newSpacePassword = '';
@@ -54,7 +56,7 @@
       loading = false;
     }
   }
-  
+
   async function loadSpaces() {
     try {
       const response = await fetch(`${API_BASE}/spaces/list`, {
@@ -62,9 +64,9 @@
           'Authorization': authorization,
         },
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         spaces = data.spaces;
       }
@@ -72,16 +74,15 @@
       console.error('Failed to load spaces:', err);
     }
   }
-  
+
   async function startSpace(spaceId) {
     actionLoading[spaceId] = 'starting';
     actionError[spaceId] = '';
     actionLoading = actionLoading;
     actionError = actionError;
-    
-    // Find the space to get its access_url
+
     const space = spaces.find(s => s.id === spaceId);
-    
+
     try {
       const response = await fetch(`${API_BASE}/spaces/start/${spaceId}`, {
         method: 'POST',
@@ -89,9 +90,9 @@
           'Authorization': authorization,
         },
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         await loadSpaces();
       } else {
@@ -104,19 +105,19 @@
     } finally {
       delete actionLoading[spaceId];
       actionLoading = actionLoading;
-      
+
       if (space && space.access_url) {
         window.location.href = space.access_url;
       }
     }
   }
-  
+
   async function stopSpace(spaceId) {
     actionLoading[spaceId] = 'stopping';
     actionError[spaceId] = '';
     actionLoading = actionLoading;
     actionError = actionError;
-    
+
     try {
       const response = await fetch(`${API_BASE}/spaces/stop/${spaceId}`, {
         method: 'POST',
@@ -124,9 +125,9 @@
           'Authorization': authorization,
         },
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         await loadSpaces();
       } else {
@@ -141,22 +142,22 @@
       actionLoading = actionLoading;
     }
   }
-  
+
   async function refreshStatus(spaceId) {
     actionLoading[spaceId] = 'refreshing';
     actionError[spaceId] = '';
     actionLoading = actionLoading;
     actionError = actionError;
-    
+
     try {
       const response = await fetch(`${API_BASE}/spaces/status/${spaceId}`, {
         headers: {
           'Authorization': authorization,
         },
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         await loadSpaces();
       } else {
@@ -171,83 +172,155 @@
       actionLoading = actionLoading;
     }
   }
-  
+
   function handleSignOut() {
     dispatch('signout');
   }
-  
-  function getStatusColor(status) {
+
+  function getStatusClass(status) {
     switch(status?.toLowerCase()) {
-      case 'running': return '#22c55e';
-      case 'stopped': return '#ef4444';
-      case 'created': return '#eab308';
-      default: return '#888';
+      case 'running': return 'status-running';
+      case 'stopped': return 'status-stopped';
+      case 'created': return 'status-created';
+      default: return 'status-unknown';
     }
+  }
+
+  function toggleDropdown() {
+    dropdownOpen = !dropdownOpen;
+  }
+
+  function selectSpaceType(value) {
+    newSpaceType = value;
+    dropdownOpen = false;
+  }
+
+  $: selectedType = spaceTypes.find(type => type.value === newSpaceType) || spaceTypes[0];
+
+  function togglePasswordVisibility() {
+    showPassword = !showPassword;
   }
 </script>
 
+<svelte:head>
+  <link rel="stylesheet" href="/src/styles/dashboard.css" />
+</svelte:head>
+
 <div class="dashboard">
-  <header>
-    <div>
-      <h1>Hack Club Spaces</h1>
-      <p class="welcome">Welcome, {username}!</p>
+  <header class="dashboard-header">
+    <div class="header-content">
+      <img class="dashboard-logo" src="https://icons.hackclub.com/api/icons/ec3750/clubs" alt="Hack Club" />
+      <div>
+        <h1 class="dashboard-title">Hack Club Spaces</h1>
+        <p class="welcome-text">Welcome, {username}!</p>
+      </div>
     </div>
-    <button class="signout" on:click={handleSignOut}>Sign Out</button>
+    <button class="signout-button" on:click={handleSignOut}>Sign Out</button>
   </header>
-  
-  <div class="content">
+
+  <div class="dashboard-content">
     <div class="actions-bar">
-      <button class="primary" on:click={() => showCreateForm = !showCreateForm}>
+      <button class="btn-primary" on:click={() => showCreateForm = !showCreateForm}>
         {showCreateForm ? 'Cancel' : '+ Create New Space'}
       </button>
-      <button class="secondary" on:click={loadSpaces}>
+      <button class="btn-secondary" on:click={loadSpaces}>
         Refresh
       </button>
     </div>
-    
+
     {#if showCreateForm}
       <div class="create-form">
-        <h3>Create New Space</h3>
-        
+        <h3 class="create-form-title">Create New Space</h3>
+
         <div class="form-group">
-          <label for="type">Space Type</label>
-          <select id="type" bind:value={newSpaceType}>
-            {#each spaceTypes as spaceType}
-              <option value={spaceType.value}>
-                {spaceType.label} - {spaceType.description}
-              </option>
-            {/each}
-          </select>
+          <label class="form-label" for="type">Space Type</label>
+          <div class="custom-select">
+            <button
+              type="button"
+              class="select-trigger"
+              class:open={dropdownOpen}
+              on:click={toggleDropdown}
+            >
+              {selectedType.label}
+            </button>
+            <div class="select-arrow" class:open={dropdownOpen}></div>
+            <div class="select-dropdown" class:open={dropdownOpen}>
+              {#each spaceTypes as spaceType}
+                <div
+                  class="select-option"
+                  class:selected={spaceType.value === newSpaceType}
+                  on:click={() => selectSpaceType(spaceType.value)}
+                  on:keypress={(e) => e.key === 'Enter' && selectSpaceType(spaceType.value)}
+                  role="option"
+                  tabindex="0"
+                  aria-selected={spaceType.value === newSpaceType}
+                >
+                  <div class="option-label">{spaceType.label}</div>
+                  <div class="option-description">{spaceType.description}</div>
+                </div>
+              {/each}
+            </div>
+          </div>
         </div>
-        
+
         <div class="form-group">
-          <label for="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            bind:value={newSpacePassword}
-            required
-            placeholder="Set a password for this space"
-          />
+          <label class="form-label" for="password">Password</label>
+          <div class="password-input-wrapper">
+            {#if showPassword}
+              <input
+                class="form-input password-input"
+                id="password"
+                type="text"
+                bind:value={newSpacePassword}
+                required
+                placeholder="Set a password for this space"
+              />
+            {:else}
+              <input
+                class="form-input password-input"
+                id="password"
+                type="password"
+                bind:value={newSpacePassword}
+                required
+                placeholder="Set a password for this space"
+              />
+            {/if}
+            <button
+              type="button"
+              class="password-toggle"
+              on:click={togglePasswordVisibility}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {#if showPassword}
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M53.92,34.62A8,8,0,1,0,42.08,45.38L61.32,66.55C25,88.84,9.38,123.2,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208a127.11,127.11,0,0,0,52.07-10.83l22,24.21a8,8,0,1,0,11.84-10.76Zm47.33,75.84,41.67,45.85a32,32,0,0,1-41.67-45.85ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.16,133.16,0,0,1,25,128c4.69-8.79,19.66-33.39,47.35-49.38l18,19.75a48,48,0,0,0,63.66,70l14.73,16.2A112,112,0,0,1,128,192Zm6-95.43a8,8,0,0,1,3-15.72,48.16,48.16,0,0,1,38.77,42.64,8,8,0,0,1-7.22,8.71,6.39,6.39,0,0,1-.75,0,8,8,0,0,1-8-7.26A32.09,32.09,0,0,0,134,96.57Zm113.28,34.69c-.42.94-10.55,23.37-33.36,43.8a8,8,0,1,1-10.67-11.92A132.77,132.77,0,0,0,231.05,128a133.15,133.15,0,0,0-23.12-30.77C185.67,75.19,158.78,64,128,64a118.37,118.37,0,0,0-19.36,1.57A8,8,0,1,1,106,49.79,134,134,0,0,1,128,48c34.88,0,66.57,13.26,91.66,38.35,18.83,18.83,27.3,37.62,27.65,38.41A8,8,0,0,1,247.31,131.26Z"></path>
+                </svg>
+              {:else}
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
+                  <path d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"></path>
+                </svg>
+              {/if}
+            </button>
+          </div>
         </div>
-        
+
         {#if error}
-          <div class="error">{error}</div>
+          <div class="error-message">{error}</div>
         {/if}
-        
-        <button 
-          class="primary" 
-          on:click={createSpace} 
+
+        <button
+          class="btn-primary"
+          on:click={createSpace}
           disabled={loading || !newSpacePassword}
         >
           {loading ? 'Creating...' : 'Create Space'}
         </button>
       </div>
     {/if}
-    
+
     <div class="spaces-list">
-      <h3>Your Spaces</h3>
-      
+      <h3 class="section-title">Your Spaces</h3>
+
       {#if spaces.length === 0}
         <div class="empty-state">
           <p>No spaces yet. Create your first space to get started!</p>
@@ -257,19 +330,16 @@
           {#each spaces as space}
             <div class="space-card">
               <div class="space-header">
-                <h4>{space.type}</h4>
-                <span 
-                  class="status-badge" 
-                  style="background-color: {getStatusColor(space.status)}"
-                >
+                <h4 class="space-type">{space.type}</h4>
+                <span class="status-badge {getStatusClass(space.status)}">
                   {space.status || 'Unknown'}
                 </span>
               </div>
-              
+
               <div class="space-info">
                 <p><strong>Space ID:</strong> {space.id}</p>
                 {#if space.url}
-                  <p><strong>URL:</strong> 
+                  <p><strong>URL:</strong>
                     <a href={space.url} target="_blank" rel="noopener noreferrer">
                       {space.url}
                     </a>
@@ -277,11 +347,11 @@
                 {/if}
                 <p><strong>Created:</strong> {new Date(space.created_at).toLocaleString()}</p>
               </div>
-              
+
               {#if actionError[space.id]}
-                <div class="error small">{actionError[space.id]}</div>
+                <div class="error-message small">{actionError[space.id]}</div>
               {/if}
-              
+
               <div class="space-actions">
                 {#if actionLoading[space.id]}
                   <button disabled class="action-btn">
@@ -289,16 +359,16 @@
                   </button>
                 {:else}
                   {#if space.status?.toLowerCase() === 'running'}
-                    <button 
-                      class="action-btn stop" 
+                    <button
+                      class="action-btn stop"
                       on:click={() => stopSpace(space.id)}
                     >
                       Stop
                     </button>
                     {#if space.url}
-                      <a 
-                        href={space.url} 
-                        target="_blank" 
+                      <a
+                        href={space.url}
+                        target="_blank"
                         rel="noopener noreferrer"
                         class="action-btn open"
                       >
@@ -306,15 +376,15 @@
                       </a>
                     {/if}
                   {:else}
-                    <button 
-                      class="action-btn start" 
+                    <button
+                      class="action-btn start"
                       on:click={() => startSpace(space.id)}
                     >
                       Start
                     </button>
                   {/if}
-                  <button 
-                    class="action-btn refresh" 
+                  <button
+                    class="action-btn refresh"
                     on:click={() => refreshStatus(space.id)}
                   >
                     ↻
@@ -328,274 +398,3 @@
     </div>
   </div>
 </div>
-
-<style>
-  .dashboard {
-    min-height: 100vh;
-    padding: 2rem;
-  }
-  
-  header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    padding-bottom: 1rem;
-    border-bottom: 2px solid #333;
-  }
-  
-  h1 {
-    margin: 0;
-    color: #ec3750;
-  }
-  
-  .welcome {
-    margin: 0.5rem 0 0 0;
-    color: #888;
-  }
-  
-  .signout {
-    padding: 0.5rem 1rem;
-    background: transparent;
-    border: 1px solid #ef4444;
-    color: #ef4444;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s;
-  }
-  
-  .signout:hover {
-    background: rgba(239, 68, 68, 0.1);
-  }
-  
-  .content {
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-  
-  .actions-bar {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
-  }
-  
-  .primary {
-    background: #646cff;
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.3s;
-  }
-  
-  .primary:hover:not(:disabled) {
-    background: #535bf2;
-  }
-  
-  .primary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  
-  .secondary {
-    background: transparent;
-    border: 1px solid #646cff;
-    color: #646cff;
-    padding: 0.75rem 1.5rem;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s;
-  }
-  
-  .secondary:hover {
-    background: rgba(100, 108, 255, 0.1);
-  }
-  
-  .create-form {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 2rem;
-    border-radius: 12px;
-    margin-bottom: 2rem;
-  }
-  
-  .create-form h3 {
-    margin-top: 0;
-  }
-  
-  .form-group {
-    margin-bottom: 1.5rem;
-  }
-  
-  label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-  }
-  
-  input, select {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #444;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    color: inherit;
-    font-size: 1rem;
-    box-sizing: border-box;
-  }
-  
-  input:focus, select:focus {
-    outline: none;
-    border-color: #646cff;
-  }
-  
-  .error {
-    padding: 0.75rem;
-    margin-bottom: 1rem;
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: 8px;
-    color: #ef4444;
-  }
-  
-  .error.small {
-    padding: 0.5rem;
-    font-size: 0.875rem;
-  }
-  
-  .spaces-list h3 {
-    margin-bottom: 1.5rem;
-  }
-  
-  .empty-state {
-    text-align: center;
-    padding: 3rem;
-    color: #888;
-  }
-  
-  .spaces-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.5rem;
-  }
-  
-  .space-card {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 1.5rem;
-    border-radius: 12px;
-    border: 1px solid #333;
-    transition: all 0.3s;
-  }
-  
-  .space-card:hover {
-    border-color: #646cff;
-    box-shadow: 0 4px 12px rgba(100, 108, 255, 0.1);
-  }
-  
-  .space-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-  }
-  
-  .space-header h4 {
-    margin: 0;
-    text-transform: capitalize;
-  }
-  
-  .status-badge {
-    padding: 0.25rem 0.75rem;
-    border-radius: 12px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: white;
-  }
-  
-  .space-info {
-    margin-bottom: 1rem;
-    font-size: 0.875rem;
-  }
-  
-  .space-info p {
-    margin: 0.5rem 0;
-    color: #888;
-  }
-  
-  .space-info strong {
-    color: #ccc;
-  }
-  
-  .space-info a {
-    color: #646cff;
-    text-decoration: none;
-  }
-  
-  .space-info a:hover {
-    text-decoration: underline;
-  }
-  
-  .space-actions {
-    display: flex;
-    gap: 0.5rem;
-  }
-  
-  .action-btn {
-    flex: 1;
-    padding: 0.5rem;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.3s;
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .action-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  
-  .action-btn.start {
-    background: #22c55e;
-    color: white;
-  }
-  
-  .action-btn.start:hover:not(:disabled) {
-    background: #16a34a;
-  }
-  
-  .action-btn.stop {
-    background: #ef4444;
-    color: white;
-  }
-  
-  .action-btn.stop:hover:not(:disabled) {
-    background: #dc2626;
-  }
-  
-  .action-btn.open {
-    background: #646cff;
-    color: white;
-  }
-  
-  .action-btn.open:hover {
-    background: #535bf2;
-  }
-  
-  .action-btn.refresh {
-    background: transparent;
-    border: 1px solid #646cff;
-    color: #646cff;
-    flex: 0 0 auto;
-    min-width: 40px;
-  }
-  
-  .action-btn.refresh:hover:not(:disabled) {
-    background: rgba(100, 108, 255, 0.1);
-  }
-</style>
