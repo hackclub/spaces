@@ -73,7 +73,7 @@ export const createContainer = async (password, type, authorization) => {
         description: config.description,
         image: config.image,
         port,
-        access_url: `${process.env.SERVER_URL}:${port}`
+        access_url: `${process.env.SERVER_URL}/port/${port}`
       })
       .returning(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url']);
 
