@@ -5,6 +5,7 @@
   const dispatch = createEventDispatcher();
 
   let mode = 'login';
+  let authIntent = 'login'; // Track original intent (login/signup) even when in verify mode
   let email = '';
   let username = '';
   let verificationCode = '';
@@ -108,6 +109,7 @@
     error = '';
     message = '';
     verificationCode = '';
+    authIntent = newMode; // Update the auth intent
     setTimeout(() => {
       mode = newMode;
     }, 400);
@@ -184,7 +186,7 @@
       {:else if mode === 'verify'}
         <p class="info-message">Check your email for the verification code</p>
 
-        <form on:submit|preventDefault={mode === 'login' ? handleLogin : handleSignup}>
+        <form on:submit|preventDefault={authIntent === 'login' ? handleLogin : handleSignup}>
           <div class="form-group">
             <label class="form-label" for="code">Verification Code</label>
             <input
@@ -202,7 +204,7 @@
           {/if}
 
           <button class="primary-button" type="submit" disabled={loading || !verificationCode}>
-            {loading ? 'Verifying...' : mode === 'signup' ? 'Complete Sign Up' : 'Login'}
+            {loading ? 'Verifying...' : authIntent === 'signup' ? 'Complete Sign Up' : 'Login'}
           </button>
 
           <button class="secondary-button" type="button" on:click={() => switchMode(mode)}>

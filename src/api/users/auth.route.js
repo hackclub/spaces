@@ -144,9 +144,9 @@ router.post('/signup', async (req, res) => {
 // POST /api/v1/users/login
 router.post('/login', async (req, res) => {
   try {
-    const { email, code } = req.body;
+    const { email, verificationCode } = req.body;
     
-    if (!email || !code) {
+    if (!email || !verificationCode) {
       return res.status(400).json({
         success: false,
         message: 'Email and verification code are required'
@@ -161,7 +161,7 @@ router.post('/login', async (req, res) => {
       });
     }
     
-    const codeValid = await checkEmail(email, code);
+    const codeValid = await checkEmail(email, verificationCode);
     if (!codeValid) {
       return res.status(400).json({
         success: false,

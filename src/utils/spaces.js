@@ -73,12 +73,12 @@ export const createContainer = async (password, type, authorization) => {
         description: config.description,
         image: config.image,
         port,
-        access_url: `${process.env.SERVER_URL}/port/${port}`
+        access_url: `${process.env.SERVER_URL}/space/${port}/`
       })
       .returning(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url']);
 
-    if (process.env.DOCKER === 'true') {
-      newSpace.access_url = `http://${process.env.SERVER_URL}/ports/${newSpace.port}`;
+    if (process.env.DOCKER === 'false') {
+      newSpace.access_url = `http://${process.env.SERVER_URL}:${newSpace.port}`;
     }
 
     return {
