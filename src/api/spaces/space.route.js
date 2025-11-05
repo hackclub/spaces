@@ -4,7 +4,8 @@ import {
   startContainer, 
   stopContainer, 
   getContainerStatus,
-  getUserSpaces
+  getUserSpaces,
+  deleteSpace
 } from "../../utils/spaces.js";
 
 const router = express.Router();
@@ -80,6 +81,19 @@ router.get("/list", async (req, res) => {
     });
   } catch (err) {
     const statusCode = err.message.includes("Missing") || err.message.includes("Invalid authorization") ? 400 : 500;
+    res.status(statusCode).json({ error: err.message });
+  }
+});
+
+router.delete("/delete/:spaceId", async (req, res) => {
+  const { spaceId } = req.params;
+  const authorization = req.headers.authorization;
+  
+  try {
+    const result = await deleteSpace(spaceId, authorization);
+    res.json(result);
+  } catch (err) {
+    const statusCode = err.statusCode || (err.message.includes("required") || err.message.includes("Missing") || err.message.includes("Invalid authorization") ? 400 : 500);
     res.status(statusCode).json({ error: err.message });
   }
 });

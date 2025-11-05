@@ -2,6 +2,7 @@
 node_modules
 dist
 build
+AGENTS.md
 .github
 .vscode
 .DS_Store

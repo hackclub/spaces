@@ -2,6 +2,12 @@ import Docker from "dockerode";
 import getPort from "get-port";
 import pg from "./db.js";
 import { getUser } from "./user.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const docker = new Docker();
 
@@ -9,7 +15,10 @@ const containerConfigs = {
   "code-server": {
     image: "linuxserver/code-server",
     port: "8443/tcp",
-    env: (password) => [`PASSWORD=${password}`],
+    env: (password, port) => [
+      `PASSWORD=${password}`,
+      `DEFAULT_WORKSPACE=/config/workspace`
+    ],
     description: "VS Code Server"
   },
   "blender": {
@@ -56,14 +65,47 @@ export const createContainer = async (password, type, authorization) => {
 
     const container = await docker.createContainer({
       Image: config.image,
-      Env: config.env(password),
+      Env: config.env(password, port),
       ExposedPorts: { [config.port]: {} },
       HostConfig: {
         PortBindings: { [config.port]: [{ HostPort: `${port}` }] },
+        NetworkMode: "bridge",
+        Dns: ["8.8.8.8", "8.8.4.4", "1.1.1.1"],
+        PublishAllPorts: false,
+        RestartPolicy: { Name: "unless-stopped" }
       },
     });
 
     await container.start();
+
+    if (type.toLowerCase() === "code-server") {
+      try {
+        console.log("Running setup script for code-server container...");
+        const setupScriptPath = path.join(__dirname, "../../code-server-setup.sh");
+        const setupScript = fs.readFileSync(setupScriptPath, "utf8");
+        
+        const exec = await container.exec({
+          Cmd: ["bash", "-c", `cat > /tmp/setup.sh << 'EOF'\n${setupScript}\nEOF && chmod +x /tmp/setup.sh && /tmp/setup.sh`],
+          AttachStdout: true,
+          AttachStderr: true,
+        });
+        
+        const stream = await exec.start();
+        stream.pipe(process.stdout);
+        
+        console.log("Setup script executed successfully");
+      } catch (setupErr) {
+        console.error("Failed to run setup script (container will still be created):", setupErr);
+      }
+    }
+
+    if (process.env.DOCKER === 'false') {
+      console.log("Non-Docker environment detected, adjusting access URL");
+      var access_url = `${process.env.SERVER_URL}:${port}`;
+    } else {
+      console.log("Docker environment detected, using standard access URL");
+      var access_url = `${process.env.SERVER_URL}/space/${port}/`;
+    }
 
     const [newSpace] = await pg('spaces')
       .insert({
@@ -73,13 +115,10 @@ export const createContainer = async (password, type, authorization) => {
         description: config.description,
         image: config.image,
         port,
-        access_url: `${process.env.SERVER_URL}/space/${port}/`
+        access_url: access_url
       })
       .returning(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url']);
 
-    if (process.env.DOCKER === 'false') {
-      newSpace.access_url = `http://${process.env.SERVER_URL}:${newSpace.port}`;
-    }
 
     return {
       message: "Container created successfully",
@@ -297,3 +336,63 @@ export const getSpacesByUserId = async (userId) => {
     throw new Error("Failed to get spaces for user");
   }
 };
+
+export const deleteSpace = async (spaceId, authorization) => {
+  if (!spaceId) {
+    throw new Error("Space ID is required");
+  }
+
+  if (!authorization) {
+    throw new Error("Missing authorization token");
+  }
+
+  const user = await getUser(authorization);
+  if (!user) {
+    throw new Error("Invalid authorization token");
+  }
+
+  try {
+    const space = await pg('spaces')
+      .where('id', spaceId)
+      .where('user_id', user.id)
+      .first();
+
+    if (!space) {
+      const error = new Error("Space not found or not owned by user");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const container = docker.getContainer(space.container_id);
+    
+    try {
+      await container.inspect();
+      await container.stop();
+    } catch (err) {
+      console.log("Container already stopped or doesn't exist, continuing with deletion");
+    }
+    
+    try {
+      await container.remove();
+    } catch (err) {
+      console.error("Failed to remove container:", err);
+    }
+    
+    await pg('spaces')
+      .where('id', spaceId)
+      .delete();
+    
+    return {
+      message: "Space deleted successfully",
+      spaceId: space.id,
+    };
+  } catch (err) {
+    console.error("Error deleting space:", err);
+    
+    if (err.statusCode === 404) {
+      throw err;
+    }
+    
+    throw new Error("Failed to delete space");
+  }
+}

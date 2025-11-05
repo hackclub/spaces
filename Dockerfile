@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     software-properties-common \
     supervisor \
     nginx \
+    iptables \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Docker Engine for Docker-in-Docker
@@ -54,7 +55,7 @@ nodaemon=true
 user=root
 
 [program:dockerd]
-command=dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2376 --storage-driver=overlay2
+command=dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2376 --storage-driver=overlay2 --iptables=true --ip-forward=true --ip-masq=true
 autostart=true
 autorestart=true
 stderr_logfile=/var/log/supervisor/dockerd.err.log
@@ -91,7 +92,7 @@ EOF
 
 # Copy and setup startup script
 COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+RUN sed -i 's/\r$//' /app/start.sh && chmod +x /app/start.sh
 
 # Expose ports
 EXPOSE 80 3000 5173

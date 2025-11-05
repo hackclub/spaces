@@ -173,6 +173,41 @@
     }
   }
 
+  async function deleteSpace(spaceId) {
+    if (!confirm('Are you sure you want to delete this space? This action cannot be undone.')) {
+      return;
+    }
+
+    actionLoading[spaceId] = 'deleting';
+    actionError[spaceId] = '';
+    actionLoading = actionLoading;
+    actionError = actionError;
+
+    try {
+      const response = await fetch(`${API_BASE}/spaces/delete/${spaceId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': authorization,
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        await loadSpaces();
+      } else {
+        actionError[spaceId] = data.error || 'Failed to delete space';
+        actionError = actionError;
+      }
+    } catch (err) {
+      actionError[spaceId] = ERROR_MESSAGES.NETWORK_ERROR;
+      actionError = actionError;
+    } finally {
+      delete actionLoading[spaceId];
+      actionLoading = actionLoading;
+    }
+  }
+
   function handleSignOut() {
     dispatch('signout');
   }
@@ -388,6 +423,12 @@
                     on:click={() => refreshStatus(space.id)}
                   >
                     ↻
+                  </button>
+                  <button
+                    class="action-btn delete"
+                    on:click={() => deleteSpace(space.id)}
+                  >
+                    Delete
                   </button>
                 {/if}
               </div>
