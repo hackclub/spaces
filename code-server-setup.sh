@@ -15,16 +15,11 @@ sudo apt install -y \
     wget \
     git \
     nano \
-    htop \
-    tree \
     unzip \
-    zip \
     build-essential \
-    software-properties-common \
     apt-transport-https \
     ca-certificates \
-    gnupg \
-    lsb-release
+    gnupg 
 
 echo "🐍 Setting up Python environment..."
 sudo apt install -y \
@@ -34,8 +29,6 @@ sudo apt install -y \
     python3-dev \
     python3-setuptools
 
-python3 -m pip install --user pipx
-python3 -m pipx ensurepath
 
 echo "📗 Setting up Node.js..."
 curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
