@@ -25,7 +25,7 @@ router.post("/create", async (req, res) => {
       });
     }
     
-    const statusCode = err.message.includes("Missing") || err.message.includes("Invalid authorization") ? 400 : 500;
+    const statusCode = err.statusCode || (err.message.includes("Missing") || err.message.includes("Invalid authorization") ? 400 : 500);
     res.status(statusCode).json({ error: err.message });
   }
 });

@@ -108,7 +108,8 @@ router.post('/signup', async (req, res) => {
       .insert({
         email,
         username,
-        authorization: authToken
+        authorization: authToken,
+        max_spaces: 3
       })
       .returning(['id', 'email', 'username', 'authorization']);
     

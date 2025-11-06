@@ -1,7 +1,7 @@
 import Docker from "dockerode";
 import getPort from "get-port";
 import pg from "./db.js";
-import { getUser } from "./user.js";
+import { getUser, checkUserSpaceLimit } from "./user.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -52,6 +52,8 @@ export const createContainer = async (password, type, authorization) => {
   if (!user) {
     throw new Error("Invalid authorization token");
   }
+
+  await checkUserSpaceLimit(user.id);
 
   const config = containerConfigs[type.toLowerCase()];
   if (!config) {

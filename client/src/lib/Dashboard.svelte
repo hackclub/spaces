@@ -48,7 +48,11 @@
         newSpacePassword = '';
         await loadSpaces();
       } else {
-        error = data.error || ERROR_MESSAGES.CREATE_FAILED;
+        if (response.status === 403 && data.error?.includes('Maximum space limit')) {
+          error = data.error;
+        } else {
+          error = data.error || ERROR_MESSAGES.CREATE_FAILED;
+        }
       }
     } catch (err) {
       error = ERROR_MESSAGES.NETWORK_ERROR;
