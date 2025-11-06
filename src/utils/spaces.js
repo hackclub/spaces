@@ -85,7 +85,7 @@ export const createContainer = async (password, type, authorization) => {
         const setupScript = fs.readFileSync(setupScriptPath, "utf8");
         
         const exec = await container.exec({
-          Cmd: ["bash", "-c", `cat > /tmp/setup.sh << 'EOF'\n${setupScript}\nEOF && chmod +x /tmp/setup.sh && /tmp/setup.sh`],
+          Cmd: ["bash", "-c", `cat > /tmp/setup.sh << 'EOF'\n${setupScript}\nEOF\nchmod +x /tmp/setup.sh && /tmp/setup.sh > /app/postinstall.log 2>&1`],
           AttachStdout: true,
           AttachStderr: true,
         });
