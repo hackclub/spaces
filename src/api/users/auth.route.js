@@ -17,7 +17,7 @@ router.get('/send', (req, res) => {
 });
 
 // POST /api/v1/users/send 
-router.post('/send', strictLimiter, async (req, res) => {
+router.post('/send', /* strictLimiter, */ async (req, res) => {
   try {
     const { email } = req.body;
     
@@ -57,7 +57,7 @@ router.post('/send', strictLimiter, async (req, res) => {
 });
 
 // POST /api/v1/users/signup 
-router.post('/signup', authLimiter, async (req, res) => {
+router.post('/signup', /* authLimiter, */ async (req, res) => {
   try {
     const { email, username, verificationCode } = req.body;
     
@@ -146,7 +146,7 @@ router.post('/signup', authLimiter, async (req, res) => {
 });
 
 // POST /api/v1/users/login
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/login', /* authLimiter, */ async (req, res) => {
   try {
     const { email, verificationCode } = req.body;
     
