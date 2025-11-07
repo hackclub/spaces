@@ -4,7 +4,11 @@ Spaces is a web app that allows access to visual studio code, kicad, and blender
 ## Setup:
 ### Manual Setup:
 #### Prerequisites: 
-Before installing, you must have docker set up and the daemon running. You must also have nodejs and npm installed.
+Before installing, you must have:
+- Docker installed and the daemon running
+- Node.js (v18.x or higher) and npm installed
+- PostgreSQL database set up and accessible
+- Airtable account with API key and base ID for email verification
 
 #### Installation: 
 ```bash
@@ -29,9 +33,12 @@ npm run serve:client
 ### Docker Setup:
 
 #### Prerequisites: 
-Before installing, you must have both docker and docker-compose set up and the daemon running.
+Before installing, you must have:
+- Docker and docker-compose installed and the daemon running
+- PostgreSQL database set up and accessible
+- Airtable account with API key and base ID for email verification
 
-### Installation:
+#### Installation:
 ```bash
 git clone https://github.com/hackclub/spaces-new.git
 
@@ -48,12 +55,31 @@ docker compose up --build
 PG_CONNECTION_STRING=your-postgres-db-url
 # airtable credentials for email otps
 AIRTABLE_API_KEY=your-airtable-pat
-AIRTABLE_BASE_ID=your=airtable-baseid
-# port for backend server
+AIRTABLE_BASE_ID=your-airtable-base-id
+
+# Server configuration
 PORT=3000
-# set to true if using docker
+NODE_ENV=development
+
+# Frontend configuration
+FRONTEND_URL=http://localhost:5173
+
+# Server URL for container access URLs
+SERVER_URL=http://localhost
+
+# Set to 'true' if running in Docker, 'false' for manual setup
 DOCKER=false
 ```
+
+**Required Environment Variables:**
+- `PG_CONNECTION_STRING` - PostgreSQL database connection URL
+- `AIRTABLE_API_KEY` - Airtable API key for email verification
+- `AIRTABLE_BASE_ID` - Airtable base ID for storing verification codes
+- `PORT` - Backend server port (default: 3000)
+- `DOCKER` - Must be 'true' for Docker setup, 'false' for manual setup
+- `SERVER_URL` - Base URL for container access (e.g., http://localhost or your domain)
+- `FRONTEND_URL` - Frontend URL for CORS (default: http://localhost:5173)
+- `NODE_ENV` - Environment mode: 'development' or 'production'
 
 ## API Documentation:
 
