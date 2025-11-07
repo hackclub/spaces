@@ -44,6 +44,9 @@ RUN cd client && npm install
 # Copy application code
 COPY . .
 
+# Build frontend
+RUN cd client && npm run build
+
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
@@ -55,7 +58,7 @@ nodaemon=true
 user=root
 
 [program:dockerd]
-command=dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2376 --storage-driver=overlay2 --iptables=true --ip-forward=true --ip-masq=true
+command=dockerd --host=unix:///var/run/docker.sock --storage-driver=overlay2 --exec-opt native.cgroupdriver=cgroupfs --iptables=true --ip-forward=true --ip-masq=true
 autostart=true
 autorestart=true
 stderr_logfile=/var/log/supervisor/dockerd.err.log
@@ -71,14 +74,14 @@ stderr_logfile=/var/log/supervisor/docker-pull.err.log
 stdout_logfile=/var/log/supervisor/docker-pull.out.log
 priority=150
 
-[program:dev-server]
-command=npm run dev
+[program:backend]
+command=npm run serve:server
 directory=/app
 autostart=true
 autorestart=true
-stderr_logfile=/var/log/supervisor/dev-server.err.log
-stdout_logfile=/var/log/supervisor/dev-server.out.log
-environment=NODE_ENV=development
+stderr_logfile=/var/log/supervisor/backend.err.log
+stdout_logfile=/var/log/supervisor/backend.out.log
+environment=NODE_ENV=production
 priority=200
 
 [program:nginx]
@@ -95,10 +98,10 @@ COPY start.sh /app/start.sh
 RUN sed -i 's/\r$//' /app/start.sh && chmod +x /app/start.sh
 
 # Expose ports
-EXPOSE 80 3000 5173
+EXPOSE 80 3000
 
 # Set environment variables
-ENV NODE_ENV=development
+ENV NODE_ENV=production
 ENV DOCKER_HOST=unix:///var/run/docker.sock
 ENV DOCKER_TLS_CERTDIR=""
 

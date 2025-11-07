@@ -1,6 +1,7 @@
 import express from "express"; 
 import spaces from './spaces/space.route.js';
 import auth from './users/auth.route.js';
+import admin from './admin/admin.route.js';
 
 
 const router = express.Router();
@@ -13,4 +14,5 @@ router.get('/', (req, res) => {
 
 router.use('/spaces/', spaces);
 router.use('/users/', auth);
+router.use('/admin/', admin);
 export default router;

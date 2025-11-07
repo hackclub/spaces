@@ -10,7 +10,6 @@ const pg = knex({
 });
 
 console.log("Connected to PostgreSQL database");
-console.log(`Using connection string: ${process.env.PG_CONNECTION_STRING}`);
 
 export default pg;
     

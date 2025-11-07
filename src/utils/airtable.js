@@ -92,7 +92,7 @@ export const sendEmail = async (email) => {
       code: code
     });
     
-    console.log(`Email verification code ${code} created for ${email}`);
+    console.log(`Email verification code created for ${email}`);
     return {
       success: true,
       recordId: record.id,
@@ -120,7 +120,7 @@ export const checkEmail = async (email, codeToCheck) => {
     const latestRecord = records[0];
     
     if (latestRecord.fields.code !== codeToCheck) {
-      console.log(`Verification code ${latestRecord.fields.code} for ${email} does not match most recent one ${codeToCheck}.`);
+      console.log(`Verification code for ${email} does not match.`);
       return false; 
     }
     

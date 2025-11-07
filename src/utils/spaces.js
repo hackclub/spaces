@@ -5,6 +5,7 @@ import { getUser, checkUserSpaceLimit } from "./user.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import crypto from "crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,10 +37,6 @@ const containerConfigs = {
 };
 
 export const createContainer = async (password, type, authorization) => {
-  if (!password) {
-    throw new Error("Missing container password");
-  }
-  
   if (!type) {
     throw new Error("Missing container type");
   }
@@ -62,6 +59,13 @@ export const createContainer = async (password, type, authorization) => {
     throw error;
   }
 
+  const typeLower = type.toLowerCase();
+  if (typeLower === "kicad" || typeLower === "blender") {
+    password = crypto.randomBytes(16).toString('hex');
+  } else if (!password) {
+    throw new Error("Missing container password");
+  }
+
   try {
     const port = await getPort();
 
@@ -74,7 +78,16 @@ export const createContainer = async (password, type, authorization) => {
         NetworkMode: "bridge",
         Dns: ["8.8.8.8", "8.8.4.4", "1.1.1.1"],
         PublishAllPorts: false,
-        RestartPolicy: { Name: "unless-stopped" }
+        RestartPolicy: { Name: "unless-stopped" },
+        Memory: 2 * 1024 * 1024 * 1024,
+        MemorySwap: 2 * 1024 * 1024 * 1024,
+        NanoCpus: 2000000000,
+        CpuShares: 1024,
+        PidsLimit: 512,
+        SecurityOpt: ["no-new-privileges:true"],
+        ReadonlyRootfs: false,
+        CapDrop: ["ALL"],
+        CapAdd: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID", "NET_BIND_SERVICE"]
       },
     });
 
@@ -106,23 +119,42 @@ export const createContainer = async (password, type, authorization) => {
       var access_url = `${process.env.SERVER_URL}:${port}`;
     } else {
       console.log("Docker environment detected, using standard access URL");
-      var access_url = `${process.env.SERVER_URL}/space/${port}/`;
+      if (type.toLowerCase() === 'kicad') {
+        var access_url = `${process.env.SERVER_URL}/kicad/space/${port}/`;
+      } else {
+        var access_url = `${process.env.SERVER_URL}/space/${port}/`;
+      }
+    }
+
+    if (typeLower === "kicad" || typeLower === "blender") {
+      const urlObj = new URL(access_url);
+      urlObj.username = "abc";
+      urlObj.password = password;
+      access_url = urlObj.toString();
+    }
+
+    const insertData = {
+      user_id: user.id,
+      container_id: container.id,
+      type: type.toLowerCase(),
+      description: config.description,
+      image: config.image,
+      port,
+      access_url: access_url,
+      running: true,
+      started_at: new Date()
+    };
+
+    if (typeLower === "kicad" || typeLower === "blender") {
+      insertData.password = password;
     }
 
     const [newSpace] = await pg('spaces')
-      .insert({
-        user_id: user.id,
-        container_id: container.id,
-        type: type.toLowerCase(),
-        description: config.description,
-        image: config.image,
-        port,
-        access_url: access_url
-      })
-      .returning(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url']);
+      .insert(insertData)
+      .returning(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'running']);
 
 
-    return {
+    const result = {
       message: "Container created successfully",
       spaceId: newSpace.id,
       containerId: newSpace.container_id,
@@ -132,6 +164,12 @@ export const createContainer = async (password, type, authorization) => {
       port: newSpace.port,
       accessUrl: newSpace.access_url
     };
+
+    if (newSpace.password) {
+      result.password = newSpace.password;
+    }
+
+    return result;
   } catch (err) {
     console.error("Docker error:", err);
     throw new Error("Failed to create container");
@@ -164,10 +202,31 @@ export const startContainer = async (spaceId, authorization) => {
       throw error;
     }
 
+    // Check if user already has a running space
+    const runningSpace = await pg('spaces')
+      .where('user_id', user.id)
+      .where('running', true)
+      .whereNot('id', spaceId)
+      .first();
+
+    if (runningSpace) {
+      const error = new Error("You can only have one space running at a time. Please stop your other space first.");
+      error.statusCode = 400;
+      throw error;
+    }
+
     const container = docker.getContainer(space.container_id);
     
     await container.inspect();
     await container.start();
+    
+    // Update running status and started_at timestamp in database
+    await pg('spaces')
+      .where('id', spaceId)
+      .update({ 
+        running: true,
+        started_at: new Date()
+      });
     
     return {
       message: "Container started successfully",
@@ -186,6 +245,9 @@ export const startContainer = async (spaceId, authorization) => {
       const error = new Error("Container is already running");
       error.statusCode = 400;
       throw error;
+    }
+    if (err.statusCode === 400) {
+      throw err;
     }
     
     throw new Error("Failed to start container");
@@ -222,6 +284,14 @@ export const stopContainer = async (spaceId, authorization) => {
     
     await container.inspect();
     await container.stop();
+    
+    // Update running status and clear started_at timestamp in database
+    await pg('spaces')
+      .where('id', spaceId)
+      .update({ 
+        running: false,
+        started_at: null
+      });
     
     return {
       message: "Container stopped successfully",
@@ -312,9 +382,16 @@ export const getUserSpaces = async (authorization) => {
   try {
     const spaces = await pg('spaces')
       .where('user_id', user.id)
-      .select(['id', 'type', 'description', 'image', 'port', 'access_url', 'created_at']);
+      .select(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'created_at', 'running']);
 
-    return spaces;
+    const spacesWithStatus = spaces.map((space) => {
+      return {
+        ...space,
+        status: space.running ? 'running' : 'stopped'
+      };
+    });
+
+    return spacesWithStatus;
   } catch (err) {
     console.error("Database error:", err);
     throw new Error("Failed to get user spaces");

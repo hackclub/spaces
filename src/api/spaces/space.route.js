@@ -7,10 +7,11 @@ import {
   getUserSpaces,
   deleteSpace
 } from "../../utils/spaces.js";
+import { containerOpsLimiter } from "../../middlewares/rate-limit.middleware.js";
 
 const router = express.Router();
 
-router.post("/create", async (req, res) => {
+router.post("/create", containerOpsLimiter, async (req, res) => {
   const { password, type } = req.body;
   const authorization = req.headers.authorization;
   
@@ -30,7 +31,7 @@ router.post("/create", async (req, res) => {
   }
 });
 
-router.post("/start/:spaceId", async (req, res) => {
+router.post("/start/:spaceId", containerOpsLimiter, async (req, res) => {
   const { spaceId } = req.params;
   const authorization = req.headers.authorization;
   
@@ -43,7 +44,7 @@ router.post("/start/:spaceId", async (req, res) => {
   }
 });
 
-router.post("/stop/:spaceId", async (req, res) => {
+router.post("/stop/:spaceId", containerOpsLimiter, async (req, res) => {
   const { spaceId } = req.params;
   const authorization = req.headers.authorization;
   

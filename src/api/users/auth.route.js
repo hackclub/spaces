@@ -2,6 +2,7 @@ import express from 'express';
 import { sendEmail, checkEmail } from '../../utils/airtable.js';
 import pg from '../../utils/db.js';
 import crypto from 'crypto';
+import { strictLimiter, authLimiter } from '../../middlewares/rate-limit.middleware.js';
 
 const router = express.Router();
 
@@ -16,7 +17,7 @@ router.get('/send', (req, res) => {
 });
 
 // POST /api/v1/users/send 
-router.post('/send', async (req, res) => {
+router.post('/send', strictLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     
@@ -56,7 +57,7 @@ router.post('/send', async (req, res) => {
 });
 
 // POST /api/v1/users/signup 
-router.post('/signup', async (req, res) => {
+router.post('/signup', authLimiter, async (req, res) => {
   try {
     const { email, username, verificationCode } = req.body;
     
@@ -109,9 +110,10 @@ router.post('/signup', async (req, res) => {
         email,
         username,
         authorization: authToken,
-        max_spaces: 3
+        max_spaces: 3,
+        is_admin: false
       })
-      .returning(['id', 'email', 'username', 'authorization']);
+      .returning(['id', 'email', 'username', 'authorization', 'is_admin']);
     
     res.status(201).json({
       success: true,
@@ -121,6 +123,7 @@ router.post('/signup', async (req, res) => {
         email: newUser.email,
         username: newUser.username,
         authorization: newUser.authorization,
+        is_admin: newUser.is_admin
       }
     });
     
@@ -143,7 +146,7 @@ router.post('/signup', async (req, res) => {
 });
 
 // POST /api/v1/users/login
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const { email, verificationCode } = req.body;
     
@@ -186,7 +189,7 @@ router.post('/login', async (req, res) => {
     const [updatedUser] = await pg('users')
       .where('email', email)
       .update({ authorization: newAuthToken })
-      .returning(['email', 'username', 'authorization']);
+      .returning(['email', 'username', 'authorization', 'is_admin']);
     
     res.status(200).json({
       success: true,
@@ -195,6 +198,7 @@ router.post('/login', async (req, res) => {
         email: updatedUser.email,
         username: updatedUser.username,
         authorization: updatedUser.authorization,
+        is_admin: updatedUser.is_admin
       }
     });
     

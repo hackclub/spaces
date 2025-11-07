@@ -8,10 +8,12 @@ services:
       - "2593:80"      # Nginx proxy
     volumes:
       - docker-data:/var/lib/docker  # Docker storage volume
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw  # Fix cgroupv2 support
     environment:
       - NODE_ENV=development
       - DOCKER_HOST=unix:///var/run/docker.sock
       - DOCKER_TLS_CERTDIR=""
     restart: unless-stopped
+    cgroup: host  # Use host cgroup namespace
 volumes:
   docker-data:

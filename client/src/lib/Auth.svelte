@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { API_BASE, ERROR_MESSAGES } from '../config.js';
+  import '../styles/auth.css';
 
   const dispatch = createEventDispatcher();
 
@@ -62,7 +63,8 @@
         dispatch('authenticated', {
           authorization: data.data.authorization,
           username: data.data.username,
-          email: data.data.email
+          email: data.data.email,
+          is_admin: data.data.is_admin
         });
       } else {
         error = data.message || 'Login failed';
@@ -93,7 +95,8 @@
         dispatch('authenticated', {
           authorization: data.data.authorization,
           username: data.data.username,
-          email: data.data.email
+          email: data.data.email,
+          is_admin: data.data.is_admin
         });
       } else {
         error = data.message || 'Signup failed';
@@ -119,9 +122,7 @@
   }
 </script>
 
-<svelte:head>
-  <link rel="stylesheet" href="/src/styles/auth.css" />
-</svelte:head>
+
 
 <a href="https://hackclub.com/">
   <img class="flag-banner" src="https://assets.hackclub.com/flag-orpheus-top.svg" alt="Hack Club"/>
