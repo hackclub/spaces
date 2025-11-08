@@ -6,12 +6,11 @@ set -e
 
 echo "Starting development environment setup..."
 
-sudo apt install -y wget
-wget -O /config/workspace/README.md https://hc-cdn.hel1.your-objectstorage.com/s/v3/07ecba76556e3d58d3532ab237ea0aa3dfb6c18e_in-space.md 
-
-
 echo "Updating package manager..."
 sudo apt update && sudo apt upgrade -y
+
+sudo apt install -y wget
+wget -O /config/workspace/README.md https://hc-cdn.hel1.your-objectstorage.com/s/v3/07ecba76556e3d58d3532ab237ea0aa3dfb6c18e_in-space.md 
 
 echo "Installing essential system tools..."
 sudo apt install -y \
