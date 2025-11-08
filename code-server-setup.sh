@@ -6,13 +6,16 @@ set -e
 
 echo "Starting development environment setup..."
 
+sudo apt install -y wget
+wget -O /config/workspace/README.md https://hc-cdn.hel1.your-objectstorage.com/s/v3/07ecba76556e3d58d3532ab237ea0aa3dfb6c18e_in-space.md 
+
+
 echo "Updating package manager..."
 sudo apt update && sudo apt upgrade -y
 
 echo "Installing essential system tools..."
 sudo apt install -y \
     curl \
-    wget \
     git \
     nano \
     unzip \
@@ -38,6 +41,17 @@ echo "🧶 Installing Yarn..."
 curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
 echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
 sudo apt update && sudo apt install -y yarn
+
+echo "setting up gh cli"
+(type -p wget >/dev/null || (sudo apt update && sudo apt install wget -y)) \
+	&& sudo mkdir -p -m 755 /etc/apt/keyrings \
+	&& out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+	&& cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+	&& sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+	&& sudo mkdir -p -m 755 /etc/apt/sources.list.d \
+	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+	&& sudo apt update \
+	&& sudo apt install gh -y
 
 echo "☕ Setting up Java..."
 sudo apt install -y openjdk-17-jdk openjdk-17-jre
@@ -77,6 +91,12 @@ sudo apt install -y \
     postgresql-client \
     mysql-client
 
+# Extras
+echo "Seting up extras"
+curl -LsSf https://astral.sh/uv/install.sh | sh
+sudo apt install crystal
+gem install rails
+sudo npm install pnpm
 
 
 # Final cleanup
