@@ -1,5 +1,5 @@
 # Spaces
-Spaces is a web app that allows access to visual studio code, kicad, and blender, inside of a web browser. It achieves this using container streaming. Spaces was developed by [Ivie Fonner](https://github.com/charmunks/) and [Hack Club](https://github.com/hackclub/)
+Spaces is a web app that creates secure cloud based development enviorments, accessible through a web browser. The goal of this project is to allow people to create amazing projects no matter what hardware they have access to. Spaces was developed by [Ivie Fonner](https://github.com/charmunks/), [Arnav](https://github.com/arnavravinder) and [Hack Club](https://github.com/hackclub/)
 
 ## Setup:
 ### Manual Setup:
@@ -312,3 +312,10 @@ Common HTTP status codes:
 - `409`: Conflict (duplicate email/username)
 - `500`: Internal Server Error
 
+<div align="center">
+  <a href="https://moonshot.hackclub.com" target="_blank">
+    <img src="https://hc-cdn.hel1.your-objectstorage.com/s/v3/35ad2be8c916670f3e1ac63c1df04d76a4b337d1_moonshot.png" 
+         alt="This project is part of Moonshot, a 4-day hackathon in Florida visiting Kennedy Space Center and Universal Studios!" 
+         style="width: 100%;">
+  </a>
+</div>
