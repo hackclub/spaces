@@ -1,7 +1,10 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { API_BASE, ERROR_MESSAGES } from '../config.js';
   import '../styles/dashboard.css';
+  import { currentTheme } from '../stores/theme.js';
+  import { themes } from '../themes.js';
+  import FlagIcon from '../assets/flag.svg?raw';
 
   export let spaces = [];
   export let authorization = '';
@@ -237,6 +240,14 @@
 
   $: selectedType = spaceTypes.find(type => type.value === newSpaceType) || spaceTypes[0];
 
+  $: logoColor = (() => {
+    const theme = themes[$currentTheme];
+    if (theme && theme.colors['--red']) {
+      return theme.colors['--red'];
+    }
+    return '#ec3750';
+  })();
+
   function togglePasswordVisibility() {
     showPassword = !showPassword;
   }
@@ -245,7 +256,9 @@
 <div class="dashboard">
   <header class="dashboard-header">
     <div class="header-content">
-      <img class="dashboard-logo" src="https://icons.hackclub.com/api/icons/ec3750/clubs" alt="Hack Club" />
+      <div class="dashboard-logo" style="color: {logoColor}">
+        {@html FlagIcon}
+      </div>
       <div>
         <h1 class="dashboard-title">Hack Club Spaces</h1>
         <p class="welcome-text">Welcome, {username}!</p>
