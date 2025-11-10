@@ -1,6 +1,10 @@
-export const API_BASE = window.location.hostname === 'localhost' || window.location.hostname.includes('github.dev')
-  ? `${window.location.protocol}//${window.location.host}/api/v1`
-  : 'https://t0080w08wcockgs44ws8w880.b.selfhosted.hackclub.com/api/v1';
+export function getApiBase() {
+  if (typeof window !== 'undefined' && window.location &&
+    (window.location.hostname === 'localhost' || window.location.hostname.includes('github.dev'))) {
+    return `${window.location.protocol}//${window.location.host}/api/v1`;
+  }
+  return 'https://t0080w08wcockgs44ws8w880.b.selfhosted.hackclub.com/api/v1';
+}
 
 export const ERROR_MESSAGES = {
   NETWORK_ERROR: 'Network error. Please try again.',
