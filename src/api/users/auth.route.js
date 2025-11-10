@@ -129,7 +129,7 @@ router.post('/signup', /* authLimiter, */ async (req, res) => {
       .returning(['id', 'email', 'username', 'authorization', 'is_admin']);
 
     res.cookie('auth_token', newUser.authorization, {
-      httpOnly: false,
+      httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
       sameSite: 'strict',
       secure: process.env.NODE_ENV === 'production'
