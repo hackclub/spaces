@@ -53,3 +53,86 @@ export const checkUserSpaceLimit = async (userId) => {
     throw error;
   }
 };
+
+export const updateUser = async (authorization, updateData) => {
+  if (!authorization) {
+    throw new Error("Authorization token is required");
+  }
+
+  try {
+    const user = await pg('users')
+      .where('authorization', authorization)
+      .first();
+
+    if (!user) {
+      const error = new Error("User not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const updates = {};
+    
+    if (updateData.email !== undefined) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(updateData.email)) {
+        const error = new Error("Invalid email format");
+        error.statusCode = 400;
+        throw error;
+      }
+      
+      const existingEmail = await pg('users')
+        .where('email', updateData.email)
+        .whereNot('id', user.id)
+        .first();
+      
+      if (existingEmail) {
+        const error = new Error("Email already in use");
+        error.statusCode = 409;
+        throw error;
+      }
+      
+      updates.email = updateData.email;
+    }
+    
+    if (updateData.username !== undefined) {
+      if (updateData.username.length > 100) {
+        const error = new Error("Username must be 100 characters or less");
+        error.statusCode = 400;
+        throw error;
+      }
+      
+      const existingUsername = await pg('users')
+        .where('username', updateData.username)
+        .whereNot('id', user.id)
+        .first();
+      
+      if (existingUsername) {
+        const error = new Error("Username already taken");
+        error.statusCode = 409;
+        throw error;
+      }
+      
+      updates.username = updateData.username;
+    }
+    
+    if (updateData.hackatime_api_key !== undefined) {
+      updates.hackatime_api_key = updateData.hackatime_api_key;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      const error = new Error("No valid fields to update");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const [updatedUser] = await pg('users')
+      .where('authorization', authorization)
+      .update(updates)
+      .returning(['id', 'email', 'username', 'hackatime_api_key']);
+
+    return updatedUser;
+  } catch (error) {
+    console.error('Error updating user:', error);
+    throw error;
+  }
+};
