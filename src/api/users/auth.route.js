@@ -16,18 +16,18 @@ router.get('/send', (req, res) => {
   });
 });
 
-// POST /api/v1/users/send 
+// POST /api/v1/users/send
 router.post('/send', /* strictLimiter, */ async (req, res) => {
   try {
-    const { email } = req.body;
-    
+    const { email, mode } = req.body;
+
     if (!email) {
       return res.status(400).json({
         success: false,
         message: 'Email is required'
       });
     }
-    
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
@@ -35,9 +35,22 @@ router.post('/send', /* strictLimiter, */ async (req, res) => {
         message: 'Invalid email format'
       });
     }
-    
+
+    if (mode === 'login') {
+      const user = await pg('users')
+        .where('email', email)
+        .first();
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'No account found with this email. Please sign up first.'
+        });
+      }
+    }
+
     const result = await sendEmail(email);
-    
+
     res.status(200).json({
       success: true,
       message: 'Verification code sent successfully',
@@ -45,7 +58,7 @@ router.post('/send', /* strictLimiter, */ async (req, res) => {
         email: result.email,
       }
     });
-    
+
   } catch (error) {
     console.error('Error in /send route:', error);
     res.status(500).json({

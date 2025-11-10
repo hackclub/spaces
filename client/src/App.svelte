@@ -3,7 +3,10 @@
   import Auth from './lib/Auth.svelte';
   import Dashboard from './lib/Dashboard.svelte';
   import AdminPanel from './lib/AdminPanel.svelte';
+  import ThemeSwitcher from './lib/ThemeSwitcher.svelte';
   import { API_BASE } from './config.js';
+  import { applyTheme, currentTheme } from './stores/theme.js';
+  import { get } from 'svelte/store';
 
   let isAuthenticated = false;
   let user = null;
@@ -11,9 +14,11 @@
   let showAdminPanel = false;
 
   onMount(() => {
+    applyTheme(get(currentTheme));
+
     const storedAuth = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('user_data');
-    
+
     if (storedAuth && storedUser) {
       try {
         isAuthenticated = true;
@@ -89,6 +94,7 @@
 
 <main>
   {#if isAuthenticated && user}
+    <ThemeSwitcher />
     {#if showAdminPanel && user.is_admin}
       <div class="admin-header">
         <button on:click={() => showAdminPanel = false}>Back to Dashboard</button>
@@ -120,20 +126,22 @@
 
   .admin-header, .admin-link {
     padding: 10px 20px;
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #ddd;
+    background-color: var(--snow);
+    border-bottom: 1px solid var(--smoke);
   }
 
   .admin-header button, .admin-link button {
     padding: 8px 16px;
-    background-color: #007bff;
-    color: white;
+    background-color: var(--blue);
+    color: var(--white);
     border: none;
     border-radius: 4px;
     cursor: pointer;
+    transition: all 0.2s ease;
   }
 
   .admin-header button:hover, .admin-link button:hover {
-    background-color: #0056b3;
+    background-color: var(--cyan);
+    transform: translateY(-1px);
   }
 </style>

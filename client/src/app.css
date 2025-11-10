@@ -96,3 +96,64 @@ button {
 input, textarea, select {
   font-family: 'Phantom Sans', sans-serif;
 }
+
+[data-theme="darkGradient"] body {
+  background: linear-gradient(135deg, #0a0f1a 0%, #0f1a2a 25%, #1a2a3a 50%, #0f1a2a 75%, #0a0f1a 100%);
+  background-size: 400% 400%;
+  animation: gradientShift 15s ease infinite;
+}
+
+[data-theme="lgbtq"] body {
+  position: relative;
+  background:
+    radial-gradient(circle at 20% 80%, rgba(228, 3, 3, 0.8) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 140, 0, 0.8) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(255, 237, 0, 0.8) 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(0, 128, 38, 0.8) 0%, transparent 50%),
+    radial-gradient(circle at 20% 20%, rgba(36, 64, 142, 0.8) 0%, transparent 50%),
+    radial-gradient(circle at 60% 60%, rgba(115, 41, 130, 0.8) 0%, transparent 40%),
+    linear-gradient(135deg, #1a0616 0%, #2a0a26 100%);
+  background-size: 200% 200%;
+  animation: prideShift 30s ease infinite;
+}
+
+[data-theme="lgbtq"] .dashboard,
+[data-theme="lgbtq"] .auth-container,
+[data-theme="lgbtq"] .create-form,
+[data-theme="lgbtq"] .space-card,
+[data-theme="lgbtq"] .theme-menu,
+[data-theme="lgbtq"] .theme-toggle {
+  background: rgba(26, 6, 22, 0.7) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+[data-theme="lgbtq"] .auth-form-panel {
+  background: rgba(26, 6, 22, 0.8) !important;
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+}
+
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes prideShift {
+  0%, 100% {
+    background-position: 0% 0%;
+  }
+  25% {
+    background-position: 100% 0%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  75% {
+    background-position: 0% 100%;
+  }
+}

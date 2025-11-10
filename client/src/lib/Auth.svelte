@@ -26,7 +26,7 @@
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, mode }),
       });
 
       const data = await response.json();
@@ -35,7 +35,21 @@
         message = 'Verification code sent to your email!';
         mode = 'verify';
       } else {
-        error = data.message || 'Failed to send verification code';
+        if (response.status === 404 && mode === 'login') {
+          error = "We couldn't find your account. Let's create one!";
+          setTimeout(() => {
+            error = '';
+            authIntent = 'signup';
+            setTimeout(() => {
+              mode = 'signup';
+            }, 400);
+            setTimeout(() => {
+              displayMode = 'signup';
+            }, 800);
+          }, 1500);
+        } else {
+          error = data.message || 'Failed to send verification code';
+        }
       }
     } catch (err) {
       error = ERROR_MESSAGES.NETWORK_ERROR;
@@ -128,19 +142,21 @@
   <img class="flag-banner" src="https://assets.hackclub.com/flag-orpheus-top.svg" alt="Hack Club"/>
 </a>
 
-<div class="auth-container" class:signup-mode={mode === 'signup'}>
+<div class="auth-container" class:signup-mode={authIntent === 'signup'} class:verify-mode={mode === 'verify' && authIntent === 'login'}>
   <div class="auth-panel auth-form-panel">
     <div class="auth-form-content">
       <div class="auth-header">
-        <img class="auth-logo" src="https://icons.hackclub.com/api/icons/ec3750/clubs" alt="Hack Club" />
+        <img class="auth-logo" src="https://icons.hackclub.com/api/icons/ec3750/flag" alt="Hack Club" />
         <h2 class="auth-title">{displayMode === 'signup' ? 'Join Hack Club Spaces' : 'Welcome Back'}</h2>
-        <p class="auth-subtitle">Lorem ipsum dolor sit amet</p>
+        <p class="auth-subtitle">Build amazing projects in the cloud</p>
       </div>
 
       {#if mode === 'login' || mode === 'signup'}
         <form on:submit|preventDefault={sendVerificationCode}>
           <div class="form-group">
-            <label class="form-label" for="email">Email</label>
+            <label class="form-label" for="email">
+              Email
+            </label>
             <input
               class="form-input"
               id="email"
@@ -152,7 +168,9 @@
           </div>
 
           <div class="form-group username-field" class:show={mode === 'signup'}>
-            <label class="form-label" for="username">Username</label>
+            <label class="form-label" for="username">
+              Username
+            </label>
             <input
               class="form-input"
               id="username"
@@ -172,7 +190,7 @@
             <div class="success-message">{message}</div>
           {/if}
 
-          <button class="primary-button" type="submit" disabled={loading || !email}>
+          <button class="primary-button" type="submit" disabled={loading || !email || (mode === 'signup' && !username)}>
             {loading ? 'Sending...' : 'Send Verification Code'}
           </button>
         </form>
@@ -184,12 +202,56 @@
             Already have an account? <span class="auth-mode-link" on:click={() => switchMode('login')} on:keypress={(e) => e.key === 'Enter' && switchMode('login')} role="button" tabindex="0">Log in</span>
           {/if}
         </div>
-      {:else if mode === 'verify'}
-        <p class="info-message">Check your email for the verification code</p>
+      {/if}
 
-        <form on:submit|preventDefault={authIntent === 'login' ? handleLogin : handleSignup}>
+      {#if authIntent === 'signup'}
+        <div class="verification-code-section" class:show={mode === 'verify'}>
+            <div class="verification-notice">
+              <p class="verification-title">Check your email</p>
+              <p class="verification-text">We sent a verification code to <strong>{email}</strong></p>
+            </div>
+
+            <form on:submit|preventDefault={handleSignup}>
+              <div class="form-group">
+                <label class="form-label" for="code">
+                  Verification Code
+                </label>
+                <input
+                  class="form-input"
+                  id="code"
+                  type="text"
+                  bind:value={verificationCode}
+                  required
+                  placeholder="Enter code from email"
+                />
+              </div>
+
+              {#if error}
+                <div class="error-message">{error}</div>
+              {/if}
+
+              <button class="primary-button" type="submit" disabled={loading || !verificationCode}>
+                {loading ? 'Verifying...' : 'Complete Sign Up'}
+              </button>
+
+              <button class="secondary-button" type="button" on:click={sendVerificationCode}>
+                Resend Code
+              </button>
+            </form>
+        </div>
+      {/if}
+
+      {#if mode === 'verify' && authIntent === 'login'}
+        <div class="verification-notice">
+          <p class="verification-title">Check your email</p>
+          <p class="verification-text">We sent a verification code to <strong>{email}</strong></p>
+        </div>
+
+        <form on:submit|preventDefault={handleLogin}>
           <div class="form-group">
-            <label class="form-label" for="code">Verification Code</label>
+            <label class="form-label" for="code">
+              Verification Code
+            </label>
             <input
               class="form-input"
               id="code"
@@ -205,10 +267,10 @@
           {/if}
 
           <button class="primary-button" type="submit" disabled={loading || !verificationCode}>
-            {loading ? 'Verifying...' : authIntent === 'signup' ? 'Complete Sign Up' : 'Login'}
+            {loading ? 'Verifying...' : 'Login'}
           </button>
 
-          <button class="secondary-button" type="button" on:click={() => switchMode(mode)}>
+          <button class="secondary-button" type="button" on:click={() => switchMode('login')}>
             Resend Code
           </button>
         </form>
