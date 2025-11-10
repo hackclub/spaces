@@ -7,6 +7,7 @@
   import { API_BASE } from './config.js';
   import { applyTheme, currentTheme } from './stores/theme.js';
   import { get } from 'svelte/store';
+  import { getCookie } from './utils/cookies.js';
 
   let isAuthenticated = false;
   let user = null;
@@ -15,35 +16,18 @@
 
   onMount(() => {
     applyTheme(get(currentTheme));
-
-    const storedAuth = localStorage.getItem('auth_token');
-    const storedUser = localStorage.getItem('user_data');
-
-    if (storedAuth && storedUser) {
-      try {
-        isAuthenticated = true;
-        user = JSON.parse(storedUser);
-        loadSpaces();
-      } catch (err) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_data');
-      }
-    }
   });
 
   function handleAuthenticated(event) {
     const { authorization, username, email, is_admin } = event.detail;
-    
+
     user = {
       authorization,
       username,
       email,
       is_admin
     };
-    
-    localStorage.setItem('auth_token', authorization);
-    localStorage.setItem('user_data', JSON.stringify(user));
-    
+
     isAuthenticated = true;
     loadSpaces();
   }
@@ -82,13 +66,10 @@
         console.error('Sign out error:', err);
       }
     }
-    
+
     isAuthenticated = false;
     user = null;
     spaces = [];
-    
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_data');
   }
 </script>
 

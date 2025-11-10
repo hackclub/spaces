@@ -127,7 +127,14 @@ router.post('/signup', /* authLimiter, */ async (req, res) => {
         is_admin: false
       })
       .returning(['id', 'email', 'username', 'authorization', 'is_admin']);
-    
+
+    res.cookie('auth_token', newUser.authorization, {
+      httpOnly: false,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production'
+    });
+
     res.status(201).json({
       success: true,
       message: 'User created successfully',
@@ -203,7 +210,14 @@ router.post('/login', /* authLimiter, */ async (req, res) => {
       .where('email', email)
       .update({ authorization: newAuthToken })
       .returning(['email', 'username', 'authorization', 'is_admin']);
-    
+
+    res.cookie('auth_token', updatedUser.authorization, {
+      httpOnly: false,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production'
+    });
+
     res.status(200).json({
       success: true,
       message: 'Login successful',
@@ -254,7 +268,9 @@ router.post('/signout', async (req, res) => {
       .where('authorization', authorization)
       .update({ authorization: newAuthToken })
       .returning(['email']);
-    
+
+    res.clearCookie('auth_token');
+
     res.status(200).json({
       success: true,
       message: 'Sign out successful',
