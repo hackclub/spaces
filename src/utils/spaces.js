@@ -64,6 +64,8 @@ export const createContainer = async (password, type, authorization) => {
     password = crypto.randomBytes(16).toString('hex');
   } else if (!password) {
     throw new Error("Missing container password");
+  } else if (password.length < 8) {
+    throw new Error("Password must be at least 8 characters long");
   }
 
   try {

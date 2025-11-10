@@ -301,7 +301,7 @@
 
         {#if newSpaceType !== 'kicad' && newSpaceType !== 'blender'}
           <div class="form-group">
-            <label class="form-label" for="password">Password</label>
+            <label class="form-label" for="password">Password (min. 8 characters)</label>
             <p class="password-info">This password will be needed to access the space. Please pick a secure password, you cannot change it later.</p>
             <div class="password-input-wrapper">
               {#if showPassword}
@@ -353,7 +353,7 @@
         <button
           class="btn-primary"
           on:click={createSpace}
-          disabled={loading || (newSpaceType !== 'kicad' && newSpaceType !== 'blender' && !newSpacePassword)}
+          disabled={loading || (newSpaceType !== 'kicad' && newSpaceType !== 'blender' && (!newSpacePassword || newSpacePassword.length < 8))}
         >
           {loading ? 'Creating...' : 'Create Space'}
         </button>
