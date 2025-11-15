@@ -24,7 +24,7 @@
 
 <div class="theme-switcher">
   <button class="theme-toggle" on:click|stopPropagation={toggleMenu} aria-label="Switch theme">
-    theme: {themes[$currentTheme]?.name || 'light'}
+    Theme: {themes[$currentTheme]?.name || 'light'}
   </button>
 
   {#if isOpen}
