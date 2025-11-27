@@ -78,7 +78,8 @@
           authorization: data.data.authorization,
           username: data.data.username,
           email: data.data.email,
-          is_admin: data.data.is_admin
+          is_admin: data.data.is_admin,
+          hackatime_api_key: data.data.hackatime_api_key
         });
       } else {
         error = data.message || 'Login failed';
@@ -110,7 +111,8 @@
           authorization: data.data.authorization,
           username: data.data.username,
           email: data.data.email,
-          is_admin: data.data.is_admin
+          is_admin: data.data.is_admin,
+          hackatime_api_key: data.data.hackatime_api_key
         });
       } else {
         error = data.message || 'Signup failed';

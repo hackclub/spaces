@@ -126,7 +126,7 @@ router.post('/signup', /* authLimiter, */ async (req, res) => {
         max_spaces: 3,
         is_admin: false
       })
-      .returning(['id', 'email', 'username', 'authorization', 'is_admin']);
+      .returning(['id', 'email', 'username', 'authorization', 'is_admin', 'hackatime_api_key']);
 
     res.cookie('auth_token', newUser.authorization, {
       httpOnly: true,
@@ -143,7 +143,8 @@ router.post('/signup', /* authLimiter, */ async (req, res) => {
         email: newUser.email,
         username: newUser.username,
         authorization: newUser.authorization,
-        is_admin: newUser.is_admin
+        is_admin: newUser.is_admin,
+        hackatime_api_key: newUser.hackatime_api_key
       }
     });
     
@@ -209,7 +210,7 @@ router.post('/login', /* authLimiter, */ async (req, res) => {
     const [updatedUser] = await pg('users')
       .where('email', email)
       .update({ authorization: newAuthToken })
-      .returning(['email', 'username', 'authorization', 'is_admin']);
+      .returning(['email', 'username', 'authorization', 'is_admin', 'hackatime_api_key']);
 
     res.cookie('auth_token', updatedUser.authorization, {
       httpOnly: true,
@@ -225,7 +226,8 @@ router.post('/login', /* authLimiter, */ async (req, res) => {
         email: updatedUser.email,
         username: updatedUser.username,
         authorization: updatedUser.authorization,
-        is_admin: updatedUser.is_admin
+        is_admin: updatedUser.is_admin,
+        hackatime_api_key: updatedUser.hackatime_api_key
       }
     });
     
@@ -284,6 +286,187 @@ router.post('/signout', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to sign out',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// PUT /api/v1/users/update
+router.put('/update', async (req, res) => {
+  try {
+    const authorization = req.headers.authorization;
+    const { username, hackatime_api_key } = req.body;
+    
+    if (!authorization) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+    
+    const user = await pg('users')
+      .where('authorization', authorization)
+      .first();
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    const updates = {};
+    
+    if (username && username !== user.username) {
+      if (username.length > 100) {
+        return res.status(400).json({
+          success: false,
+          message: 'Username must be 100 characters or less'
+        });
+      }
+      
+      const existingUser = await pg('users')
+        .where('username', username)
+        .first();
+      
+      if (existingUser) {
+        return res.status(409).json({
+          success: false,
+          message: 'Username already taken'
+        });
+      }
+      updates.username = username;
+    }
+    
+    if (hackatime_api_key !== undefined) {
+      updates.hackatime_api_key = hackatime_api_key;
+    }
+    
+    if (Object.keys(updates).length > 0) {
+      await pg('users')
+        .where('id', user.id)
+        .update(updates);
+    }
+    
+    const updatedUser = await pg('users')
+      .where('id', user.id)
+      .first();
+      
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        username: updatedUser.username,
+        email: updatedUser.email,
+        authorization: updatedUser.authorization,
+        is_admin: updatedUser.is_admin,
+        hackatime_api_key: updatedUser.hackatime_api_key
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in /update route:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update profile',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// POST /api/v1/users/verify-email-change
+router.post('/verify-email-change', async (req, res) => {
+  try {
+    const authorization = req.headers.authorization;
+    const { newEmail, verificationCode } = req.body;
+    
+    if (!authorization) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized'
+      });
+    }
+    
+    if (!newEmail || !verificationCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'New email and verification code are required'
+      });
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid email format'
+      });
+    }
+    
+    const user = await pg('users')
+      .where('authorization', authorization)
+      .first();
+      
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    if (user.email === newEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'New email is the same as current email'
+      });
+    }
+    
+    // Check if email is already taken
+    const existingUser = await pg('users')
+      .where('email', newEmail)
+      .first();
+      
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'Email already registered'
+      });
+    }
+    
+    // Verify code
+    const codeValid = await checkEmail(newEmail, verificationCode);
+    if (!codeValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification code'
+      });
+    }
+    
+    // Update email
+    await pg('users')
+      .where('id', user.id)
+      .update({ email: newEmail });
+      
+    const updatedUser = await pg('users')
+      .where('id', user.id)
+      .first();
+      
+    res.status(200).json({
+      success: true,
+      message: 'Email updated successfully',
+      data: {
+        username: updatedUser.username,
+        email: updatedUser.email,
+        authorization: updatedUser.authorization,
+        is_admin: updatedUser.is_admin,
+        hackatime_api_key: updatedUser.hackatime_api_key
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error in /verify-email-change route:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update email',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
