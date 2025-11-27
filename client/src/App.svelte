@@ -4,48 +4,39 @@
   import Dashboard from './lib/Dashboard.svelte';
   import AdminPanel from './lib/AdminPanel.svelte';
   import ThemeSwitcher from './lib/ThemeSwitcher.svelte';
+  import Settings from './lib/Settings.svelte';
   import { API_BASE } from './config.js';
   import { applyTheme, currentTheme } from './stores/theme.js';
   import { get } from 'svelte/store';
+  import { getCookie } from './utils/cookies.js';
 
   let isAuthenticated = false;
   let user = null;
   let spaces = [];
   let showAdminPanel = false;
+  let showSettings = false;
 
   onMount(() => {
     applyTheme(get(currentTheme));
-
-    const storedAuth = localStorage.getItem('auth_token');
-    const storedUser = localStorage.getItem('user_data');
-
-    if (storedAuth && storedUser) {
-      try {
-        isAuthenticated = true;
-        user = JSON.parse(storedUser);
-        loadSpaces();
-      } catch (err) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_data');
-      }
-    }
   });
 
   function handleAuthenticated(event) {
-    const { authorization, username, email, is_admin } = event.detail;
-    
+    const { authorization, username, email, is_admin, hackatime_api_key } = event.detail;
+
     user = {
       authorization,
       username,
       email,
-      is_admin
+      is_admin,
+      hackatime_api_key
     };
-    
-    localStorage.setItem('auth_token', authorization);
-    localStorage.setItem('user_data', JSON.stringify(user));
-    
+
     isAuthenticated = true;
     loadSpaces();
+  }
+  
+  function handleUserUpdate(event) {
+    user = { ...user, ...event.detail };
   }
 
   async function loadSpaces() {
@@ -82,13 +73,10 @@
         console.error('Sign out error:', err);
       }
     }
-    
+
     isAuthenticated = false;
     user = null;
     spaces = [];
-    
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_data');
   }
 </script>
 
@@ -96,10 +84,15 @@
   {#if isAuthenticated && user}
     <ThemeSwitcher />
     {#if showAdminPanel && user.is_admin}
-      <div class="admin-header">
+      <div class="nav-header">
         <button on:click={() => showAdminPanel = false}>Back to Dashboard</button>
       </div>
       <AdminPanel authorization={user.authorization} />
+    {:else if showSettings}
+      <div class="nav-header">
+        <button on:click={() => showSettings = false}>Back to Dashboard</button>
+      </div>
+      <Settings {user} authorization={user.authorization} on:update={handleUserUpdate} />
     {:else}
       {#if user.is_admin}
         <div class="admin-link">
@@ -111,6 +104,7 @@
         authorization={user.authorization}
         username={user.username}
         on:signout={handleSignOut}
+        on:settings={() => showSettings = true}
       />
     {/if}
   {:else}
@@ -124,13 +118,13 @@
     min-height: 100vh;
   }
 
-  .admin-header, .admin-link {
+  .nav-header, .admin-link {
     padding: 10px 20px;
     background-color: var(--snow);
     border-bottom: 1px solid var(--smoke);
   }
 
-  .admin-header button, .admin-link button {
+  .nav-header button, .admin-link button {
     padding: 8px 16px;
     background-color: var(--blue);
     color: var(--white);
@@ -140,7 +134,7 @@
     transition: all 0.2s ease;
   }
 
-  .admin-header button:hover, .admin-link button:hover {
+  .nav-header button:hover, .admin-link button:hover {
     background-color: var(--cyan);
     transform: translateY(-1px);
   }

@@ -251,6 +251,10 @@
   function togglePasswordVisibility() {
     showPassword = !showPassword;
   }
+
+  function handleSettings() {
+    dispatch('settings');
+  }
 </script>
 
 <div class="dashboard">
@@ -264,7 +268,10 @@
         <p class="welcome-text">Welcome, {username}!</p>
       </div>
     </div>
-    <button class="signout-button" on:click={handleSignOut}>Sign Out</button>
+    <div class="header-actions">
+      <button class="settings-button" on:click={handleSettings}>Settings</button>
+      <button class="signout-button" on:click={handleSignOut}>Sign Out</button>
+    </div>
   </header>
 
   <div class="dashboard-content">
