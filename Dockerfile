@@ -37,8 +37,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY client/package*.json ./client/
 
-# Install dependencies (include devDependencies for build)
-RUN npm install
+# Install dependencies (include devDependencies for build and nodemon)
+RUN npm install --include=dev
 RUN cd client && npm install --include=dev
 
 # Copy application code
