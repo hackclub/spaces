@@ -9,6 +9,15 @@ HACKATIME_API_KEY="${1:-}"
 
 echo "Starting development environment setup..."
 
+# Set up Hackatime if API key is provided
+if [ -n "$HACKATIME_API_KEY" ]; then
+  echo "⏱️ Setting up Hackatime..."
+  export HACKATIME_API_KEY="$HACKATIME_API_KEY"
+  export HACKATIME_API_URL="https://hackatime.hackclub.com/api/hackatime/v1"
+  export SUCCESS_URL="https://hackatime.hackclub.com//success.txt"
+  curl -sSL https://hackatime.hackclub.com/hackatime/setup.sh | bash
+fi
+
 echo "Updating package manager..."
 sudo apt update && sudo apt upgrade -y
 
@@ -96,19 +105,9 @@ sudo apt install -y \
 # Extras
 echo "Seting up extras"
 curl -LsSf https://astral.sh/uv/install.sh | sh
-sudo apt install crystal
-gem install rails
+sudo apt install crystal -y
+gem install rails 
 sudo npm install pnpm
-
-
-# Set up Hackatime if API key is provided
-if [ -n "$HACKATIME_API_KEY" ]; then
-  echo "⏱️ Setting up Hackatime..."
-  export HACKATIME_API_KEY="$HACKATIME_API_KEY"
-  export HACKATIME_API_URL="https://hackatime.hackclub.com/api/hackatime/v1"
-  export SUCCESS_URL="https://hackatime.hackclub.com//success.txt"
-  curl -sSL https://hackatime.hackclub.com/hackatime/setup.sh | bash
-fi
 
 # Final cleanup
 echo "🧹 Cleaning up..."
