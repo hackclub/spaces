@@ -7,6 +7,10 @@ If a tool you need is not listed, attempt to install it using one of the package
 
 If a tool listed here is not working, wait a few minutes and try again! The installation is ran in the background upon space creation to minimize space creation times, so you might have to wait a minute or two for all tools to become available
 
+##### Hackatime
+
+Make sure to set your hackatime api key in settings! if you have done that, Hackatime has been auto installed and set up for you, and will be tracking your time
+
 ##### General
 ```
 git
@@ -27,6 +31,7 @@ python3-pip
 python3-venv
 python3-dev
 python3-setuptools
+uv
 ```
 
 ##### Javascript:
@@ -78,5 +83,4 @@ rails
 ```
 go
 crystal
-uv
 ```
