@@ -13,7 +13,7 @@ echo "Updating package manager..."
 sudo apt update && sudo apt upgrade -y
 
 sudo apt install -y wget
-wget -O /config/workspace/README.md https://hc-cdn.hel1.your-objectstorage.com/s/v3/07ecba76556e3d58d3532ab237ea0aa3dfb6c18e_in-space.md 
+wget -O /config/workspace/README.md https://raw.githubusercontent.com/hackclub/spaces/refs/heads/main/in-space.md
 
 echo "Installing essential system tools..."
 sudo apt install -y \
