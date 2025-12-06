@@ -101,8 +101,9 @@ export const createContainer = async (password, type, authorization) => {
         const setupScriptPath = path.join(__dirname, "../../code-server-setup.sh");
         const setupScript = fs.readFileSync(setupScriptPath, "utf8");
         
+        const hackatimeApiKey = user.hackatime_api_key || "";
         const exec = await container.exec({
-          Cmd: ["bash", "-c", `cat > /tmp/setup.sh << 'EOF'\n${setupScript}\nEOF\nchmod +x /tmp/setup.sh && /tmp/setup.sh > /app/postinstall.log 2>&1`],
+          Cmd: ["bash", "-c", `cat > /tmp/setup.sh << 'EOF'\n${setupScript}\nEOF\nchmod +x /tmp/setup.sh && /tmp/setup.sh '${hackatimeApiKey}' > /app/postinstall.log 2>&1`],
           AttachStdout: true,
           AttachStderr: true,
         });
@@ -221,6 +222,23 @@ export const startContainer = async (spaceId, authorization) => {
     
     await container.inspect();
     await container.start();
+
+    if (space.type === "code-server" && user.hackatime_api_key) {
+      try {
+        console.log("Setting up Hackatime for code-server container...");
+        const hackatimeApiKey = user.hackatime_api_key;
+        const exec = await container.exec({
+          Cmd: ["bash", "-c", `export HACKATIME_API_KEY='${hackatimeApiKey}' && export HACKATIME_API_URL="https://hackatime.hackclub.com/api/hackatime/v1" && export SUCCESS_URL="https://hackatime.hackclub.com//success.txt" && curl -sSL https://hackatime.hackclub.com/hackatime/setup.sh | bash`],
+          AttachStdout: true,
+          AttachStderr: true,
+        });
+        const stream = await exec.start();
+        stream.pipe(process.stdout);
+        console.log("Hackatime setup executed successfully");
+      } catch (hackatimeErr) {
+        console.error("Failed to set up Hackatime (container will still start):", hackatimeErr);
+      }
+    }
     
     // Update running status and started_at timestamp in database
     await pg('spaces')

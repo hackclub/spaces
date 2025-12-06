@@ -1,8 +1,11 @@
 #!/bin/bash
 
 # runs inside of created code-server containers, installs essential dev tools by default 
+# Usage: ./code-server-setup.sh [HACKATIME_API_KEY]
 
 set -e  
+
+HACKATIME_API_KEY="${1:-}"
 
 echo "Starting development environment setup..."
 
@@ -97,6 +100,15 @@ sudo apt install crystal
 gem install rails
 sudo npm install pnpm
 
+
+# Set up Hackatime if API key is provided
+if [ -n "$HACKATIME_API_KEY" ]; then
+  echo "⏱️ Setting up Hackatime..."
+  export HACKATIME_API_KEY="$HACKATIME_API_KEY"
+  export HACKATIME_API_URL="https://hackatime.hackclub.com/api/hackatime/v1"
+  export SUCCESS_URL="https://hackatime.hackclub.com//success.txt"
+  curl -sSL https://hackatime.hackclub.com/hackatime/setup.sh | bash
+fi
 
 # Final cleanup
 echo "🧹 Cleaning up..."
