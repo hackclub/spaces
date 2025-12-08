@@ -92,7 +92,6 @@ export const sendEmail = async (email) => {
       code: code
     });
     
-    console.log(`Email verification code created for ${email}`);
     return {
       success: true,
       recordId: record.id,
@@ -107,7 +106,8 @@ export const sendEmail = async (email) => {
 
 export const checkEmail = async (email, codeToCheck) => {
   try {
-    const filterFormula = `{email} = "${email}"`;
+    const sanitizedEmail = email.replace(/["\\]/g, '');
+    const filterFormula = `{email} = "${sanitizedEmail}"`;
     const records = await findRecords('Spaces Emails', filterFormula, [
       { field: 'Time Created', direction: 'desc' }
     ]);

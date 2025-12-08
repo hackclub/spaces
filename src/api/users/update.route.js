@@ -1,11 +1,13 @@
 import express from 'express';
 import { updateUser } from '../../utils/user.js';
+import { checkEmail } from '../../utils/airtable.js';
+import pg from '../../utils/db.js';
 
 const router = express.Router();
 
 router.post('/', async (req, res) => {
   try {
-    const { authorization, email, username, hackatime_api_key } = req.body;
+    const { authorization, email, oldEmailVerificationCode, emailVerificationCode, username, hackatime_api_key } = req.body;
     
     if (!authorization) {
       return res.status(401).json({
@@ -13,9 +15,51 @@ router.post('/', async (req, res) => {
         message: 'Authorization token is required'
       });
     }
+    
+    const user = await pg('users').where('authorization', authorization).first();
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid authorization token'
+      });
+    }
 
     const updateData = {};
-    if (email !== undefined) updateData.email = email;
+    
+    if (email !== undefined) {
+      if (!oldEmailVerificationCode) {
+        return res.status(400).json({
+          success: false,
+          message: 'Verification code for current email is required'
+        });
+      }
+      
+      if (!emailVerificationCode) {
+        return res.status(400).json({
+          success: false,
+          message: 'Verification code for new email is required'
+        });
+      }
+      
+      const oldCodeValid = await checkEmail(user.email, oldEmailVerificationCode);
+      if (!oldCodeValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired verification code for current email'
+        });
+      }
+      
+      const newCodeValid = await checkEmail(email, emailVerificationCode);
+      if (!newCodeValid) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or expired verification code for new email'
+        });
+      }
+      
+      updateData.email = email;
+    }
+    
     if (username !== undefined) updateData.username = username;
     if (hackatime_api_key !== undefined) updateData.hackatime_api_key = hackatime_api_key;
 

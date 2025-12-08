@@ -11,8 +11,9 @@
   let hackatimeApiKey = user.hackatime_api_key || '';
   
   let newEmail = '';
-  let verificationCode = '';
-  let emailStep = 'input'; // input, verify
+  let oldEmailCode = '';
+  let newEmailCode = '';
+  let emailStep = 'input'; // input, verifyOld, verifyNew
   
   let message = '';
   let error = '';
@@ -50,7 +51,7 @@
     }
   }
 
-  async function sendEmailCode() {
+  async function startEmailChange() {
     emailMessage = '';
     emailError = '';
     
@@ -71,16 +72,16 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          email: newEmail,
-          mode: 'update' // Mode doesn't really matter for send logic, but good for logging if added
+          email: user.email,
+          mode: 'update'
         })
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        emailMessage = 'Verification code sent to ' + newEmail;
-        emailStep = 'verify';
+        emailMessage = 'Verification code sent to your current email (' + user.email + ')';
+        emailStep = 'verifyOld';
       } else {
         emailError = data.message || 'Failed to send code';
       }
@@ -90,25 +91,61 @@
     }
   }
 
-  async function verifyEmailChange() {
+  async function verifyOldEmail() {
     emailMessage = '';
     emailError = '';
 
-    if (!verificationCode) {
+    if (!oldEmailCode) {
       emailError = 'Please enter the verification code';
       return;
     }
 
     try {
-      const response = await fetch(`${API_BASE}/users/verify-email-change`, {
+      const response = await fetch(`${API_BASE}/users/send`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authorization
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          newEmail,
-          verificationCode
+          email: newEmail,
+          mode: 'update'
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        emailMessage = 'Verification code sent to your new email (' + newEmail + ')';
+        emailStep = 'verifyNew';
+      } else {
+        emailError = data.message || 'Failed to send code to new email';
+      }
+    } catch (err) {
+      emailError = 'An error occurred. Please try again.';
+      console.error(err);
+    }
+  }
+
+  async function verifyNewEmailAndUpdate() {
+    emailMessage = '';
+    emailError = '';
+
+    if (!newEmailCode) {
+      emailError = 'Please enter the verification code';
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/users/update/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          authorization,
+          email: newEmail,
+          oldEmailVerificationCode: parseInt(oldEmailCode),
+          emailVerificationCode: parseInt(newEmailCode)
         })
       });
 
@@ -117,16 +154,25 @@
       if (response.ok) {
         emailMessage = 'Email updated successfully';
         newEmail = '';
-        verificationCode = '';
+        oldEmailCode = '';
+        newEmailCode = '';
         emailStep = 'input';
         dispatch('update', data.data);
       } else {
-        emailError = data.message || 'Failed to verify email';
+        emailError = data.message || 'Failed to update email';
       }
     } catch (err) {
       emailError = 'An error occurred. Please try again.';
       console.error(err);
     }
+  }
+  
+  function cancelEmailChange() {
+    emailStep = 'input';
+    oldEmailCode = '';
+    newEmailCode = '';
+    emailMessage = '';
+    emailError = '';
   }
 </script>
 
@@ -176,20 +222,36 @@
           placeholder="Enter new email"
         />
       </div>
-      <button on:click={sendEmailCode}>Send Verification Code</button>
-    {:else}
+      <button on:click={startEmailChange}>Change Email</button>
+    {:else if emailStep === 'verifyOld'}
+      <p class="step-info">Step 1 of 2: Verify your current email</p>
       <div class="form-group">
-        <label for="verificationCode">Verification Code</label>
+        <label for="oldEmailCode">Verification Code (sent to {user.email})</label>
         <input 
           type="text" 
-          id="verificationCode" 
-          bind:value={verificationCode} 
+          id="oldEmailCode" 
+          bind:value={oldEmailCode} 
           placeholder="Enter 6-digit code"
         />
       </div>
       <div class="button-group">
-        <button on:click={verifyEmailChange}>Verify & Update</button>
-        <button class="secondary" on:click={() => emailStep = 'input'}>Cancel</button>
+        <button on:click={verifyOldEmail}>Continue</button>
+        <button class="secondary" on:click={cancelEmailChange}>Cancel</button>
+      </div>
+    {:else if emailStep === 'verifyNew'}
+      <p class="step-info">Step 2 of 2: Verify your new email</p>
+      <div class="form-group">
+        <label for="newEmailCode">Verification Code (sent to {newEmail})</label>
+        <input 
+          type="text" 
+          id="newEmailCode" 
+          bind:value={newEmailCode} 
+          placeholder="Enter 6-digit code"
+        />
+      </div>
+      <div class="button-group">
+        <button on:click={verifyNewEmailAndUpdate}>Update Email</button>
+        <button class="secondary" on:click={cancelEmailChange}>Cancel</button>
       </div>
     {/if}
 
@@ -301,5 +363,12 @@
   .button-group {
     display: flex;
     align-items: center;
+  }
+
+  .step-info {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 15px;
+    font-style: italic;
   }
 </style>
