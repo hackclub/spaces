@@ -1,4 +1,3 @@
-import airtable from './airtable.js';
 import pg from './db.js';
 
 export const getUser = async (authorization) => {
@@ -51,6 +50,54 @@ export const checkUserSpaceLimit = async (userId) => {
   } catch (error) {
     console.error('Error checking space limit:', error);
     throw error;
+  }
+};
+
+export const ensureHackclubVerified = async (user) => {
+  if (!user) {
+    throw new Error("User is required");
+  }
+
+  const validStatuses = ['verified', 'verified_eligible', 'verified_but_over_18'];
+  
+  if (validStatuses.includes(user.hackclub_verification_status)) {
+    const lastChecked = user.hackclub_last_checked_at;
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    
+    if (lastChecked && new Date(lastChecked) > oneHourAgo) {
+      return user.hackclub_verification_status;
+    }
+  }
+
+  try {
+    const response = await fetch(
+      `https://auth.hackclub.com/api/external/check?email=${encodeURIComponent(user.email)}`
+    );
+
+    if (!response.ok) {
+      if (validStatuses.includes(user.hackclub_verification_status)) {
+        return user.hackclub_verification_status;
+      }
+      return user.hackclub_verification_status || 'unknown';
+    }
+
+    const data = await response.json();
+    const newStatus = data.result || 'not_found';
+
+    await pg('users')
+      .where({ id: user.id })
+      .update({
+        hackclub_verification_status: newStatus,
+        hackclub_last_checked_at: new Date()
+      });
+
+    return newStatus;
+  } catch (error) {
+    console.error('Error checking Hack Club verification:', error);
+    if (validStatuses.includes(user.hackclub_verification_status)) {
+      return user.hackclub_verification_status;
+    }
+    return user.hackclub_verification_status || 'unknown';
   }
 };
 

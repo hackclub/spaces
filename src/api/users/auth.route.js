@@ -126,7 +126,7 @@ router.post('/signup', /* authLimiter, */ async (req, res) => {
         max_spaces: 3,
         is_admin: false
       })
-      .returning(['id', 'email', 'username', 'authorization', 'is_admin', 'hackatime_api_key']);
+      .returning(['id', 'email', 'username', 'authorization', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
 
     res.cookie('auth_token', newUser.authorization, {
       httpOnly: true,
@@ -144,7 +144,9 @@ router.post('/signup', /* authLimiter, */ async (req, res) => {
         username: newUser.username,
         authorization: newUser.authorization,
         is_admin: newUser.is_admin,
-        hackatime_api_key: newUser.hackatime_api_key
+        hackatime_api_key: newUser.hackatime_api_key,
+        hackclub_id: newUser.hackclub_id,
+        hackclub_verification_status: newUser.hackclub_verification_status
       }
     });
     
@@ -210,7 +212,7 @@ router.post('/login', /* authLimiter, */ async (req, res) => {
     const [updatedUser] = await pg('users')
       .where('email', email)
       .update({ authorization: newAuthToken })
-      .returning(['email', 'username', 'authorization', 'is_admin', 'hackatime_api_key']);
+      .returning(['email', 'username', 'authorization', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
 
     res.cookie('auth_token', updatedUser.authorization, {
       httpOnly: true,
@@ -227,7 +229,9 @@ router.post('/login', /* authLimiter, */ async (req, res) => {
         username: updatedUser.username,
         authorization: updatedUser.authorization,
         is_admin: updatedUser.is_admin,
-        hackatime_api_key: updatedUser.hackatime_api_key
+        hackatime_api_key: updatedUser.hackatime_api_key,
+        hackclub_id: updatedUser.hackclub_id,
+        hackclub_verification_status: updatedUser.hackclub_verification_status
       }
     });
     

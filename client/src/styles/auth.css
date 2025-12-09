@@ -356,6 +356,62 @@
   border-top-color: var(--smoke);
 }
 
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 24px 0;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--smoke);
+}
+
+.divider span {
+  padding: 0 16px;
+  color: var(--muted);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.hackclub-button {
+  width: 100%;
+  padding: 14px 32px;
+  border: 2px solid var(--smoke);
+  border-radius: 99999px;
+  background: var(--white);
+  color: var(--black);
+  font-size: 16px;
+  font-weight: bold;
+  font-family: Phantom Sans, sans-serif;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: transform 0.125s ease-in-out, box-shadow 0.125s ease-in-out, border-color 0.125s ease-in-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hackclub-button:hover {
+  transform: scale(1.0625);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-color: var(--red);
+}
+
+.hackclub-button:active {
+  transform: scale(1);
+}
+
+.hackclub-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
 
 @media (max-width: 768px) {
   .auth-container {

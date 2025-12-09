@@ -18,25 +18,51 @@
 
   onMount(() => {
     applyTheme(get(currentTheme));
+    restoreSession();
   });
 
+  function restoreSession() {
+    const savedUser = localStorage.getItem('spaces_user');
+    if (savedUser) {
+      try {
+        user = JSON.parse(savedUser);
+        isAuthenticated = true;
+        loadSpaces();
+      } catch (e) {
+        localStorage.removeItem('spaces_user');
+      }
+    }
+  }
+
+  function saveSession(userData) {
+    localStorage.setItem('spaces_user', JSON.stringify(userData));
+  }
+
+  function clearSession() {
+    localStorage.removeItem('spaces_user');
+  }
+
   function handleAuthenticated(event) {
-    const { authorization, username, email, is_admin, hackatime_api_key } = event.detail;
+    const { authorization, username, email, is_admin, hackatime_api_key, hackclub_id, hackclub_verification_status } = event.detail;
 
     user = {
       authorization,
       username,
       email,
       is_admin,
-      hackatime_api_key
+      hackatime_api_key,
+      hackclub_id,
+      hackclub_verification_status
     };
 
+    saveSession(user);
     isAuthenticated = true;
     loadSpaces();
   }
   
   function handleUserUpdate(event) {
     user = { ...user, ...event.detail };
+    saveSession(user);
   }
 
   async function loadSpaces() {
@@ -74,6 +100,7 @@
       }
     }
 
+    clearSession();
     isAuthenticated = false;
     user = null;
     spaces = [];

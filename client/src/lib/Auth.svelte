@@ -1,12 +1,12 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { API_BASE, ERROR_MESSAGES } from '../config.js';
   import '../styles/auth.css';
 
   const dispatch = createEventDispatcher();
 
   let mode = 'login';
-  let authIntent = 'login'; // Track original intent (login/signup) even when in verify mode
+  let authIntent = 'login';
   let email = '';
   let username = '';
   let verificationCode = '';
@@ -14,6 +14,53 @@
   let loading = false;
   let message = '';
   let displayMode = 'login';
+
+  onMount(() => {
+    const hash = window.location.hash.startsWith('#') 
+      ? window.location.hash.slice(1) 
+      : window.location.hash;
+    const hashParams = new URLSearchParams(hash);
+    const queryParams = new URLSearchParams(window.location.search);
+    
+    if (hashParams.get('oauth_success') === 'true') {
+      const userData = hashParams.get('user_data');
+      if (userData) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(userData));
+          dispatch('authenticated', {
+            authorization: parsed.authorization,
+            username: parsed.username,
+            email: parsed.email,
+            is_admin: parsed.is_admin,
+            hackatime_api_key: parsed.hackatime_api_key,
+            hackclub_id: parsed.hackclub_id,
+            hackclub_verification_status: parsed.hackclub_verification_status
+          });
+          window.history.replaceState({}, '', window.location.pathname);
+        } catch (e) {
+          console.error('Failed to parse OAuth user data:', e);
+        }
+      }
+    }
+    
+    const oauthError = queryParams.get('error');
+    if (oauthError) {
+      const errorMessages = {
+        'oauth_denied': 'Authorization was denied. Please try again.',
+        'oauth_invalid_state': 'Invalid session. Please try again.',
+        'oauth_state_expired': 'Session expired. Please try again.',
+        'oauth_token_failed': 'Failed to complete authorization. Please try again.',
+        'oauth_hackclub_already_linked': 'This Hack Club account is already linked to another user.',
+        'oauth_callback_failed': 'Something went wrong. Please try again.'
+      };
+      error = errorMessages[oauthError] || 'OAuth error. Please try again.';
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  });
+
+  function loginWithHackClub() {
+    window.location.href = `${API_BASE}/oauth/hackclub/login`;
+  }
 
   async function sendVerificationCode() {
     error = '';
@@ -194,6 +241,15 @@
 
           <button class="primary-button" type="submit" disabled={loading || !email || (mode === 'signup' && !username)}>
             {loading ? 'Sending...' : 'Send Verification Code'}
+          </button>
+
+          <div class="divider">
+            <span>or</span>
+          </div>
+
+          <button class="hackclub-button" type="button" on:click={loginWithHackClub}>
+            <img src="https://assets.hackclub.com/icon-rounded.svg" alt="" class="hackclub-icon" />
+            Continue with Hack Club
           </button>
         </form>
 
