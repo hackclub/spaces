@@ -48,3 +48,37 @@ export const containerOpsLimiter = rateLimit({
     });
   }
 });
+
+export const clubsLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many club API requests. Please try again in 10 minutes.'
+  },
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      message: 'Too many club API requests. Please try again in 10 minutes.'
+    });
+  }
+});
+
+export const spaceShareLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many share requests. Please try again in 1 minute.'
+  },
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      message: 'Too many share requests. Please try again in 1 minute.'
+    });
+  }
+});

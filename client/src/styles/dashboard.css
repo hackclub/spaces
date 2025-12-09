@@ -91,6 +91,30 @@
   transform: scale(1);
 }
 
+.clubs-button {
+  padding: 12px 24px;
+  background: transparent;
+  border: 2px solid var(--green);
+  border-radius: 99999px;
+  color: var(--green);
+  font-size: 16px;
+  font-weight: bold;
+  font-family: Phantom Sans, sans-serif;
+  cursor: pointer;
+  transition: transform 0.125s ease-in-out, box-shadow 0.125s ease-in-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.clubs-button:hover {
+  transform: scale(1.0625);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.125);
+  background: rgba(51, 214, 166, 0.1);
+}
+
+.clubs-button:active {
+  transform: scale(1);
+}
+
 .header-actions {
   display: flex;
   gap: 16px;
@@ -466,6 +490,12 @@
 .space-info a:hover {
   color: var(--red);
   text-decoration: underline;
+}
+
+.space-share-section {
+  margin-bottom: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--smoke);
 }
 
 .space-actions {

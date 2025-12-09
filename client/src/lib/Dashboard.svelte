@@ -5,6 +5,7 @@
   import { currentTheme } from '../stores/theme.js';
   import { themes } from '../themes.js';
   import FlagIcon from '../assets/flag.svg?raw';
+  import ShareWithClubToggle from './ShareWithClubToggle.svelte';
 
   export let spaces = [];
   export let authorization = '';
@@ -21,6 +22,48 @@
   let actionError = {};
   let dropdownOpen = false;
   let showPassword = false;
+  let clubData = null;
+  let spaceShareStatus = {};
+
+  onMount(() => {
+    loadClubData();
+  });
+
+  async function loadClubData() {
+    try {
+      const response = await fetch(`${API_BASE}/clubs/me`, {
+        headers: {
+          'Authorization': authorization
+        }
+      });
+      const data = await response.json();
+      if (response.ok && data.success && data.data.club) {
+        clubData = data.data.club;
+        loadSpaceShareStatuses();
+      }
+    } catch (err) {
+      console.error('Failed to load club data:', err);
+    }
+  }
+
+  async function loadSpaceShareStatuses() {
+    for (const space of spaces) {
+      try {
+        const response = await fetch(`${API_BASE}/spaces/${space.id}/share/status`, {
+          headers: {
+            'Authorization': authorization
+          }
+        });
+        const data = await response.json();
+        if (response.ok && data.success) {
+          spaceShareStatus[space.id] = data.data;
+          spaceShareStatus = spaceShareStatus;
+        }
+      } catch (err) {
+        console.error('Failed to load share status:', err);
+      }
+    }
+  }
 
   const spaceTypes = [
     { value: 'code-server', label: 'VS Code Server', description: 'Web-based code editor' },
@@ -255,6 +298,10 @@
   function handleSettings() {
     dispatch('settings');
   }
+
+  function handleClubs() {
+    dispatch('clubs');
+  }
 </script>
 
 <div class="dashboard">
@@ -269,6 +316,7 @@
       </div>
     </div>
     <div class="header-actions">
+      <button class="clubs-button" on:click={handleClubs}>My Club</button>
       <button class="settings-button" on:click={handleSettings}>Settings</button>
       <button class="signout-button" on:click={handleSignOut}>Sign Out</button>
     </div>
@@ -401,6 +449,16 @@
               <div class="space-info">
                 <p><strong>Space ID:</strong> {space.id}</p>
                 <p><strong>Created:</strong> {new Date(space.created_at).toLocaleString()}</p>
+              </div>
+
+              <div class="space-share-section">
+                <ShareWithClubToggle 
+                  spaceId={space.id}
+                  {authorization}
+                  hasClub={!!clubData}
+                  initialShared={spaceShareStatus[space.id]?.shared || false}
+                  clubName={clubData?.displayName || clubData?.name || ''}
+                />
               </div>
 
               {#if actionError[space.id]}

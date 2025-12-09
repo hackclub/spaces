@@ -5,6 +5,7 @@
   import AdminPanel from './lib/AdminPanel.svelte';
   import ThemeSwitcher from './lib/ThemeSwitcher.svelte';
   import Settings from './lib/Settings.svelte';
+  import Clubs from './lib/Clubs.svelte';
   import { API_BASE } from './config.js';
   import { applyTheme, currentTheme } from './stores/theme.js';
   import { get } from 'svelte/store';
@@ -15,6 +16,7 @@
   let spaces = [];
   let showAdminPanel = false;
   let showSettings = false;
+  let showClubs = false;
 
   onMount(() => {
     applyTheme(get(currentTheme));
@@ -120,6 +122,11 @@
         <button on:click={() => showSettings = false}>Back to Dashboard</button>
       </div>
       <Settings {user} authorization={user.authorization} on:update={handleUserUpdate} />
+    {:else if showClubs}
+      <div class="nav-header">
+        <button on:click={() => showClubs = false}>Back to Dashboard</button>
+      </div>
+      <Clubs authorization={user.authorization} {user} />
     {:else}
       {#if user.is_admin}
         <div class="admin-link">
@@ -132,6 +139,7 @@
         username={user.username}
         on:signout={handleSignOut}
         on:settings={() => showSettings = true}
+        on:clubs={() => showClubs = true}
       />
     {/if}
   {:else}

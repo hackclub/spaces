@@ -3,6 +3,7 @@ import spaces from './spaces/space.route.js';
 import users from './users/users.route.js';
 import admin from './admin/admin.route.js';
 import oauth from './oauth/oauth.route.js';
+import clubs from './clubs/clubs.route.js';
 
 const router = express.Router();
 
@@ -16,5 +17,6 @@ router.use('/spaces/', spaces);
 router.use('/users/', users);
 router.use('/admin/', admin);
 router.use('/oauth/', oauth);
+router.use('/clubs/', clubs);
 
 export default router;
