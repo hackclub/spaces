@@ -13,7 +13,7 @@ import {
   getClubMembers,
   unlinkUserFromClub
 } from '../../utils/clubs.js';
-import { clubsLimiter } from '../../middlewares/rate-limit.middleware.js';
+
 
 const router = express.Router();
 
@@ -23,7 +23,7 @@ router.get('/', (req, res) => {
   });
 });
 
-router.post('/link', clubsLimiter, async (req, res) => {
+router.post('/link', async (req, res) => {
   try {
     const authorization = req.headers.authorization;
 
@@ -90,7 +90,7 @@ router.post('/link', clubsLimiter, async (req, res) => {
   }
 });
 
-router.post('/unlink', clubsLimiter, async (req, res) => {
+router.post('/unlink', async (req, res) => {
   try {
     const authorization = req.headers.authorization;
 
@@ -133,7 +133,7 @@ router.post('/unlink', clubsLimiter, async (req, res) => {
   }
 });
 
-router.get('/me', clubsLimiter, async (req, res) => {
+router.get('/me', async (req, res) => {
   try {
     const authorization = req.headers.authorization;
 
@@ -203,7 +203,7 @@ router.get('/me', clubsLimiter, async (req, res) => {
   }
 });
 
-router.get('/me/details', clubsLimiter, async (req, res) => {
+router.get('/me/details', async (req, res) => {
   try {
     const authorization = req.headers.authorization;
 
@@ -262,7 +262,7 @@ router.get('/me/details', clubsLimiter, async (req, res) => {
   }
 });
 
-router.get('/me/ships', clubsLimiter, async (req, res) => {
+router.get('/me/ships', async (req, res) => {
   try {
     const authorization = req.headers.authorization;
 
@@ -313,7 +313,7 @@ router.get('/me/ships', clubsLimiter, async (req, res) => {
   }
 });
 
-router.get('/me/members', clubsLimiter, async (req, res) => {
+router.get('/me/members', async (req, res) => {
   try {
     const authorization = req.headers.authorization;
 
