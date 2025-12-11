@@ -126,6 +126,38 @@
   margin: 0 auto;
 }
 
+.view-switcher {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--smoke);
+  border-radius: 99999px;
+}
+
+.view-tab {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 99999px;
+  color: var(--slate);
+  font-size: 14px;
+  font-weight: bold;
+  font-family: Phantom Sans, sans-serif;
+  cursor: pointer;
+  transition: background 0.125s ease-in-out, color 0.125s ease-in-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.view-tab:hover:not(.active) {
+  color: var(--black);
+}
+
+.view-tab.active {
+  background: var(--white);
+  color: var(--red);
+  cursor: default;
+}
+
 .actions-bar {
   display: flex;
   gap: 16px;

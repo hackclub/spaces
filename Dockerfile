@@ -50,6 +50,9 @@ RUN cd client && npm run build
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
+# Copy playground folder for static assets (Godot, etc.)
+COPY playground /app/playground
+
 # Create supervisor configuration
 RUN mkdir -p /var/log/supervisor
 COPY <<EOF /etc/supervisor/conf.d/supervisord.conf

@@ -302,6 +302,10 @@
   function handleClubs() {
     dispatch('clubs');
   }
+
+  function handleSwitchToPlayground() {
+    dispatch('switchview', { view: 'playground' });
+  }
 </script>
 
 <div class="dashboard">
@@ -316,6 +320,10 @@
       </div>
     </div>
     <div class="header-actions">
+      <div class="view-switcher">
+        <button class="view-tab active">Spaces</button>
+        <button class="view-tab" on:click={handleSwitchToPlayground}>Playground</button>
+      </div>
       <button class="clubs-button" on:click={handleClubs}>My Club</button>
       <button class="settings-button" on:click={handleSettings}>Settings</button>
       <button class="signout-button" on:click={handleSignOut}>Sign Out</button>

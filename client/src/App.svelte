@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import Auth from './lib/Auth.svelte';
   import Dashboard from './lib/Dashboard.svelte';
+  import Playground from './lib/Playground.svelte';
   import AdminPanel from './lib/AdminPanel.svelte';
   import ThemeSwitcher from './lib/ThemeSwitcher.svelte';
   import Settings from './lib/Settings.svelte';
@@ -17,6 +18,7 @@
   let showAdminPanel = false;
   let showSettings = false;
   let showClubs = false;
+  let currentView = 'spaces';
 
   onMount(() => {
     applyTheme(get(currentTheme));
@@ -133,14 +135,25 @@
           <button on:click={() => showAdminPanel = true}>Admin Panel</button>
         </div>
       {/if}
-      <Dashboard 
-        bind:spaces={spaces}
-        authorization={user.authorization}
-        username={user.username}
-        on:signout={handleSignOut}
-        on:settings={() => showSettings = true}
-        on:clubs={() => showClubs = true}
-      />
+      {#if currentView === 'playground'}
+        <Playground 
+          username={user.username}
+          on:signout={handleSignOut}
+          on:settings={() => showSettings = true}
+          on:clubs={() => showClubs = true}
+          on:switchview={(e) => currentView = e.detail.view}
+        />
+      {:else}
+        <Dashboard 
+          bind:spaces={spaces}
+          authorization={user.authorization}
+          username={user.username}
+          on:signout={handleSignOut}
+          on:settings={() => showSettings = true}
+          on:clubs={() => showClubs = true}
+          on:switchview={(e) => currentView = e.detail.view}
+        />
+      {/if}
     {/if}
   {:else}
     <Auth on:authenticated={handleAuthenticated} />
