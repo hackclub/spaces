@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import Landing from './lib/Landing.svelte';
   import Auth from './lib/Auth.svelte';
   import Dashboard from './lib/Dashboard.svelte';
   import Playground from './lib/Playground.svelte';
@@ -18,6 +19,7 @@
   let showAdminPanel = false;
   let showSettings = false;
   let showClubs = false;
+  let showAuth = false;
   let currentView = 'spaces';
 
   onMount(() => {
@@ -155,8 +157,10 @@
         />
       {/if}
     {/if}
-  {:else}
+  {:else if showAuth}
     <Auth on:authenticated={handleAuthenticated} />
+  {:else}
+    <Landing on:getstarted={() => showAuth = true} />
   {/if}
 </main>
 
