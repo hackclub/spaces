@@ -33,21 +33,17 @@ jobs:
 
       - name: Lint backend with ESLint
         run: npx eslint src/ --ext .js --max-warnings 0
-        continue-on-error: true
 
       - name: Lint client with ESLint
         run: npx eslint src/ --ext .js,.svelte --max-warnings 0
         working-directory: client
-        continue-on-error: true
 
       - name: Check Prettier formatting (backend)
         run: npx prettier --check "src/**/*.js"
-        continue-on-error: true
 
       - name: Check Prettier formatting (client)
         run: npx prettier --check "src/**/*.{js,svelte}"
         working-directory: client
-        continue-on-error: true
 
   security:
     name: Security Scan
