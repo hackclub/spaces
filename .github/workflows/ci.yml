@@ -67,12 +67,10 @@ jobs:
 
       - name: Audit backend dependencies
         run: npm audit --audit-level=high
-        continue-on-error: true
 
       - name: Audit client dependencies
         run: npm audit --audit-level=high
         working-directory: client
-        continue-on-error: true
 
       - name: Run CodeQL Analysis
         uses: github/codeql-action/init@v3
