@@ -24,6 +24,38 @@
 
   onMount(() => {
     applyTheme(get(currentTheme));
+    
+    // Check for OAuth callback before restoring session
+    const hash = window.location.hash.startsWith('#') 
+      ? window.location.hash.slice(1) 
+      : window.location.hash;
+    const hashParams = new URLSearchParams(hash);
+    
+    if (hashParams.get('oauth_success') === 'true') {
+      const userData = hashParams.get('user_data');
+      if (userData) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(userData));
+          user = {
+            authorization: parsed.authorization,
+            username: parsed.username,
+            email: parsed.email,
+            is_admin: parsed.is_admin,
+            hackatime_api_key: parsed.hackatime_api_key,
+            hackclub_id: parsed.hackclub_id,
+            hackclub_verification_status: parsed.hackclub_verification_status
+          };
+          saveSession(user);
+          isAuthenticated = true;
+          loadSpaces();
+          window.history.replaceState({}, '', window.location.pathname);
+          return;
+        } catch (e) {
+          console.error('Failed to parse OAuth user data:', e);
+        }
+      }
+    }
+    
     restoreSession();
   });
 
