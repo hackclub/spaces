@@ -12,23 +12,23 @@
   const features = [
     {
       icon: 'code',
-      title: 'VS Code in the Cloud',
+      title: 'VSCode',
       description: 'Full-featured code editor accessible from any browser, no installation required.'
     },
     {
       icon: 'controls',
-      title: 'Blender 3D',
-      description: 'Create stunning 3D models and animations right from your browser.'
+      title: 'Blender',
+      description: 'Create 3D models and animations right from your browser.'
     },
     {
       icon: 'settings',
-      title: 'KiCad PCB Design',
-      description: 'Design professional circuit boards without any local setup.'
+      title: 'KiCad',
+      description: 'Design circuit boards without any local setup.'
     },
     {
       icon: 'bolt',
       title: 'Instant Access',
-      description: 'Launch your development environment in seconds from any device.'
+      description: 'Launch your development environment from any device.'
     },
     {
       icon: 'private',
@@ -37,7 +37,7 @@
     },
     {
       icon: 'community',
-      title: 'Club Integration',
+      title: 'Clubs Integration',
       description: 'Share spaces with your Hack Club and collaborate with friends.'
     }
   ];
@@ -55,17 +55,17 @@
       </div>
       <h1 class="hero-title">Hack Club Spaces</h1>
       <p class="hero-subtitle">
-        Code from anywhere. Build anything. No powerful hardware required.
+        Code from anywhere. Build anything.
       </p>
       <p class="hero-description">
-        Virtual development environments for teen hackers. VS Code, Blender, KiCad, and more, all running in the cloud.
+        Virtual development environments for Hack Clubbers. VSCode, Blender, KiCad, and more, in the cloud.
       </p>
       <div class="hero-actions">
         <button class="btn-cta" on:click={handleGetStarted}>
           Get Started
         </button>
         <a href="https://hackclub.com" target="_blank" rel="noopener noreferrer" class="btn-outline">
-          Learn About Hack Club
+          What is Hack Club?
         </a>
       </div>
     </div>
@@ -129,11 +129,6 @@
             <div class="code-line"><span class="keyword">async function</span> <span class="function">joinHackClub</span>() {"{"}</div>
             <div class="code-line">  <span class="keyword">const</span> <span class="variable">slack</span> = <span class="string">"hackclub.com/slack"</span>;</div>
             <div class="code-line">  <span class="keyword">const</span> <span class="variable">friends</span> = <span class="keyword">await</span> <span class="function">fetch</span>(<span class="variable">slack</span>);</div>
-            <div class="code-line"></div>
-            <div class="code-line">  <span class="comment">// 50,000+ teen hackers</span></div>
-            <div class="code-line">  <span class="comment">// Ship projects together</span></div>
-            <div class="code-line">  <span class="comment">// Get help when stuck</span></div>
-            <div class="code-line"></div>
             <div class="code-line">  <span class="keyword">return</span> <span class="variable">friends</span>;</div>
             <div class="code-line">{"}"}</div>
           </div>
