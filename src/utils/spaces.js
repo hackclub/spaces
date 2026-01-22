@@ -2,6 +2,7 @@ import Docker from "dockerode";
 import getPort from "get-port";
 import pg from "./db.js";
 import { getUser, checkUserSpaceLimit, ensureHackclubVerified } from "./user.js";
+import { getUserPrimaryMembership } from "./clubs.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -50,11 +51,14 @@ export const createContainer = async (password, type, authorization) => {
     throw new Error("Invalid authorization token");
   }
 
-  const verificationStatus = await ensureHackclubVerified(user);
-  if (!['verified', 'verified_eligible', 'verified_but_over_18'].includes(verificationStatus)) {
-    const error = new Error("You must be a verified Hack Club member to create a space. Please link your Hack Club account and complete verification.");
-    error.statusCode = 403;
-    throw error;
+  const membership = await getUserPrimaryMembership(user.id);
+  if (!membership) {
+    const verificationStatus = await ensureHackclubVerified(user);
+    if (!['verified', 'verified_eligible', 'verified_but_over_18'].includes(verificationStatus)) {
+      const error = new Error("You must be a verified Hack Club member or a club member to create a space. Please link your Hack Club account and complete verification, or link to a club.");
+      error.statusCode = 403;
+      throw error;
+    }
   }
 
   await checkUserSpaceLimit(user.id);
