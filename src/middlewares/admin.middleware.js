@@ -3,7 +3,7 @@ import { getUser } from '../utils/user.js';
 
 export const requireAdmin = async (req, res, next) => {
   try {
-    const { authorization } = req.body;
+    const authorization = req.headers.authorization || req.cookies?.auth_token || req.body?.authorization;
     
     if (!authorization) {
       return res.status(401).json({
