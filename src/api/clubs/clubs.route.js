@@ -13,9 +13,11 @@ import {
   getClubMembers,
   unlinkUserFromClub
 } from '../../utils/clubs.js';
+import { extractAuth } from '../../middlewares/auth.middleware.js';
 
 
 const router = express.Router();
+router.use(extractAuth);
 
 router.get('/', (req, res) => {
   res.status(200).json({
@@ -25,7 +27,7 @@ router.get('/', (req, res) => {
 
 router.post('/link', async (req, res) => {
   try {
-    const authorization = req.headers.authorization;
+    const authorization = req.authToken;
 
     if (!authorization) {
       return res.status(401).json({
@@ -92,7 +94,7 @@ router.post('/link', async (req, res) => {
 
 router.post('/unlink', async (req, res) => {
   try {
-    const authorization = req.headers.authorization;
+    const authorization = req.authToken;
 
     if (!authorization) {
       return res.status(401).json({
@@ -135,7 +137,7 @@ router.post('/unlink', async (req, res) => {
 
 router.get('/me', async (req, res) => {
   try {
-    const authorization = req.headers.authorization;
+    const authorization = req.authToken;
 
     if (!authorization) {
       return res.status(401).json({
@@ -205,7 +207,7 @@ router.get('/me', async (req, res) => {
 
 router.get('/me/details', async (req, res) => {
   try {
-    const authorization = req.headers.authorization;
+    const authorization = req.authToken;
 
     if (!authorization) {
       return res.status(401).json({
@@ -264,7 +266,7 @@ router.get('/me/details', async (req, res) => {
 
 router.get('/me/ships', async (req, res) => {
   try {
-    const authorization = req.headers.authorization;
+    const authorization = req.authToken;
 
     if (!authorization) {
       return res.status(401).json({
@@ -315,7 +317,7 @@ router.get('/me/ships', async (req, res) => {
 
 router.get('/me/members', async (req, res) => {
   try {
-    const authorization = req.headers.authorization;
+    const authorization = req.authToken;
 
     if (!authorization) {
       return res.status(401).json({

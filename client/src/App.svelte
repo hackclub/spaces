@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import Landing from './lib/Landing.svelte';
   import Auth from './lib/Auth.svelte';
+  import ClubMemberAuth from './lib/ClubMemberAuth.svelte';
   import Dashboard from './lib/Dashboard.svelte';
   import Playground from './lib/Playground.svelte';
   import AdminPanel from './lib/AdminPanel.svelte';
@@ -20,6 +21,7 @@
   let showSettings = false;
   let showClubs = false;
   let showAuth = false;
+  let showClubMemberAuth = false;
   let currentView = 'spaces';
 
   onMount(() => {
@@ -37,7 +39,6 @@
         try {
           const parsed = JSON.parse(decodeURIComponent(userData));
           user = {
-            authorization: parsed.authorization,
             username: parsed.username,
             email: parsed.email,
             is_admin: parsed.is_admin,
@@ -81,10 +82,9 @@
   }
 
   function handleAuthenticated(event) {
-    const { authorization, username, email, is_admin, hackatime_api_key, hackclub_id, hackclub_verification_status } = event.detail;
+    const { username, email, is_admin, hackatime_api_key, hackclub_id, hackclub_verification_status } = event.detail;
 
     user = {
-      authorization,
       username,
       email,
       is_admin,
@@ -108,9 +108,7 @@
     
     try {
       const response = await fetch(`${API_BASE}/spaces/list`, {
-        headers: {
-          'Authorization': user.authorization,
-        },
+        credentials: 'include',
       });
       
       const data = await response.json();
@@ -124,18 +122,13 @@
   }
 
   async function handleSignOut() {
-    if (user) {
-      try {
-        await fetch(`${API_BASE}/users/signout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ authorization: user.authorization }),
-        });
-      } catch (err) {
-        console.error('Sign out error:', err);
-      }
+    try {
+      await fetch(`${API_BASE}/users/signout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (err) {
+      console.error('Sign out error:', err);
     }
 
     clearSession();
@@ -152,17 +145,17 @@
       <div class="nav-header">
         <button on:click={() => showAdminPanel = false}>Back to Dashboard</button>
       </div>
-      <AdminPanel authorization={user.authorization} />
+      <AdminPanel />
     {:else if showSettings}
       <div class="nav-header">
         <button on:click={() => showSettings = false}>Back to Dashboard</button>
       </div>
-      <Settings {user} authorization={user.authorization} on:update={handleUserUpdate} />
+      <Settings {user} on:update={handleUserUpdate} />
     {:else if showClubs}
       <div class="nav-header">
         <button on:click={() => showClubs = false}>Back to Dashboard</button>
       </div>
-      <Clubs authorization={user.authorization} {user} />
+      <Clubs {user} />
     {:else}
       {#if user.is_admin}
         <div class="admin-link">
@@ -180,7 +173,6 @@
       {:else}
         <Dashboard 
           bind:spaces={spaces}
-          authorization={user.authorization}
           username={user.username}
           on:signout={handleSignOut}
           on:settings={() => showSettings = true}
@@ -189,8 +181,10 @@
         />
       {/if}
     {/if}
+  {:else if showClubMemberAuth}
+    <ClubMemberAuth on:authenticated={handleAuthenticated} on:back={() => { showClubMemberAuth = false; showAuth = true; }} />
   {:else if showAuth}
-    <Auth on:authenticated={handleAuthenticated} />
+    <Auth on:authenticated={handleAuthenticated} on:clubmember={() => { showAuth = false; showClubMemberAuth = true; }} />
   {:else}
     <Landing on:getstarted={() => showAuth = true} />
   {/if}

@@ -8,7 +8,6 @@
   import ShareWithClubToggle from './ShareWithClubToggle.svelte';
 
   export let spaces = [];
-  export let authorization = '';
   export let username = '';
 
   const dispatch = createEventDispatcher();
@@ -32,9 +31,7 @@
   async function loadClubData() {
     try {
       const response = await fetch(`${API_BASE}/clubs/me`, {
-        headers: {
-          'Authorization': authorization
-        }
+        credentials: 'include'
       });
       const data = await response.json();
       if (response.ok && data.success && data.data.club) {
@@ -50,9 +47,7 @@
     for (const space of spaces) {
       try {
         const response = await fetch(`${API_BASE}/spaces/${space.id}/share/status`, {
-          headers: {
-            'Authorization': authorization
-          }
+          credentials: 'include'
         });
         const data = await response.json();
         if (response.ok && data.success) {
@@ -84,9 +79,9 @@
       const response = await fetch(`${API_BASE}/spaces/create`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authorization,
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify(body),
       });
 
@@ -113,9 +108,7 @@
   async function loadSpaces() {
     try {
       const response = await fetch(`${API_BASE}/spaces/list`, {
-        headers: {
-          'Authorization': authorization,
-        },
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -137,9 +130,7 @@
     try {
       const response = await fetch(`${API_BASE}/spaces/start/${spaceId}`, {
         method: 'POST',
-        headers: {
-          'Authorization': authorization,
-        },
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -172,9 +163,7 @@
     try {
       const response = await fetch(`${API_BASE}/spaces/stop/${spaceId}`, {
         method: 'POST',
-        headers: {
-          'Authorization': authorization,
-        },
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -202,9 +191,7 @@
 
     try {
       const response = await fetch(`${API_BASE}/spaces/status/${spaceId}`, {
-        headers: {
-          'Authorization': authorization,
-        },
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -237,9 +224,7 @@
     try {
       const response = await fetch(`${API_BASE}/spaces/delete/${spaceId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': authorization,
-        },
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -462,7 +447,6 @@
               <div class="space-share-section">
                 <ShareWithClubToggle 
                   spaceId={space.id}
-                  {authorization}
                   hasClub={!!clubData}
                   initialShared={spaceShareStatus[space.id]?.shared || false}
                   clubName={clubData?.displayName || clubData?.name || ''}

@@ -3,7 +3,6 @@
   import { API_BASE } from '../config.js';
 
   export let user;
-  export let authorization;
 
   const dispatch = createEventDispatcher();
 
@@ -36,9 +35,9 @@
       const response = await fetch(`${API_BASE}/oauth/hackclub/link`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authorization
-        }
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -65,9 +64,9 @@
       const response = await fetch(`${API_BASE}/oauth/unlink`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authorization
-        }
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -99,9 +98,9 @@
       const response = await fetch(`${API_BASE}/oauth/refresh-verification`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authorization
-        }
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -152,9 +151,9 @@
       const response = await fetch(`${API_BASE}/users/update`, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authorization
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({
           username,
           hackatime_api_key: hackatimeApiKey

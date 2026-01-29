@@ -159,6 +159,78 @@ All API endpoints that require authentication expect an `authorization` token in
   }
   ```
 
+#### Club Member Check
+- **POST** `/api/v1/users/club-member/check`
+- **Description**: Check if an email is associated with a Hack Club club membership
+- **Body**:
+  ```json
+  {
+    "email": "member@school.edu"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "isMember": true,
+      "isLeader": false,
+      "clubName": "Example High School Hack Club",
+      "hasExistingAccount": false,
+      "hasPasswordAuth": false
+    }
+  }
+  ```
+
+#### Club Member Sign Up
+- **POST** `/api/v1/users/club-member/signup`
+- **Description**: Create a new account as a verified club member (requires valid club membership)
+- **Body**:
+  ```json
+  {
+    "email": "member@school.edu",
+    "username": "myusername",
+    "password": "securepassword123"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Account created successfully",
+    "data": {
+      "email": "member@school.edu",
+      "username": "myusername",
+      "authorization": "auth_token_here",
+      "club_name": "Example High School Hack Club",
+      "club_role": "member"
+    }
+  }
+  ```
+
+#### Club Member Login
+- **POST** `/api/v1/users/club-member/login`
+- **Description**: Login with email and password (for accounts created via club member signup)
+- **Body**:
+  ```json
+  {
+    "email": "member@school.edu",
+    "password": "securepassword123"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Login successful",
+    "data": {
+      "email": "member@school.edu",
+      "username": "myusername",
+      "authorization": "new_auth_token_here"
+    }
+  }
+  ```
+
 #### Sign Out
 - **POST** `/api/v1/users/signout`
 - **Description**: Sign out and invalidate the current authorization token

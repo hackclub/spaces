@@ -2,7 +2,6 @@
   import { API_BASE } from '../config.js';
 
   export let spaceId;
-  export let authorization;
   export let hasClub = false;
   export let initialShared = false;
   export let clubName = '';
@@ -22,9 +21,9 @@
       const response = await fetch(`${API_BASE}/spaces/${spaceId}/share/club`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authorization
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({ share: newShareState })
       });
 

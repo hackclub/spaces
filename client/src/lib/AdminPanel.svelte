@@ -2,8 +2,6 @@
   import { onMount } from 'svelte';
   import { API_BASE } from '../config.js';
 
-  export let authorization;
-
   let analytics = { totalUsers: 0, totalSpaces: 0, activeSpaces: 0 };
   let users = [];
   let spaces = [];
@@ -29,7 +27,7 @@
       const response = await fetch(`${API_BASE}/admin/analytics`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ authorization })
+        credentials: 'include'
       });
       const data = await response.json();
       if (response.ok) {
@@ -45,7 +43,7 @@
       const response = await fetch(`${API_BASE}/admin/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ authorization })
+        credentials: 'include'
       });
       const data = await response.json();
       if (response.ok) {
@@ -61,7 +59,7 @@
       const response = await fetch(`${API_BASE}/admin/spaces`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ authorization })
+        credentials: 'include'
       });
       const data = await response.json();
       if (response.ok) {
@@ -77,7 +75,8 @@
       const response = await fetch(`${API_BASE}/admin/users/${userId}/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ authorization, ...updates })
+        credentials: 'include',
+        body: JSON.stringify(updates)
       });
       if (response.ok) {
         await loadUsers();
@@ -95,7 +94,7 @@
       const response = await fetch(`${API_BASE}/admin/users/${userId}/delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ authorization })
+        credentials: 'include'
       });
       if (response.ok) {
         await loadData();
@@ -112,7 +111,7 @@
       const response = await fetch(`${API_BASE}/admin/spaces/${spaceId}/delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ authorization })
+        credentials: 'include'
       });
       if (response.ok) {
         await loadData();

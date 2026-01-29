@@ -2,8 +2,10 @@ import express from 'express';
 import crypto from 'crypto';
 import pg from '../../utils/db.js';
 import { getUser } from '../../utils/user.js';
+import { extractAuth } from '../../middlewares/auth.middleware.js';
 
 const router = express.Router();
+router.use(extractAuth);
 
 const HACKCLUB_AUTH_URL = 'https://auth.hackclub.com/oauth/authorize';
 const HACKCLUB_TOKEN_URL = 'https://auth.hackclub.com/oauth/token';
@@ -47,7 +49,7 @@ router.get('/hackclub/login', async (req, res) => {
 
 router.post('/hackclub/link', async (req, res) => {
   try {
-    const authorization = req.headers.authorization;
+    const authorization = req.authToken;
     
     if (!authorization) {
       return res.status(401).json({
@@ -253,7 +255,6 @@ router.get('/callback', async (req, res) => {
     });
 
     const userData = {
-      authorization: user.authorization,
       username: user.username,
       email: user.email,
       is_admin: user.is_admin,
@@ -273,7 +274,7 @@ router.get('/callback', async (req, res) => {
 
 router.get('/status', async (req, res) => {
   try {
-    const authorization = req.headers.authorization;
+    const authorization = req.authToken;
     
     if (!authorization) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -301,7 +302,7 @@ router.get('/status', async (req, res) => {
 
 router.post('/refresh-verification', async (req, res) => {
   try {
-    const authorization = req.headers.authorization;
+    const authorization = req.authToken;
     
     if (!authorization) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -350,7 +351,7 @@ router.post('/refresh-verification', async (req, res) => {
 
 router.post('/unlink', async (req, res) => {
   try {
-    const authorization = req.headers.authorization;
+    const authorization = req.authToken;
     
     if (!authorization) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });

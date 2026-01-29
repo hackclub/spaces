@@ -1,6 +1,8 @@
 import pg from './db.js';
 
 export const getUser = async (authorization) => {
+  if (!authorization) return null;
+  
   try {
     const user = await pg('users')
       .where('authorization', authorization)
@@ -12,6 +14,16 @@ export const getUser = async (authorization) => {
     console.error('Error fetching user:', error);
     throw error;
   }
+};
+
+export const getUserFromRequest = async (req) => {
+  const authHeader = req.headers.authorization;
+  const authCookie = req.cookies?.auth_token;
+  const authorization = authHeader || authCookie;
+  
+  if (!authorization) return null;
+  
+  return getUser(authorization);
 };
 
 export const checkUserSpaceLimit = async (userId) => {

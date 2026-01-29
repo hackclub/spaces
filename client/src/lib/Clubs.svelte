@@ -2,7 +2,6 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { API_BASE } from '../config.js';
 
-  export let authorization = '';
   export let user = null;
 
   const dispatch = createEventDispatcher();
@@ -28,9 +27,7 @@
 
     try {
       const response = await fetch(`${API_BASE}/clubs/me`, {
-        headers: {
-          'Authorization': authorization
-        }
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -59,9 +56,7 @@
 
     try {
       const response = await fetch(`${API_BASE}/clubs/me/ships`, {
-        headers: {
-          'Authorization': authorization
-        }
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -81,9 +76,7 @@
 
     try {
       const response = await fetch(`${API_BASE}/spaces/shared-with-me`, {
-        headers: {
-          'Authorization': authorization
-        }
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -107,9 +100,9 @@
       const response = await fetch(`${API_BASE}/clubs/link`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authorization
-        }
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -141,9 +134,9 @@
       const response = await fetch(`${API_BASE}/clubs/unlink`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': authorization
-        }
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
       });
 
       const data = await response.json();

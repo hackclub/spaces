@@ -413,6 +413,15 @@
   border-radius: 6px;
 }
 
+.club-member-button {
+  margin-top: 12px;
+}
+
+.club-member-button .hackclub-icon {
+  border-radius: 0;
+  stroke: var(--blue);
+}
+
 @media (max-width: 768px) {
   .auth-container {
     flex-direction: column;

@@ -18,12 +18,15 @@ import {
 } from "../../utils/clubs.js";
 import pg from "../../utils/db.js";
 import { containerOpsLimiter, spaceShareLimiter } from "../../middlewares/rate-limit.middleware.js";
+import { extractAuth } from "../../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
+router.use(extractAuth);
+
 router.post("/create", containerOpsLimiter, async (req, res) => {
   const { password, type } = req.body;
-  const authorization = req.headers.authorization;
+  const authorization = req.authToken;
   
   try {
     const result = await createContainer(password, type, authorization);
@@ -43,7 +46,7 @@ router.post("/create", containerOpsLimiter, async (req, res) => {
 
 router.post("/start/:spaceId", containerOpsLimiter, async (req, res) => {
   const { spaceId } = req.params;
-  const authorization = req.headers.authorization;
+  const authorization = req.authToken;
   
   try {
     const result = await startContainer(spaceId, authorization);
@@ -56,7 +59,7 @@ router.post("/start/:spaceId", containerOpsLimiter, async (req, res) => {
 
 router.post("/stop/:spaceId", containerOpsLimiter, async (req, res) => {
   const { spaceId } = req.params;
-  const authorization = req.headers.authorization;
+  const authorization = req.authToken;
   
   try {
     const result = await stopContainer(spaceId, authorization);
@@ -69,7 +72,7 @@ router.post("/stop/:spaceId", containerOpsLimiter, async (req, res) => {
 
 router.get("/status/:spaceId", containerOpsLimiter, async (req, res) => {
   const { spaceId } = req.params;
-  const authorization = req.headers.authorization;
+  const authorization = req.authToken;
   
   try {
     const result = await getContainerStatus(spaceId, authorization);
@@ -82,7 +85,7 @@ router.get("/status/:spaceId", containerOpsLimiter, async (req, res) => {
 
 // GET /api/v1/spaces/list - List all spaces for authenticated user
 router.get("/list", async (req, res) => {
-  const authorization = req.headers.authorization;
+  const authorization = req.authToken;
   
   try {
     const spaces = await getUserSpaces(authorization);
@@ -98,7 +101,7 @@ router.get("/list", async (req, res) => {
 
 router.delete("/delete/:spaceId", containerOpsLimiter, async (req, res) => {
   const { spaceId } = req.params;
-  const authorization = req.headers.authorization;
+  const authorization = req.authToken;
   
   try {
     const result = await deleteSpace(spaceId, authorization);
@@ -112,7 +115,7 @@ router.delete("/delete/:spaceId", containerOpsLimiter, async (req, res) => {
 router.post("/:spaceId/share/club", spaceShareLimiter, async (req, res) => {
   const { spaceId } = req.params;
   const { share } = req.body;
-  const authorization = req.headers.authorization;
+  const authorization = req.authToken;
 
   try {
     if (!authorization) {
@@ -189,7 +192,7 @@ router.post("/:spaceId/share/club", spaceShareLimiter, async (req, res) => {
 
 router.get("/:spaceId/share/status", async (req, res) => {
   const { spaceId } = req.params;
-  const authorization = req.headers.authorization;
+  const authorization = req.authToken;
 
   try {
     if (!authorization) {
@@ -241,7 +244,7 @@ router.get("/:spaceId/share/status", async (req, res) => {
 });
 
 router.get("/shared-with-me", async (req, res) => {
-  const authorization = req.headers.authorization;
+  const authorization = req.authToken;
 
   try {
     if (!authorization) {

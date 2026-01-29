@@ -3,8 +3,11 @@ import { sendEmail, checkEmail } from '../../utils/airtable.js';
 import pg from '../../utils/db.js';
 import crypto from 'crypto';
 import { strictLimiter, authLimiter } from '../../middlewares/rate-limit.middleware.js';
+import { validateEmail, validateUsername, normalizeEmail } from '../../utils/validation.js';
+import { extractAuth } from '../../middlewares/auth.middleware.js';
 
 const router = express.Router();
+router.use(extractAuth);
 
 const randomToken = () => {
   return crypto.randomBytes(32).toString('hex');
@@ -19,22 +22,16 @@ router.get('/send', (req, res) => {
 // POST /api/v1/users/send
 router.post('/send', /* strictLimiter, */ async (req, res) => {
   try {
-    const { email, mode } = req.body;
+    const { email: rawEmail, mode } = req.body;
 
-    if (!email) {
+    const emailValidation = validateEmail(rawEmail);
+    if (!emailValidation.valid) {
       return res.status(400).json({
         success: false,
-        message: 'Email is required'
+        message: emailValidation.message
       });
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid email format'
-      });
-    }
+    const email = emailValidation.normalized;
 
     if (mode === 'login') {
       const user = await pg('users')
@@ -72,27 +69,30 @@ router.post('/send', /* strictLimiter, */ async (req, res) => {
 // POST /api/v1/users/signup 
 router.post('/signup', /* authLimiter, */ async (req, res) => {
   try {
-    const { email, username, verificationCode } = req.body;
+    const { email: rawEmail, username: rawUsername, verificationCode } = req.body;
     
-    if (!email || !username || !verificationCode) {
+    const emailValidation = validateEmail(rawEmail);
+    if (!emailValidation.valid) {
       return res.status(400).json({
         success: false,
-        message: 'Email, username, and verification code are required'
+        message: emailValidation.message
       });
     }
+    const email = emailValidation.normalized;
     
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    const usernameValidation = validateUsername(rawUsername);
+    if (!usernameValidation.valid) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid email format'
+        message: usernameValidation.message
       });
     }
+    const username = usernameValidation.normalized;
     
-    if (username.length > 100) {
+    if (!verificationCode) {
       return res.status(400).json({
         success: false,
-        message: 'Username must be 100 characters or less'
+        message: 'Verification code is required'
       });
     }
     
@@ -142,7 +142,6 @@ router.post('/signup', /* authLimiter, */ async (req, res) => {
         id: newUser.id,
         email: newUser.email,
         username: newUser.username,
-        authorization: newUser.authorization,
         is_admin: newUser.is_admin,
         hackatime_api_key: newUser.hackatime_api_key,
         hackclub_id: newUser.hackclub_id,
@@ -171,20 +170,21 @@ router.post('/signup', /* authLimiter, */ async (req, res) => {
 // POST /api/v1/users/login
 router.post('/login', /* authLimiter, */ async (req, res) => {
   try {
-    const { email, verificationCode } = req.body;
+    const { email: rawEmail, verificationCode } = req.body;
     
-    if (!email || !verificationCode) {
+    const emailValidation = validateEmail(rawEmail);
+    if (!emailValidation.valid) {
       return res.status(400).json({
         success: false,
-        message: 'Email and verification code are required'
+        message: emailValidation.message
       });
     }
+    const email = emailValidation.normalized;
     
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!verificationCode) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid email format'
+        message: 'Verification code is required'
       });
     }
     
@@ -227,7 +227,6 @@ router.post('/login', /* authLimiter, */ async (req, res) => {
       data: {
         email: updatedUser.email,
         username: updatedUser.username,
-        authorization: updatedUser.authorization,
         is_admin: updatedUser.is_admin,
         hackatime_api_key: updatedUser.hackatime_api_key,
         hackclub_id: updatedUser.hackclub_id,
@@ -248,12 +247,13 @@ router.post('/login', /* authLimiter, */ async (req, res) => {
 // POST /api/v1/users/signout
 router.post('/signout', async (req, res) => {
   try {
-    const { authorization } = req.body;
+    const authorization = req.headers.authorization || req.cookies?.auth_token;
     
     if (!authorization) {
-      return res.status(400).json({
-        success: false,
-        message: 'Authorization token is required'
+      res.clearCookie('auth_token');
+      return res.status(200).json({
+        success: true,
+        message: 'Sign out successful'
       });
     }
     
@@ -261,36 +261,26 @@ router.post('/signout', async (req, res) => {
       .where('authorization', authorization)
       .first();
     
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Invalid authorization token'
-      });
+    if (user) {
+      const newAuthToken = randomToken();
+      await pg('users')
+        .where('authorization', authorization)
+        .update({ authorization: newAuthToken });
     }
-    
-    const newAuthToken = randomToken();
-    
-    const [updatedUser] = await pg('users')
-      .where('authorization', authorization)
-      .update({ authorization: newAuthToken })
-      .returning(['email']);
 
     res.clearCookie('auth_token');
 
     res.status(200).json({
       success: true,
-      message: 'Sign out successful',
-      data: {
-        email: updatedUser.email,
-      }
+      message: 'Sign out successful'
     });
     
   } catch (error) {
     console.error('Error in /signout route:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to sign out',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    res.clearCookie('auth_token');
+    res.status(200).json({
+      success: true,
+      message: 'Sign out successful'
     });
   }
 });
@@ -298,7 +288,7 @@ router.post('/signout', async (req, res) => {
 // PUT /api/v1/users/update
 router.put('/update', async (req, res) => {
   try {
-    const authorization = req.headers.authorization;
+    const authorization = req.authToken;
     const { username, hackatime_api_key } = req.body;
     
     if (!authorization) {
@@ -362,7 +352,6 @@ router.put('/update', async (req, res) => {
       data: {
         username: updatedUser.username,
         email: updatedUser.email,
-        authorization: updatedUser.authorization,
         is_admin: updatedUser.is_admin,
         hackatime_api_key: updatedUser.hackatime_api_key
       }
@@ -381,7 +370,7 @@ router.put('/update', async (req, res) => {
 // POST /api/v1/users/verify-email-change
 router.post('/verify-email-change', async (req, res) => {
   try {
-    const authorization = req.headers.authorization;
+    const authorization = req.authToken;
     const { newEmail, verificationCode } = req.body;
     
     if (!authorization) {
@@ -391,18 +380,19 @@ router.post('/verify-email-change', async (req, res) => {
       });
     }
     
-    if (!newEmail || !verificationCode) {
+    const emailValidation = validateEmail(newEmail);
+    if (!emailValidation.valid) {
       return res.status(400).json({
         success: false,
-        message: 'New email and verification code are required'
+        message: emailValidation.message
       });
     }
+    const normalizedNewEmail = emailValidation.normalized;
     
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newEmail)) {
+    if (!verificationCode) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid email format'
+        message: 'Verification code is required'
       });
     }
     
@@ -417,7 +407,7 @@ router.post('/verify-email-change', async (req, res) => {
       });
     }
     
-    if (user.email === newEmail) {
+    if (user.email === normalizedNewEmail) {
       return res.status(400).json({
         success: false,
         message: 'New email is the same as current email'
@@ -426,7 +416,7 @@ router.post('/verify-email-change', async (req, res) => {
     
     // Check if email is already taken
     const existingUser = await pg('users')
-      .where('email', newEmail)
+      .where('email', normalizedNewEmail)
       .first();
       
     if (existingUser) {
@@ -437,7 +427,7 @@ router.post('/verify-email-change', async (req, res) => {
     }
     
     // Verify code
-    const codeValid = await checkEmail(newEmail, verificationCode);
+    const codeValid = await checkEmail(normalizedNewEmail, verificationCode);
     if (!codeValid) {
       return res.status(400).json({
         success: false,
@@ -448,7 +438,7 @@ router.post('/verify-email-change', async (req, res) => {
     // Update email
     await pg('users')
       .where('id', user.id)
-      .update({ email: newEmail });
+      .update({ email: normalizedNewEmail });
       
     const updatedUser = await pg('users')
       .where('id', user.id)
@@ -460,7 +450,6 @@ router.post('/verify-email-change', async (req, res) => {
       data: {
         username: updatedUser.username,
         email: updatedUser.email,
-        authorization: updatedUser.authorization,
         is_admin: updatedUser.is_admin,
         hackatime_api_key: updatedUser.hackatime_api_key
       }
