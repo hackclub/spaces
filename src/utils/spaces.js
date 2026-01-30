@@ -462,28 +462,34 @@ export const getSpacesByUserId = async (userId) => {
   }
 };
 
-export const deleteSpace = async (spaceId, authorization) => {
+export const deleteSpace = async (spaceId, authorization, { isAdmin = false } = {}) => {
   if (!spaceId) {
     throw new Error("Space ID is required");
   }
 
-  if (!authorization) {
-    throw new Error("Missing authorization token");
-  }
+  if (!isAdmin) {
+    if (!authorization) {
+      throw new Error("Missing authorization token");
+    }
 
-  const user = await getUser(authorization);
-  if (!user) {
-    throw new Error("Invalid authorization token");
+    const user = await getUser(authorization);
+    if (!user) {
+      throw new Error("Invalid authorization token");
+    }
   }
 
   try {
-    const space = await pg('spaces')
-      .where('id', spaceId)
-      .where('user_id', user.id)
-      .first();
+    let spaceQuery = pg('spaces').where('id', spaceId);
+    
+    if (!isAdmin) {
+      const user = await getUser(authorization);
+      spaceQuery = spaceQuery.where('user_id', user.id);
+    }
+    
+    const space = await spaceQuery.first();
 
     if (!space) {
-      const error = new Error("Space not found or not owned by user");
+      const error = new Error(isAdmin ? "Space not found" : "Space not found or not owned by user");
       error.statusCode = 404;
       throw error;
     }

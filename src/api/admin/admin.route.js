@@ -140,7 +140,7 @@ router.post('/spaces/:spaceId/delete', requireAdmin, async (req, res) => {
   try {
     const { spaceId } = req.params;
 
-    await deleteSpace(spaceId);
+    await deleteSpace(spaceId, null, { isAdmin: true });
 
     res.status(200).json({
       success: true,
