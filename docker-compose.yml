@@ -9,6 +9,7 @@ services:
     volumes:
       - docker-data:/var/lib/docker  # Docker storage volume
       - /sys/fs/cgroup:/sys/fs/cgroup:rw  # Fix cgroupv2 support
+      - /data:/data  # Persistent storage volume
     environment:
       - NODE_ENV=development
       - DOCKER_HOST=unix:///var/run/docker.sock

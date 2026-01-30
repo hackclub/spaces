@@ -8,6 +8,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 
+const VOLUME_BASE_PATH = process.env.VOLUME_BASE_PATH;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -82,26 +84,36 @@ export const createContainer = async (password, type, authorization) => {
   try {
     const port = await getPort();
 
+    let volumePath = null;
+    const hostConfig = {
+      PortBindings: { [config.port]: [{ HostPort: `${port}` }] },
+      NetworkMode: "bridge",
+      Dns: ["8.8.8.8", "8.8.4.4", "1.1.1.1"],
+      PublishAllPorts: false,
+      RestartPolicy: { Name: "unless-stopped" },
+      Memory: 2 * 1024 * 1024 * 1024,
+      MemorySwap: 2 * 1024 * 1024 * 1024,
+      NanoCpus: 2000000000,
+      CpuShares: 1024,
+      PidsLimit: 512,
+      SecurityOpt: ["no-new-privileges:true"],
+      ReadonlyRootfs: false,
+      CapDrop: ["ALL"],
+      CapAdd: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID", "NET_BIND_SERVICE"]
+    };
+
+    if (VOLUME_BASE_PATH) {
+      const spaceUuid = crypto.randomUUID();
+      volumePath = path.join(VOLUME_BASE_PATH, user.id.toString(), spaceUuid);
+      fs.mkdirSync(volumePath, { recursive: true });
+      hostConfig.Binds = [`${volumePath}:/config`];
+    }
+
     const container = await docker.createContainer({
       Image: config.image,
       Env: config.env(password, port),
       ExposedPorts: { [config.port]: {} },
-      HostConfig: {
-        PortBindings: { [config.port]: [{ HostPort: `${port}` }] },
-        NetworkMode: "bridge",
-        Dns: ["8.8.8.8", "8.8.4.4", "1.1.1.1"],
-        PublishAllPorts: false,
-        RestartPolicy: { Name: "unless-stopped" },
-        Memory: 2 * 1024 * 1024 * 1024,
-        MemorySwap: 2 * 1024 * 1024 * 1024,
-        NanoCpus: 2000000000,
-        CpuShares: 1024,
-        PidsLimit: 512,
-        SecurityOpt: ["no-new-privileges:true"],
-        ReadonlyRootfs: false,
-        CapDrop: ["ALL"],
-        CapAdd: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID", "NET_BIND_SERVICE"]
-      },
+      HostConfig: hostConfig,
     });
 
     await container.start();
@@ -157,7 +169,8 @@ export const createContainer = async (password, type, authorization) => {
       port,
       access_url: access_url,
       running: true,
-      started_at: new Date()
+      started_at: new Date(),
+      volume_path: volumePath
     };
 
     if (typeLower === "kicad" || typeLower === "blender") {
@@ -488,6 +501,15 @@ export const deleteSpace = async (spaceId, authorization) => {
       await container.remove();
     } catch (err) {
       console.error("Failed to remove container:", err);
+    }
+
+    if (space.volume_path) {
+      try {
+        fs.rmSync(space.volume_path, { recursive: true, force: true });
+        console.log(`Removed volume directory: ${space.volume_path}`);
+      } catch (err) {
+        console.error("Failed to remove volume directory:", err);
+      }
     }
     
     await pg('spaces')
