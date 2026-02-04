@@ -9,6 +9,45 @@
   let activeTab = 'analytics';
   let spaceSearch = '';
   let spaceSortBy = 'id';
+  let selectedSpaces = new Set();
+
+  $: allSelected = filteredSpaces.length > 0 && filteredSpaces.every(s => selectedSpaces.has(s.id));
+
+  function toggleSpaceSelection(spaceId) {
+    if (selectedSpaces.has(spaceId)) {
+      selectedSpaces.delete(spaceId);
+    } else {
+      selectedSpaces.add(spaceId);
+    }
+    selectedSpaces = selectedSpaces;
+  }
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      selectedSpaces = new Set();
+    } else {
+      selectedSpaces = new Set(filteredSpaces.map(s => s.id));
+    }
+  }
+
+  async function deleteSelectedSpaces() {
+    if (selectedSpaces.size === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedSpaces.size} space(s)?`)) return;
+
+    for (const spaceId of selectedSpaces) {
+      try {
+        await fetch(`${API_BASE}/admin/spaces/${spaceId}/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include'
+        });
+      } catch (err) {
+        console.error(`Failed to delete space ${spaceId}:`, err);
+      }
+    }
+    selectedSpaces = new Set();
+    await loadData();
+  }
 
   $: filteredSpaces = spaces
     .filter(space => {
@@ -242,11 +281,17 @@
           <option value="id">Sort by ID</option>
           <option value="started_at">Sort by Last Turned On</option>
         </select>
+        {#if selectedSpaces.size > 0}
+          <button on:click={deleteSelectedSpaces} class="delete-selected-btn">
+            Delete Selected ({selectedSpaces.size})
+          </button>
+        {/if}
       </div>
       <div class="table-container">
         <table>
           <thead>
             <tr>
+              <th><input type="checkbox" checked={allSelected} on:change={toggleSelectAll} /></th>
               <th>ID</th>
               <th>Type</th>
               <th>Owner</th>
@@ -260,6 +305,7 @@
           <tbody>
             {#each filteredSpaces as space}
               <tr>
+                <td><input type="checkbox" checked={selectedSpaces.has(space.id)} on:change={() => toggleSpaceSelection(space.id)} /></td>
                 <td>{space.id}</td>
                 <td>{space.type}</td>
                 <td>{space.username}</td>
@@ -401,5 +447,19 @@
     border-radius: 4px;
     font-size: 14px;
     cursor: pointer;
+  }
+
+  .delete-selected-btn {
+    padding: 8px 16px;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .delete-selected-btn:hover {
+    background-color: #c82333;
   }
 </style>
