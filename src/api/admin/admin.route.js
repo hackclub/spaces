@@ -64,7 +64,7 @@ router.post('/users', requireAdmin, async (req, res) => {
 router.post('/spaces', requireAdmin, async (req, res) => {
   try {
     const spaces = await pg('spaces')
-      .select('spaces.*', 'users.username', 'users.email')
+      .select('spaces.id', 'spaces.type', 'spaces.port', 'spaces.running', 'spaces.started_at', 'spaces.user_id', 'users.username', 'users.email')
       .join('users', 'spaces.user_id', 'users.id')
       .orderBy('spaces.id', 'desc');
 

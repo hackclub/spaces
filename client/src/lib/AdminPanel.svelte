@@ -7,6 +7,28 @@
   let spaces = [];
   let loading = false;
   let activeTab = 'analytics';
+  let spaceSearch = '';
+  let spaceSortBy = 'id';
+
+  $: filteredSpaces = spaces
+    .filter(space => {
+      if (!spaceSearch) return true;
+      const search = spaceSearch.toLowerCase();
+      return (
+        space.id.toString().includes(search) ||
+        space.type?.toLowerCase().includes(search) ||
+        space.username?.toLowerCase().includes(search) ||
+        space.email?.toLowerCase().includes(search)
+      );
+    })
+    .sort((a, b) => {
+      if (spaceSortBy === 'started_at') {
+        const aTime = a.started_at ? new Date(a.started_at).getTime() : 0;
+        const bTime = b.started_at ? new Date(b.started_at).getTime() : 0;
+        return bTime - aTime;
+      }
+      return b.id - a.id;
+    });
 
   onMount(() => {
     loadData();
@@ -209,6 +231,18 @@
     {/if}
 
     {#if activeTab === 'spaces'}
+      <div class="spaces-controls">
+        <input 
+          type="text" 
+          placeholder="Search by ID, type, owner, or email..." 
+          bind:value={spaceSearch}
+          class="search-input"
+        />
+        <select bind:value={spaceSortBy} class="sort-select">
+          <option value="id">Sort by ID</option>
+          <option value="started_at">Sort by Last Turned On</option>
+        </select>
+      </div>
       <div class="table-container">
         <table>
           <thead>
@@ -218,18 +252,20 @@
               <th>Owner</th>
               <th>Email</th>
               <th>Status</th>
+              <th>Last Turned On</th>
               <th>Port</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {#each spaces as space}
+            {#each filteredSpaces as space}
               <tr>
                 <td>{space.id}</td>
                 <td>{space.type}</td>
                 <td>{space.username}</td>
                 <td>{space.email}</td>
                 <td>{space.running ? 'Running' : 'Stopped'}</td>
+                <td>{space.started_at ? new Date(space.started_at).toLocaleString() : 'Never'}</td>
                 <td>{space.port}</td>
                 <td>
                   <button on:click={() => deleteSpace(space.id)} class="delete-btn">Delete</button>
@@ -343,5 +379,27 @@
 
   .delete-btn:hover {
     background-color: #c82333;
+  }
+
+  .spaces-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+
+  .search-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  .sort-select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
   }
 </style>
