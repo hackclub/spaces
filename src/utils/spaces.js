@@ -331,12 +331,10 @@ export const stopContainer = async (spaceId, authorization) => {
     await container.inspect();
     await container.stop();
     
-    // Update running status and clear started_at timestamp in database
     await pg('spaces')
       .where('id', spaceId)
       .update({ 
-        running: false,
-        started_at: null
+        running: false
       });
     
     return {
