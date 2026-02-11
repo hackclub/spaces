@@ -1,5 +1,5 @@
 # Spaces
-Spaces is a web app that creates secure cloud based development enviorments, accessible through a web browser. The goal of this project is to allow people to create amazing projects no matter what hardware they have access to. Spaces was developed by [Ivie Fonner](https://github.com/charmunks/), [Arnav](https://github.com/arnavravinder) and [Hack Club](https://github.com/hackclub/)
+Spaces is a web app that creates secure cloud based development environments, accessible through a web browser. The goal of this project is to allow people to create amazing projects no matter what hardware they have access to. Spaces was developed by [Ivie Fonner](https://github.com/charmunks/), [Arnav](https://github.com/arnavravinder) and [Hack Club](https://github.com/hackclub/)
 
 ## Setup:
 ### Manual Setup:
