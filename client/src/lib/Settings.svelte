@@ -160,6 +160,8 @@
         })
       });
 
+      user.hackatime_api_key = hackatimeApiKey;
+
       const data = await response.json();
       
       if (response.ok) {
