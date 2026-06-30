@@ -450,9 +450,8 @@ astro-build.astro-vscode
       ></textarea>
       <small
         >Not sure how to find extension IDs? Read this
-        <!-- TODO: add the guide here -->
         <a
-          href="https://hackatime.hackclub.com/my/settings/access"
+          href="https://i.sstatic.net/F9GWv.png"
           target="_blank"
           rel="noopener noreferrer">guide</a
         ></small
