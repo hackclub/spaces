@@ -21,9 +21,6 @@ ln -s /app/code-server/bin/code-server /usr/local/bin/code
 # Set up Hackatime if API key is provided
 if [ -n "$HACKATIME_API_KEY" ]; then
   echo "⏱️ Setting up Hackatime..."
-  echo "> Setting up code symlink"
-  ln -s /app/code-server/bin/code-server /usr/local/bin/code
-
   export HACKATIME_API_KEY="$HACKATIME_API_KEY"
   echo "> Setting up Hackatime"
   curl -fsSL https://hack.club/setup/install.sh | bash -s -- $HACKATIME_API_KEY --yes
@@ -33,6 +30,8 @@ fi
 
 readarray -t EXTENSIONS <<< "$EXTENSIONS_STRING"
 for extension in "${EXTENSIONS[@]}"; do
+  [ -z "$extension" ] && continue
+
   echo "> Installing $extension"
   code --install-extension "$extension" --extensions-dir /config/extensions --force 
 done
