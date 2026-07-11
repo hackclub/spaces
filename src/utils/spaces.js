@@ -195,7 +195,7 @@ export const createContainer = async (password, type, authorization, homeDir) =>
         const setupScript = fs.readFileSync(setupScriptPath, "utf8").replace(/\r\n/g, '\n');
 
         const hackatimeApiKey = user.hackatime_api_key || "";
-        const sanitizedApiKey = hackatimeApiKey.replace(/[^a-zA-Z0-9\-_]/g, '');
+        const sanitizedApiKey = hackatimeApiKey.replace(/[^a-zA-Z0-9._\s-]/g, '');
         const exec = await container.exec({
           Cmd: ["bash", "-c", `cat > /tmp/setup.sh << 'EOF'\n${setupScript}\nEOF\nchmod +x /tmp/setup.sh && /tmp/setup.sh '${sanitizedApiKey}' '${(user.vscode_extensions || "").replace(/[^a-zA-Z0-9.-]/g, "")}' '${workspaceDir}' > /app/postinstall.log 2>&1`],
           AttachStdout: true,
@@ -499,7 +499,7 @@ export const getUserSpaces = async (authorization) => {
   try {
     const spaces = await pg('spaces')
       .where('user_id', user.id)
-      .select(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'created_at', 'running','is_favorite','last_opened_at']);
+      .select(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'created_at', 'running', 'is_favorite', 'last_opened_at']);
 
     const spacesWithStatus = spaces.map((space) => {
       return {
