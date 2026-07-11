@@ -15,6 +15,9 @@ echo "Using workspace directory: $WORKSPACE_DIR"
 echo "> Ensuring workspace directory exists"
 mkdir -p "$WORKSPACE_DIR"
 
+echo "> Setting up code symlink"
+ln -s /app/code-server/bin/code-server /usr/local/bin/code
+
 # Set up Hackatime if API key is provided
 if [ -n "$HACKATIME_API_KEY" ]; then
   echo "⏱️ Setting up Hackatime..."
