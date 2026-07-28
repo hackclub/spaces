@@ -362,7 +362,7 @@
       <small
         >This key is used for integration with Hackatime. Find your hackatime
         API key <a
-          href="https://hackatime.hackclub.com/my/settings/access"
+          href="https://hackatime.hackclub.com/api-key"
           target="_blank"
           rel="noopener noreferrer">here</a
         > (look in the "Wakatime config" section)</small
