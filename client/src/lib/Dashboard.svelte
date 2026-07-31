@@ -33,6 +33,7 @@
 
   onMount(() => {
     loadClubData();
+    loadSpaces();
   });
 
   async function loadClubData() {
