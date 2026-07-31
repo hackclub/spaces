@@ -1,4 +1,4 @@
-<script>
+ <script>
   import { createEventDispatcher, onMount } from "svelte";
   import { API_BASE } from "../config.js";
   import { userData } from "../stores/user.svelte";
@@ -362,10 +362,10 @@
       <small
         >This key is used for integration with Hackatime. Find your hackatime
         API key <a
-          href="https://hackatime.hackclub.com/my/settings/access"
+          href="https://hackatime.hackclub.com/api-key"
           target="_blank"
           rel="noopener noreferrer">here</a
-        > (look in the "Wakatime config" section)</small
+        > (Click the key to copy it and paste it here)</small
       >
     </div>
 
