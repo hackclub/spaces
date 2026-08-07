@@ -50,6 +50,19 @@
       console.error("Failed to load club data:", err);
     }
   }
+async function openSpace(space) {
+  await fetch(`${API_BASE}/spaces/${space.id}/open`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  space.last_opened_at = new Date().toISOString();
+
+  window.open(space.access_url, "_blank");
+}
+
+  window.open(space.access_url, '_blank');
+}
 
   async function loadSpaceShareStatuses() {
     for (const space of spaces) {
@@ -723,14 +736,13 @@ $: filteredSpaces = sortedSpaces.filter(space => {
             {:else}
               {#if space.running || space.status?.toLowerCase() === "running"}
                 {#if space.access_url}
-                  <a
-                    href={space.access_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
                     class="action-btn open"
+                    on:click={() => openSpace(space)}
                   >
                     Open
-                  </a>
+                  </button>
 
                   <button
                     type="button"
