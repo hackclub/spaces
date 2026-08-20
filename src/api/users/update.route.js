@@ -7,8 +7,9 @@ const router = express.Router();
 
 router.post('/', async (req, res) => {
   try {
-    const { authorization, email, oldEmailVerificationCode, emailVerificationCode, username, hackatime_api_key } = req.body;
-    
+    const { email, oldEmailVerificationCode, emailVerificationCode, username, hackatime_api_key } = req.body;
+    const authorization = req.headers.authorization || req.cookies?.auth_token || req.body.authorization;
+
     if (!authorization) {
       return res.status(401).json({
         success: false,
