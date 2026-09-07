@@ -3,8 +3,6 @@
 # runs inside of created code-server containers, installs essential dev tools by default 
 # Usage: ./code-server-setup.sh [HACKATIME_API_KEY]
 
-set -e  
-
 HACKATIME_API_KEY="${1:-}"
 EXTENSIONS_STRING="${2:-}"
 WORKSPACE_DIR="${3:-/config/workspace}"
@@ -15,8 +13,10 @@ echo "Using workspace directory: $WORKSPACE_DIR"
 echo "> Ensuring workspace directory exists"
 mkdir -p "$WORKSPACE_DIR"
 
-echo "> Setting up code symlink"
-ln -s /app/code-server/bin/code-server /usr/local/bin/code
+if [ ! -e /usr/local/bin/code ]; then
+  echo "> Setting up code symlink"
+  ln -s /app/code-server/bin/code-server /usr/local/bin/code
+fi
 
 # Set up Hackatime if API key is provided
 if [ -n "$HACKATIME_API_KEY" ]; then
@@ -35,6 +35,17 @@ for extension in "${EXTENSIONS[@]}"; do
   echo "> Installing $extension"
   code --install-extension "$extension" --extensions-dir /config/extensions --force 
 done
+
+if [ -e /opt/.spaces-toolchain ]; then
+  echo "> Toolchain is baked into the image, skipping install"
+  if [ -e /opt/in-space.md ]; then
+    cp /opt/in-space.md "$WORKSPACE_DIR/README.md"
+  fi
+  echo "Setup complete."
+  exit 0
+fi
+
+set -e
 
 echo "Updating package manager..."
 sudo apt update && sudo apt upgrade -y

@@ -62,9 +62,11 @@ const ensureImageExists = async (image) => {
   }
 };
 
+const CODE_SERVER_IMAGE = process.env.CODE_SERVER_IMAGE || "linuxserver/code-server";
+
 const containerConfigs = {
   "code-server": {
-    image: "linuxserver/code-server",
+    image: CODE_SERVER_IMAGE,
     port: "8443/tcp",
     env: (password, port, workspaceDir = DEFAULT_WORKSPACE_DIR) => [
       `PASSWORD=${password}`,
