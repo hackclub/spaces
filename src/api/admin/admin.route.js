@@ -1,9 +1,44 @@
 import express from 'express';
+import fs from 'fs';
+import Docker from 'dockerode';
 import pg from '../../utils/db.js';
 import { requireAdmin } from '../../middlewares/admin.middleware.js';
 import { deleteSpace } from '../../utils/spaces.js';
 
 const router = express.Router();
+const docker = new Docker();
+
+const INACTIVE_DAYS = 90;
+
+const getDiskUsage = async (mountPath) => {
+  try {
+    const stats = await fs.promises.statfs(mountPath);
+    const total = stats.blocks * stats.bsize;
+    const free = stats.bavail * stats.bsize;
+    return { path: mountPath, total, free, used: total - free };
+  } catch (err) {
+    console.error(`Failed to read disk usage for ${mountPath}:`, err.message);
+    return null;
+  }
+};
+
+const getDockerUsage = async () => {
+  try {
+    const df = await docker.df();
+    const sum = (items, key) => (items || []).reduce((acc, item) => acc + (item[key] || 0), 0);
+    return {
+      images: { count: (df.Images || []).length, size: sum(df.Images, 'Size') },
+      containers: { count: (df.Containers || []).length, size: sum(df.Containers, 'SizeRw') },
+      volumes: {
+        count: (df.Volumes || []).length,
+        size: (df.Volumes || []).reduce((acc, v) => acc + (v.UsageData?.Size > 0 ? v.UsageData.Size : 0), 0)
+      }
+    };
+  } catch (err) {
+    console.error('Failed to read docker disk usage:', err.message);
+    return null;
+  }
+};
 
 router.post('/analytics', requireAdmin, async (req, res) => {
   try {
@@ -12,13 +47,33 @@ router.post('/analytics', requireAdmin, async (req, res) => {
     const [activeSpaces] = await pg('spaces')
       .where('running', true)
       .count('id as count');
+    const [inactiveSpaces] = await pg('spaces')
+      .where('running', false)
+      .whereRaw('COALESCE(last_opened_at, started_at, created_at) < ?', [
+        new Date(Date.now() - INACTIVE_DAYS * 24 * 60 * 60 * 1000)
+      ])
+      .count('id as count');
+
+    const volumePath = process.env.VOLUME_BASE_PATH;
+    const [rootDisk, volumeDisk, dockerUsage] = await Promise.all([
+      getDiskUsage('/'),
+      volumePath ? getDiskUsage(volumePath) : Promise.resolve(null),
+      getDockerUsage()
+    ]);
 
     res.status(200).json({
       success: true,
       data: {
         totalUsers: parseInt(userCount.count),
         totalSpaces: parseInt(spaceCount.count),
-        activeSpaces: parseInt(activeSpaces.count)
+        activeSpaces: parseInt(activeSpaces.count),
+        inactiveSpaces: parseInt(inactiveSpaces.count),
+        inactiveDays: INACTIVE_DAYS,
+        storage: {
+          root: rootDisk,
+          volume: volumeDisk,
+          docker: dockerUsage
+        }
       }
     });
   } catch (error) {
@@ -136,39 +191,39 @@ router.post('/users/:userId/delete', requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/spaces/delete-old', requireAdmin, async (req, res) => {
+router.post('/spaces/delete-inactive', requireAdmin, async (req, res) => {
   try {
-    const cutoffDate = new Date();
-    cutoffDate.setMonth(cutoffDate.getMonth() - 2);
+    const cutoffDate = new Date(Date.now() - INACTIVE_DAYS * 24 * 60 * 60 * 1000);
 
-    const oldSpaces = await pg('spaces')
-      .where('created_at', '<', cutoffDate)
+    const inactiveSpaces = await pg('spaces')
+      .where('running', false)
+      .whereRaw('COALESCE(last_opened_at, started_at, created_at) < ?', [cutoffDate])
       .select('id');
 
     const deletedIds = [];
     const errors = [];
 
-    for (const space of oldSpaces) {
+    for (const space of inactiveSpaces) {
       try {
         await deleteSpace(space.id, null, { isAdmin: true });
         deletedIds.push(space.id);
       } catch (err) {
-        console.error(`Error deleting old space ${space.id}:`, err);
+        console.error(`Error deleting inactive space ${space.id}:`, err);
         errors.push({ id: space.id, error: err.message });
       }
     }
 
     res.status(200).json({
       success: true,
-      message: `Deleted ${deletedIds.length} space(s) older than 2 months successfully`,
+      message: `Deleted ${deletedIds.length} space(s) inactive for ${INACTIVE_DAYS} days or more successfully`,
       deletedCount: deletedIds.length,
       errors
     });
   } catch (error) {
-    console.error('Error deleting old spaces:', error);
+    console.error('Error deleting inactive spaces:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete old spaces'
+      message: 'Failed to delete inactive spaces'
     });
   }
 });

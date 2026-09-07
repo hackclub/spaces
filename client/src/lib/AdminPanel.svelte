@@ -2,16 +2,58 @@
   import { onMount } from 'svelte';
   import { API_BASE } from '../config.js';
 
-  let analytics = { totalUsers: 0, totalSpaces: 0, activeSpaces: 0 };
+  const emptyDisk = { path: '', total: 0, free: 0, used: 0 };
+  const emptyDockerEntry = { count: 0, size: 0 };
+
+  let analytics = {
+    totalUsers: 0,
+    totalSpaces: 0,
+    activeSpaces: 0,
+    inactiveSpaces: 0,
+    inactiveDays: 90
+  };
+  let storage = {
+    root: { ...emptyDisk },
+    volume: { ...emptyDisk },
+    docker: {
+      images: { ...emptyDockerEntry },
+      containers: { ...emptyDockerEntry },
+      volumes: { ...emptyDockerEntry }
+    }
+  };
   let users = [];
   let spaces = [];
   let loading = false;
   let activeTab = 'analytics';
+  let userSearch = '';
   let spaceSearch = '';
   let spaceSortBy = 'id';
   let selectedSpaces = new Set();
 
   $: allSelected = filteredSpaces.length > 0 && filteredSpaces.every(s => selectedSpaces.has(s.id));
+
+  function removeSpacesLocally(deletedIds) {
+    const ids = new Set(deletedIds);
+    const removed = spaces.filter(space => ids.has(space.id));
+    if (removed.length === 0) return;
+
+    spaces = spaces.filter(space => !ids.has(space.id));
+
+    const removedPerUser = new Map();
+    for (const space of removed) {
+      removedPerUser.set(space.user_id, (removedPerUser.get(space.user_id) || 0) + 1);
+    }
+    users = users.map((user) => {
+      const count = removedPerUser.get(user.id);
+      return count ? { ...user, spaceCount: Math.max(0, user.spaceCount - count) } : user;
+    });
+
+    analytics = {
+      ...analytics,
+      totalSpaces: Math.max(0, analytics.totalSpaces - removed.length),
+      activeSpaces: Math.max(0, analytics.activeSpaces - removed.filter(s => s.running).length)
+    };
+  }
 
   function toggleSpaceSelection(spaceId) {
     if (selectedSpaces.has(spaceId)) {
@@ -34,20 +76,55 @@
     if (selectedSpaces.size === 0) return;
     if (!confirm(`Are you sure you want to delete ${selectedSpaces.size} space(s)?`)) return;
 
+    const deleted = [];
     for (const spaceId of selectedSpaces) {
       try {
-        await fetch(`${API_BASE}/admin/spaces/${spaceId}/delete`, {
+        const response = await fetch(`${API_BASE}/admin/spaces/${spaceId}/delete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include'
         });
+        if (response.ok) deleted.push(spaceId);
       } catch (err) {
         console.error(`Failed to delete space ${spaceId}:`, err);
       }
     }
+    removeSpacesLocally(deleted);
     selectedSpaces = new Set();
-    await loadData();
   }
+
+  function formatBytes(bytes = 0) {
+    const value = Number(bytes) || 0;
+    if (value <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const exponent = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+    const scaled = value / Math.pow(1024, exponent);
+    return `${scaled.toFixed(scaled >= 10 || exponent === 0 ? 0 : 1)} ${units[exponent]}`;
+  }
+
+  $: diskCards = [
+    { label: 'System Disk', disk: storage.root },
+    { label: 'User Data', disk: storage.volume }
+  ]
+    .filter(entry => (entry.disk?.total ?? 0) > 0)
+    .map(entry => ({
+      label: entry.label,
+      path: entry.disk?.path ?? '',
+      used: entry.disk?.used ?? 0,
+      total: entry.disk?.total ?? 0,
+      free: entry.disk?.free ?? 0,
+      percent: Math.round(((entry.disk?.used ?? 0) / (entry.disk?.total || 1)) * 100)
+    }));
+
+  $: filteredUsers = users.filter((user) => {
+    if (!userSearch) return true;
+    const search = userSearch.toLowerCase();
+    return (
+      user.id.toString().includes(search) ||
+      user.email?.toLowerCase().includes(search) ||
+      user.username?.toLowerCase().includes(search)
+    );
+  });
 
   $: filteredSpaces = spaces
     .filter(space => {
@@ -93,6 +170,15 @@
       const data = await response.json();
       if (response.ok) {
         analytics = data.data;
+        storage = {
+          root: data.data.storage?.root ?? { ...emptyDisk },
+          volume: data.data.storage?.volume ?? { ...emptyDisk },
+          docker: data.data.storage?.docker ?? {
+            images: { ...emptyDockerEntry },
+            containers: { ...emptyDockerEntry },
+            volumes: { ...emptyDockerEntry }
+          }
+        };
       }
     } catch (err) {
       console.error('Failed to load analytics:', err);
@@ -175,33 +261,33 @@
         credentials: 'include'
       });
       if (response.ok) {
-        await loadData();
+        removeSpacesLocally([spaceId]);
       }
     } catch (err) {
       console.error('Failed to delete space:', err);
     }
   }
 
-  async function deleteOldSpaces() {
-    if (!confirm('Are you sure you want to delete all spaces older than 2 months? This action is irreversible.')) return;
-    
+  async function deleteInactiveSpaces() {
+    if (!confirm('Are you sure you want to delete all spaces that have been stopped for 90 days or more? This action is irreversible.')) return;
+
     try {
       loading = true;
-      const response = await fetch(`${API_BASE}/admin/spaces/delete-old`, {
+      const response = await fetch(`${API_BASE}/admin/spaces/delete-inactive`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include'
       });
       const data = await response.json();
       if (response.ok) {
-        alert(data.message || 'Old spaces deleted successfully');
+        alert(data.message || 'Inactive spaces deleted successfully');
         await loadData();
       } else {
-        alert(data.message || 'Failed to delete old spaces');
+        alert(data.message || 'Failed to delete inactive spaces');
       }
     } catch (err) {
-      console.error('Failed to delete old spaces:', err);
-      alert('Error deleting old spaces');
+      console.error('Failed to delete inactive spaces:', err);
+      alert('Error deleting inactive spaces');
     } finally {
       loading = false;
     }
@@ -245,10 +331,57 @@
           <h3>Active Spaces</h3>
           <p class="stat">{analytics.activeSpaces}</p>
         </div>
+        <div class="stat-card">
+          <h3>Inactive &gt; {analytics.inactiveDays ?? 90}d</h3>
+          <p class="stat">{analytics.inactiveSpaces ?? 0}</p>
+        </div>
       </div>
+
+      {#if storage}
+        <h2 class="section-heading">Storage</h2>
+        <div class="analytics">
+          {#each diskCards as disk}
+            <div class="stat-card">
+              <h3>{disk.label}</h3>
+              <p class="stat" class:stat-warn={disk.percent >= 80} class:stat-danger={disk.percent >= 90}>
+                {disk.percent}%
+              </p>
+              <p class="stat-sub">{formatBytes(disk.used)} of {formatBytes(disk.total)} used</p>
+              <p class="stat-sub">{formatBytes(disk.free)} free</p>
+            </div>
+          {/each}
+
+          {#if storage.docker}
+            <div class="stat-card">
+              <h3>Docker Images</h3>
+              <p class="stat">{formatBytes(storage.docker.images.size)}</p>
+              <p class="stat-sub">{storage.docker.images.count} image(s)</p>
+            </div>
+            <div class="stat-card">
+              <h3>Docker Containers</h3>
+              <p class="stat">{formatBytes(storage.docker.containers.size)}</p>
+              <p class="stat-sub">{storage.docker.containers.count} container(s)</p>
+            </div>
+            <div class="stat-card">
+              <h3>Docker Volumes</h3>
+              <p class="stat">{formatBytes(storage.docker.volumes.size)}</p>
+              <p class="stat-sub">{storage.docker.volumes.count} volume(s)</p>
+            </div>
+          {/if}
+        </div>
+      {/if}
     {/if}
 
     {#if activeTab === 'users'}
+      <div class="spaces-controls">
+        <input
+          type="text"
+          placeholder="Search by ID, username, or email..."
+          bind:value={userSearch}
+          class="search-input"
+        />
+        <span class="result-count">{filteredUsers.length} of {users.length}</span>
+      </div>
       <div class="table-container">
         <table>
           <thead>
@@ -263,7 +396,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each users as user}
+            {#each filteredUsers as user (user.id)}
               <tr>
                 <td>{user.id}</td>
                 <td>{user.email}</td>
@@ -311,8 +444,8 @@
             Delete Selected ({selectedSpaces.size})
           </button>
         {/if}
-        <button on:click={deleteOldSpaces} class="delete-old-btn">
-          Delete Spaces &gt; 2 Months Old
+        <button on:click={deleteInactiveSpaces} class="delete-inactive-btn">
+          Delete Spaces Inactive &gt; 90 Days
         </button>
       </div>
       <div class="table-container">
@@ -331,7 +464,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each filteredSpaces as space}
+            {#each filteredSpaces as space (space.id)}
               <tr>
                 <td><input type="checkbox" checked={selectedSpaces.has(space.id)} on:change={() => toggleSpaceSelection(space.id)} /></td>
                 <td>{space.id}</td>
@@ -408,6 +541,31 @@
     font-size: 32px;
     font-weight: bold;
     margin: 0;
+  }
+
+  .stat-warn {
+    color: #b26a00;
+  }
+
+  .stat-danger {
+    color: #c62828;
+  }
+
+  .stat-sub {
+    margin: 6px 0 0 0;
+    font-size: 12px;
+    color: #666;
+  }
+
+  .section-heading {
+    margin: 32px 0 16px 0;
+    font-size: 18px;
+  }
+
+  .result-count {
+    font-size: 13px;
+    color: #666;
+    white-space: nowrap;
   }
 
   .table-container {
@@ -491,7 +649,7 @@
     background-color: #c82333;
   }
 
-  .delete-old-btn {
+  .delete-inactive-btn {
     padding: 8px 16px;
     background-color: #e67e22;
     color: white;
@@ -503,11 +661,11 @@
     transition: background-color 0.2s, transform 0.1s;
   }
 
-  .delete-old-btn:hover {
+  .delete-inactive-btn:hover {
     background-color: #d35400;
   }
 
-  .delete-old-btn:active {
+  .delete-inactive-btn:active {
     transform: scale(0.98);
   }
 </style>
