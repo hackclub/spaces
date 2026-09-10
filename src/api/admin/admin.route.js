@@ -27,7 +27,7 @@ const getDockerUsage = async () => {
     const df = await docker.df();
     const sum = (items, key) => (items || []).reduce((acc, item) => acc + (item[key] || 0), 0);
     return {
-      images: { count: (df.Images || []).length, size: sum(df.Images, 'Size') },
+      images: { count: (df.Images || []).length, size: df.LayersSize ?? sum(df.Images, 'Size') },
       containers: { count: (df.Containers || []).length, size: sum(df.Containers, 'SizeRw') },
       volumes: {
         count: (df.Volumes || []).length,
