@@ -133,7 +133,17 @@ router.post("/:spaceId/favorite", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+router.post('/:spaceId/open', async (req, res) => {
+  const { spaceId } = req.params;
 
+  await pg('spaces')
+    .where('id', spaceId)
+    .update({
+      last_opened_at: new Date()
+    });
+
+  res.json({ success: true });
+});
 router.post("/:spaceId/share/club", spaceShareLimiter, async (req, res) => {
   const { spaceId } = req.params;
   const { share } = req.body;
