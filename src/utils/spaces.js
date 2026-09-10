@@ -94,7 +94,154 @@ const containerConfigs = {
   }
 };
 
+const BASIC_AUTH_TYPES = ["kicad", "blender", "freecad"];
+
+const buildAccessUrl = (typeLower, port, password) => {
+  let access_url;
+
+  if (process.env.DOCKER === 'false') {
+    access_url = `${process.env.SERVER_URL}:${port}`;
+  } else if (typeLower === 'kicad') {
+    access_url = `${process.env.SERVER_URL}/kicad/space/${port}/`;
+  } else if (typeLower === 'freecad') {
+    access_url = `${process.env.SERVER_URL}/freecad/space/${port}/`;
+  } else {
+    access_url = `${process.env.SERVER_URL}/space/${port}/`;
+  }
+
+  if (BASIC_AUTH_TYPES.includes(typeLower)) {
+    const urlObj = new URL(access_url);
+    urlObj.username = "abc";
+    urlObj.password = password;
+    access_url = urlObj.toString();
+  }
+
+  return access_url;
+};
+
+const buildHostConfig = (config, port, volumePath) => {
+  const hostConfig = {
+    PortBindings: { [config.port]: [{ HostPort: `${port}` }] },
+    NetworkMode: "bridge",
+    Dns: ["8.8.8.8", "8.8.4.4", "1.1.1.1"],
+    PublishAllPorts: false,
+    RestartPolicy: { Name: "unless-stopped" },
+    Memory: 2 * 1024 * 1024 * 1024,
+    MemorySwap: 2 * 1024 * 1024 * 1024,
+    NanoCpus: 2000000000,
+    CpuShares: 1024,
+    PidsLimit: 512,
+    SecurityOpt: ["no-new-privileges:true"],
+    ReadonlyRootfs: false,
+    CapDrop: ["ALL"],
+    CapAdd: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID", "NET_BIND_SERVICE"]
+  };
+
+  if (volumePath) {
+    hostConfig.Binds = [`${volumePath}:/config`];
+  }
+
+  return hostConfig;
+};
+
+export const recreateSpaceContainer = async (space, { start = true } = {}) => {
+  const typeLower = (space.type || "").toLowerCase();
+  const config = containerConfigs[typeLower];
+  if (!config) {
+    throw new Error(`Cannot recreate space ${space.id}: unknown type "${space.type}"`);
+  }
+
+  const password = space.password || crypto.randomBytes(16).toString('hex');
+  let workspaceDir = space.workspace_dir || null;
+
+  if (space.container_id) {
+    try {
+      const stale = docker.getContainer(space.container_id);
+
+      if (!workspaceDir) {
+        try {
+          const info = await stale.inspect();
+          const entry = (info?.Config?.Env || []).find((e) => e.startsWith('DEFAULT_WORKSPACE='));
+          if (entry) {
+            workspaceDir = sanitizeWorkspaceDir(entry.slice('DEFAULT_WORKSPACE='.length));
+            console.log(`Recovered workspace dir for space ${space.id}: ${workspaceDir}`);
+          }
+        } catch (inspectErr) {
+          if (inspectErr.statusCode !== 404) {
+            console.error(`Could not inspect container for space ${space.id}:`, inspectErr.message);
+          }
+        }
+      }
+
+      await stale.remove({ force: true });
+    } catch (err) {
+      if (err.statusCode !== 404) {
+        console.error(`Failed to remove stale container for space ${space.id}:`, err.message);
+      }
+    }
+  }
+
+  if (!workspaceDir) {
+    workspaceDir = DEFAULT_WORKSPACE_DIR;
+  }
+
+  await ensureImageExists(config.image);
+
+  const port = await getPort();
+  const hostConfig = buildHostConfig(config, port, space.volume_path);
+
+  if (space.volume_path && typeLower === "code-server") {
+    const relWorkspace = workspaceDir.replace(/^\/config\/?/, "");
+    if (relWorkspace) {
+      fs.mkdirSync(path.join(space.volume_path, relWorkspace), { recursive: true });
+    }
+  }
+
+  const container = await docker.createContainer({
+    Image: config.image,
+    Env: [...config.env(password, port, workspaceDir), "SELKIES_FILE_TRANSFERS=upload,download", "SELKIES_UI_SIDEBAR_SHOW_FILES=True"],
+    ExposedPorts: { [config.port]: {} },
+    HostConfig: hostConfig,
+  });
+
+  if (start) {
+    await container.start();
+  }
+
+  const access_url = buildAccessUrl(typeLower, port, password);
+
+  const updateData = {
+    container_id: container.id,
+    image: config.image,
+    port,
+    access_url,
+    password,
+    workspace_dir: workspaceDir,
+    running: start
+  };
+
+  if (start) {
+    updateData.started_at = new Date();
+    updateData.last_opened_at = new Date();
+  }
+
+  const [updated] = await pg('spaces')
+    .where('id', space.id)
+    .update(updateData)
+    .returning(['id', 'container_id', 'type', 'port', 'access_url', 'password', 'running']);
+
+  console.log(`Recreated container for space ${space.id} on image ${config.image}`);
+
+  return { space: updated, container, password, workspaceDir };
+};
+
 export const createContainer = async (password, type, authorization, homeDir) => {
+  if (process.env.SPACES_CREATION_PAUSED === 'true') {
+    const error = new Error("Space creation is temporarily paused for maintenance. Your existing spaces are unaffected.");
+    error.statusCode = 503;
+    throw error;
+  }
+
   if (!type) {
     throw new Error("Missing container type");
   }
@@ -128,13 +275,7 @@ export const createContainer = async (password, type, authorization, homeDir) =>
   }
 
   const typeLower = type.toLowerCase();
-  if (typeLower === "kicad" || typeLower === "blender" || typeLower === "freecad") {
-    password = crypto.randomBytes(16).toString('hex');
-  } else if (!password) {
-    throw new Error("Missing container password");
-  } else if (password.length < 8) {
-    throw new Error("Password must be at least 8 characters long");
-  }
+  password = crypto.randomBytes(16).toString('hex');
 
   const workspaceDir = typeLower === "code-server"
     ? sanitizeWorkspaceDir(homeDir)
@@ -144,22 +285,7 @@ export const createContainer = async (password, type, authorization, homeDir) =>
     const port = await getPort();
 
     let volumePath = null;
-    const hostConfig = {
-      PortBindings: { [config.port]: [{ HostPort: `${port}` }] },
-      NetworkMode: "bridge",
-      Dns: ["8.8.8.8", "8.8.4.4", "1.1.1.1"],
-      PublishAllPorts: false,
-      RestartPolicy: { Name: "unless-stopped" },
-      Memory: 2 * 1024 * 1024 * 1024,
-      MemorySwap: 2 * 1024 * 1024 * 1024,
-      NanoCpus: 2000000000,
-      CpuShares: 1024,
-      PidsLimit: 512,
-      SecurityOpt: ["no-new-privileges:true"],
-      ReadonlyRootfs: false,
-      CapDrop: ["ALL"],
-      CapAdd: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID", "NET_BIND_SERVICE"]
-    };
+    const hostConfig = buildHostConfig(config, port, null);
 
     await ensureImageExists(config.image);
 
@@ -213,26 +339,7 @@ export const createContainer = async (password, type, authorization, homeDir) =>
       }
     }
 
-    if (process.env.DOCKER === 'false') {
-      console.log("Non-Docker environment detected, adjusting access URL");
-      var access_url = `${process.env.SERVER_URL}:${port}`;
-    } else {
-      console.log("Docker environment detected, using standard access URL");
-      if (type.toLowerCase() === 'kicad') {
-        var access_url = `${process.env.SERVER_URL}/kicad/space/${port}/`;
-      } else if (type.toLowerCase() === "freecad") {
-        var access_url = `${process.env.SERVER_URL}/freecad/space/${port}/`;
-      } else {
-        var access_url = `${process.env.SERVER_URL}/space/${port}/`;
-      }
-    }
-
-    if (typeLower === "kicad" || typeLower === "blender" || typeLower === "freecad") {
-      const urlObj = new URL(access_url);
-      urlObj.username = "abc";
-      urlObj.password = password;
-      access_url = urlObj.toString();
-    }
+    const access_url = buildAccessUrl(typeLower, port, password);
 
     const insertData = {
       user_id: user.id,
@@ -244,12 +351,11 @@ export const createContainer = async (password, type, authorization, homeDir) =>
       access_url: access_url,
       running: true,
       started_at: new Date(),
-      volume_path: volumePath
+      last_opened_at: new Date(),
+      volume_path: volumePath,
+      workspace_dir: workspaceDir,
+      password
     };
-
-    if (typeLower === "kicad" || typeLower === "blender" || typeLower === "freecad") {
-      insertData.password = password;
-    }
 
     const [newSpace] = await pg('spaces')
       .insert(insertData)
@@ -317,10 +423,28 @@ export const startContainer = async (spaceId, authorization) => {
       throw error;
     }
 
-    const container = docker.getContainer(space.container_id);
+    let container;
+    let containerMissing = !space.container_id;
 
-    await container.inspect();
-    await container.start();
+    if (space.container_id) {
+      container = docker.getContainer(space.container_id);
+      try {
+        await container.inspect();
+      } catch (err) {
+        if (err.statusCode !== 404) {
+          throw err;
+        }
+        containerMissing = true;
+      }
+    }
+
+    if (containerMissing || space.image !== containerConfigs[(space.type || "").toLowerCase()]?.image) {
+      console.log(`Rebuilding container for space ${space.id} (missing=${containerMissing})`);
+      const recreated = await recreateSpaceContainer(space);
+      container = recreated.container;
+    } else {
+      await container.start();
+    }
 
     if (space.type === "code-server" && user.hackatime_api_key) {
       try {

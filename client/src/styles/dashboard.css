@@ -773,3 +773,25 @@
 }
 
 
+
+.space-password {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.space-password code {
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: var(--accent, #ec3750);
+  cursor: pointer;
+  text-decoration: underline;
+}
