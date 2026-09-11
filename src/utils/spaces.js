@@ -511,7 +511,7 @@ export const startContainer = async (spaceId, authorization) => {
         const hackatimeApiKey = user.hackatime_api_key;
         const sanitizedApiKey = hackatimeApiKey.replace(/[^a-zA-Z0-9\-_]/g, '');
         const exec = await container.exec({
-          Cmd: ["bash", "-c", `export HACKATIME_API_KEY='${sanitizedApiKey}' && export HACKATIME_API_URL="https://hackatime.hackclub.com/api/hackatime/v1" && export SUCCESS_URL="https://hackatime.hackclub.com//success.txt" && curl -sSL https://hackatime.hackclub.com/hackatime/setup.sh | bash`],
+          Cmd: ["bash", "-c", `if ! command -v terminal-wakatime >/dev/null 2>&1; then curl -fsSL https://hack.club/setup/install.sh | bash -s -- '${sanitizedApiKey}' --yes; fi`],
           AttachStdout: true,
           AttachStderr: true,
         });
