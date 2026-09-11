@@ -751,9 +751,12 @@ $: filteredSpaces = sortedSpaces.filter(space => {
               {#if space.running || space.status?.toLowerCase() === "running"}
                 {#if space.access_url}
                   <a
-                    href={space.access_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    on:click={async () => {
+                      if (space.type == "code-server") {
+                        await fetch(`https://spaces.hackclub.com/space/${space.port}/login`)
+                        window.open(space.access_url, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
                     class="action-btn open"
                   >
                     Open
