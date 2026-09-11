@@ -132,6 +132,36 @@
     }
   }
 
+  function openSpace(event, space) {
+    if (space.type !== "code-server" || !space.password || !space.access_url) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const tab = window.open("", "_blank", "noopener,noreferrer");
+    if (!tab) {
+      window.location.href = space.access_url;
+      return;
+    }
+
+    const loginUrl = new URL(space.access_url, window.location.origin);
+    loginUrl.pathname = `${loginUrl.pathname.replace(/\/$/, "")}/login`;
+
+    fetch(loginUrl.toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      credentials: "include",
+      body: new URLSearchParams({ password: space.password, base: "." }).toString()
+    })
+      .catch((err) => {
+        console.error("Auto-login failed, falling back to the login page:", err);
+      })
+      .finally(() => {
+        tab.location.href = space.access_url;
+      });
+  }
+
   async function copyPassword(password) {
     try {
       await navigator.clipboard.writeText(password);
@@ -751,13 +781,11 @@ $: filteredSpaces = sortedSpaces.filter(space => {
               {#if space.running || space.status?.toLowerCase() === "running"}
                 {#if space.access_url}
                   <a
-                    on:click={async () => {
-                      if (space.type == "code-server") {
-                        await fetch(`https://spaces.hackclub.com/space/${space.port}/login`)
-                        window.open(space.access_url, '_blank', 'noopener,noreferrer');
-                      }
-                    }}
+                    href={space.access_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     class="action-btn open"
+                    on:click={(event) => openSpace(event, space)}
                   >
                     Open
                   </a>
