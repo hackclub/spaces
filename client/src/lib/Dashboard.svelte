@@ -139,11 +139,12 @@
 
     event.preventDefault();
 
-    const tab = window.open("", "_blank", "noopener,noreferrer");
+    const tab = window.open("", "_blank");
     if (!tab) {
       window.location.href = space.access_url;
       return;
     }
+    tab.opener = null;
 
     const loginUrl = new URL(space.access_url, window.location.origin);
     loginUrl.pathname = `${loginUrl.pathname.replace(/\/$/, "")}/login`;
