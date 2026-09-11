@@ -4,7 +4,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV GO_VERSION=1.21.4
 ENV PATH=/usr/local/go/bin:/usr/local/cargo/bin:$PATH
 ENV RUSTUP_HOME=/usr/local/rustup
-ENV CARGO_HOME=/usr/local/cargo
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         apt-transport-https \
@@ -50,8 +49,7 @@ RUN curl -fsSL "https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tm
     && tar -C /usr/local -xzf /tmp/go.tar.gz \
     && rm /tmp/go.tar.gz
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path \
-    && chmod -R a+w "$RUSTUP_HOME" "$CARGO_HOME"
+RUN export CARGO_HOME=/usr/local/cargo && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path && chmod -R a+rX /usr/local/rustup /usr/local/cargo
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ruby-full \
