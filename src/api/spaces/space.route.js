@@ -5,7 +5,8 @@ import {
   stopContainer, 
   getContainerStatus,
   getUserSpaces,
-  deleteSpace
+  deleteSpace,
+  changeSpacePassword
 } from "../../utils/spaces.js";
 import { getUser } from "../../utils/user.js";
 import { 
@@ -40,6 +41,20 @@ router.post("/create", containerOpsLimiter, async (req, res) => {
     }
     
     const statusCode = err.statusCode || (err.message.includes("Missing") || err.message.includes("Invalid authorization") ? 400 : 500);
+    res.status(statusCode).json({ error: err.message });
+  }
+});
+
+router.post("/password/:spaceId", containerOpsLimiter, async (req, res) => {
+  const { spaceId } = req.params;
+  const { password } = req.body;
+  const authorization = req.authToken;
+
+  try {
+    const result = await changeSpacePassword(spaceId, password, authorization);
+    res.json(result);
+  } catch (err) {
+    const statusCode = err.statusCode || (err.message.includes("required") || err.message.includes("Missing") || err.message.includes("Invalid authorization") ? 400 : 500);
     res.status(statusCode).json({ error: err.message });
   }
 });

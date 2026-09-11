@@ -144,14 +144,14 @@ const buildHostConfig = (config, port, volumePath) => {
   return hostConfig;
 };
 
-export const recreateSpaceContainer = async (space, { start = true } = {}) => {
+export const recreateSpaceContainer = async (space, { start = true, password: newPassword = null } = {}) => {
   const typeLower = (space.type || "").toLowerCase();
   const config = containerConfigs[typeLower];
   if (!config) {
     throw new Error(`Cannot recreate space ${space.id}: unknown type "${space.type}"`);
   }
 
-  const password = space.password || crypto.randomBytes(16).toString('hex');
+  const password = newPassword || space.password || crypto.randomBytes(16).toString('hex');
   let workspaceDir = space.workspace_dir || null;
 
   if (space.container_id) {
@@ -233,6 +233,65 @@ export const recreateSpaceContainer = async (space, { start = true } = {}) => {
   console.log(`Recreated container for space ${space.id} on image ${config.image}`);
 
   return { space: updated, container, password, workspaceDir };
+};
+
+export const changeSpacePassword = async (spaceId, newPassword, authorization) => {
+  if (!spaceId) {
+    throw new Error("Space ID is required");
+  }
+
+  if (!authorization) {
+    throw new Error("Missing authorization token");
+  }
+
+  if (!newPassword || typeof newPassword !== "string") {
+    const error = new Error("A new password is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (newPassword.length < 8) {
+    const error = new Error("Password must be at least 8 characters long");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (newPassword.length > 128) {
+    const error = new Error("Password must be 128 characters or fewer");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const user = await getUser(authorization);
+  if (!user) {
+    throw new Error("Invalid authorization token");
+  }
+
+  const space = await pg('spaces')
+    .where('id', spaceId)
+    .where('user_id', user.id)
+    .first();
+
+  if (!space) {
+    const error = new Error("Space not found or not owned by user");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const wasRunning = Boolean(space.running);
+  const { space: updated } = await recreateSpaceContainer(space, {
+    start: wasRunning,
+    password: newPassword
+  });
+
+  return {
+    message: wasRunning
+      ? "Password changed. Your space was restarted for the change to take effect."
+      : "Password changed.",
+    spaceId: updated.id,
+    accessUrl: updated.access_url,
+    running: updated.running
+  };
 };
 
 export const createContainer = async (password, type, authorization, homeDir) => {

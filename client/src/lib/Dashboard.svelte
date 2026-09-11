@@ -94,6 +94,44 @@
     revealedPasswords = revealedPasswords;
   }
 
+  let passwordEditor = { spaceId: null, value: "", error: "", saving: false };
+
+  function openPasswordEditor(spaceId) {
+    passwordEditor = { spaceId, value: "", error: "", saving: false };
+  }
+
+  function closePasswordEditor() {
+    passwordEditor = { spaceId: null, value: "", error: "", saving: false };
+  }
+
+  async function submitPasswordChange(spaceId) {
+    if (passwordEditor.value.length < 8) {
+      passwordEditor = { ...passwordEditor, error: "Password must be at least 8 characters." };
+      return;
+    }
+
+    passwordEditor = { ...passwordEditor, saving: true, error: "" };
+
+    try {
+      const response = await fetch(`${API_BASE}/spaces/password/${spaceId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ password: passwordEditor.value })
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        closePasswordEditor();
+        await loadSpaces();
+      } else {
+        passwordEditor = { ...passwordEditor, saving: false, error: data.error || "Failed to change password." };
+      }
+    } catch (err) {
+      passwordEditor = { ...passwordEditor, saving: false, error: ERROR_MESSAGES.NETWORK_ERROR };
+    }
+  }
+
   async function copyPassword(password) {
     try {
       await navigator.clipboard.writeText(password);
@@ -652,7 +690,40 @@ $: filteredSpaces = sortedSpaces.filter(space => {
                 <button type="button" class="link-button" on:click={() => copyPassword(space.password)}>
                   Copy
                 </button>
+                <button type="button" class="link-button" on:click={() => openPasswordEditor(space.id)}>
+                  Change
+                </button>
               </p>
+              {#if passwordEditor.spaceId === space.id}
+                <div class="password-editor">
+                  <input
+                    class="form-input"
+                    type="password"
+                    placeholder="New password (min. 8 characters)"
+                    bind:value={passwordEditor.value}
+                    disabled={passwordEditor.saving}
+                  />
+                  <button
+                    type="button"
+                    class="btn-primary"
+                    on:click={() => submitPasswordChange(space.id)}
+                    disabled={passwordEditor.saving}
+                  >
+                    {passwordEditor.saving ? "Saving..." : "Save"}
+                  </button>
+                  <button type="button" class="link-button" on:click={closePasswordEditor} disabled={passwordEditor.saving}>
+                    Cancel
+                  </button>
+                  {#if passwordEditor.error}
+                    <p class="password-editor-error">{passwordEditor.error}</p>
+                  {/if}
+                  <p class="password-editor-note">
+                    {space.running
+                      ? "Your space will restart so the new password takes effect."
+                      : "Takes effect next time you start this space."}
+                  </p>
+                </div>
+              {/if}
             {/if}
           </div>
 
