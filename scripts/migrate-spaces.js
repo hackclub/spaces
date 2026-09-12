@@ -37,7 +37,7 @@ const main = async () => {
   let query = pg('spaces')
     .where('type', 'code-server')
     .whereNot('image', targetImage)
-    .orderBy([{ column: 'last_opened_at', order: 'asc', nulls: 'first' }, { column: 'id', order: 'asc' }]);
+    .orderBy([{ column: 'last_opened_at', order: 'desc', nulls: 'last' }, { column: 'id', order: 'desc' }]);
 
   if (onlyId) {
     query = pg('spaces').where('id', parseInt(onlyId, 10));
