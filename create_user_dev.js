@@ -30,6 +30,6 @@ async function main() {
 
     console.log("user created!")
     console.dir(newUser)
-    process.exit(1)
+    process.exit(0)
 }
 main()
