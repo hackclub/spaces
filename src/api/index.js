@@ -13,6 +13,13 @@ router.get('/', (req, res) => {
   });
 });
 
+router.get('/up', (req, res) => {
+  res.status(200).json({
+    status: 'up',
+    service: 'api',
+  });
+});
+
 router.use('/spaces/', spaces);
 router.use('/users/', users);
 router.use('/admin/', admin);
