@@ -684,7 +684,7 @@ export const getUserSpaces = async (authorization) => {
   try {
     const spaces = await pg('spaces')
       .where('user_id', user.id)
-      .select(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'created_at', 'running', 'is_favorite', 'last_opened_at']);
+      .select(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'created_at', 'running', 'is_favorite', 'last_opened_at', 'volume_path']);
 
     const spacesWithStatus = spaces.map((space) => {
       return {
