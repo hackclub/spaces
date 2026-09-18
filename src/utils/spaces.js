@@ -314,13 +314,15 @@ export const createContainer = async (password, type, authorization, homeDir) =>
     throw new Error("Invalid authorization token");
   }
 
-  const membership = await getUserPrimaryMembership(user.id);
-  if (!membership) {
-    const verificationStatus = await ensureHackclubVerified(user);
-    if (!['verified', 'verified_eligible', 'verified_but_over_18'].includes(verificationStatus)) {
-      const error = new Error("You must be a verified Hack Club member or a club member to create a space. Please link your Hack Club account and complete verification, or link to a club.");
-      error.statusCode = 403;
-      throw error;
+  if (!user.is_admin) {
+    const membership = await getUserPrimaryMembership(user.id);
+    if (!membership) {
+      const verificationStatus = await ensureHackclubVerified(user);
+      if (!['verified', 'verified_eligible', 'verified_but_over_18'].includes(verificationStatus)) {
+        const error = new Error("You must be a verified Hack Club member or a club member to create a space. Please link your Hack Club account and complete verification, or link to a club.");
+        error.statusCode = 403;
+        throw error;
+      }
     }
   }
 
