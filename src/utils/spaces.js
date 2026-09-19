@@ -70,8 +70,7 @@ const containerConfigs = {
     port: "8443/tcp",
     env: (password, port, workspaceDir = DEFAULT_WORKSPACE_DIR) => [
       `PASSWORD=${password}`,
-      `DEFAULT_WORKSPACE=${workspaceDir}`,
-      `SUDO_PASSWORD=${password}`
+      `DEFAULT_WORKSPACE=${workspaceDir}`
     ],
     description: "VS Code Server"
   },
@@ -132,6 +131,7 @@ const buildHostConfig = (config, port, volumePath) => {
     NanoCpus: 2000000000,
     CpuShares: 1024,
     PidsLimit: 512,
+    SecurityOpt: ["no-new-privileges:true"],
     ReadonlyRootfs: false,
     CapDrop: ["ALL"],
     CapAdd: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID", "NET_BIND_SERVICE"]
