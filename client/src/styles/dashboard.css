@@ -822,3 +822,24 @@
   font-size: 12px;
   color: #666;
 }
+
+.safari-not-supported {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+
+  padding: 2rem;
+  border-radius: 12px;
+
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--white);
+  border: 2px solid var(--smoke);
+}
+
+.safari-not-supported p {
+  color: var(--black);
+  font-weight: bold;
+  font-size: 24px;
+}
