@@ -7,6 +7,11 @@ echo 1 > /proc/sys/net/ipv4/ip_forward
 iptables -t nat -A POSTROUTING -s 172.17.0.0/16 ! -o docker0 -j MASQUERADE 2>/dev/null || true
 iptables -t nat -A POSTROUTING -s 172.18.0.0/16 ! -o docker0 -j MASQUERADE 2>/dev/null || true
 
+if [ -f /var/run/docker.pid ]; then
+    echo "Removing stale /var/run/docker.pid left by a previous run"
+    rm -f /var/run/docker.pid
+fi
+
 if docker info >/dev/null 2>&1; then
     echo "Docker is available."
 else
