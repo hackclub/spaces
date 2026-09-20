@@ -18,8 +18,21 @@ github-cli
 curl
 wget
 nano
+vim
 unzip
+zip
 build-essentials
+cmake
+pkg-config
+jq
+tree
+htop
+tmux
+less
+ripgrep
+fd-find
+rsync
+openssh-client
 apt-transport-https
 ca-certificates
 gnupg
@@ -71,6 +84,7 @@ php-zip
 sqlite3
 postgresql-client
 mysql-client
+redis-tools
 ```
 
 ##### Ruby:
@@ -83,4 +97,6 @@ rails
 ```
 go
 crystal
+ffmpeg
+imagemagick
 ```

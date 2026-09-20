@@ -1,20 +1,36 @@
 FROM linuxserver/code-server:latest
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV GO_VERSION=1.21.4
+ENV GO_VERSION=1.25.1
 ENV PATH=/usr/local/go/bin:/usr/local/cargo/bin:$PATH
 ENV RUSTUP_HOME=/usr/local/rustup
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         apt-transport-https \
         build-essential \
         ca-certificates \
+        cmake \
         curl \
+        fd-find \
         git \
         gnupg \
+        htop \
+        jq \
+        less \
+        libffi-dev \
+        libssl-dev \
         nano \
+        openssh-client \
+        pkg-config \
+        ripgrep \
+        rsync \
+        tmux \
+        tree \
         unzip \
+        vim \
         wget \
+        zip \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -70,7 +86,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN apt-get update && apt-get install -y --no-install-recommends \
         mysql-client \
         postgresql-client \
+        redis-tools \
         sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        imagemagick \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://crystal-lang.org/install.sh | bash -s -- --channel=stable \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
