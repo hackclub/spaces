@@ -64,6 +64,12 @@ const ensureImageExists = async (image) => {
 
 const CODE_SERVER_IMAGE = process.env.CODE_SERVER_IMAGE || "linuxserver/code-server";
 
+const GB = 1024 * 1024 * 1024;
+const MB = 1024 * 1024;
+
+const EDITOR_RESOURCES = { memory: 2 * GB, shm: 512 * MB, nanoCpus: 2000000000 };
+const GUI_RESOURCES = { memory: 4 * GB, shm: 1 * GB, nanoCpus: 2000000000 };
+
 const containerConfigs = {
   "code-server": {
     image: CODE_SERVER_IMAGE,
@@ -72,24 +78,28 @@ const containerConfigs = {
       `PASSWORD=${password}`,
       `DEFAULT_WORKSPACE=${workspaceDir}`
     ],
+    resources: EDITOR_RESOURCES,
     description: "VS Code Server"
   },
   "blender": {
     image: "linuxserver/blender",
     port: "3000/tcp",
     env: (password) => [`PASSWORD=${password}`],
+    resources: GUI_RESOURCES,
     description: "Blender 3D"
   },
   "kicad": {
     image: "linuxserver/kicad",
     port: "3001/tcp",
     env: (password) => [`PASSWORD=${password}`],
+    resources: GUI_RESOURCES,
     description: "KiCad PCB Design"
   },
   "freecad": {
     image: "linuxserver/freecad",
     port: "3001/tcp",
     env: (password) => [`PASSWORD=${password}`],
+    resources: GUI_RESOURCES,
     description: "FreeCAD is a general-purpose parametric 3D computer-aided design (CAD) modeler and a building information modeling (BIM) software application with finite element method (FEM) support."
   }
 };
@@ -120,15 +130,18 @@ const buildAccessUrl = (typeLower, port, password) => {
 };
 
 const buildHostConfig = (config, port, volumePath) => {
+  const resources = config.resources || EDITOR_RESOURCES;
+
   const hostConfig = {
     PortBindings: { [config.port]: [{ HostPort: `${port}` }] },
     NetworkMode: "bridge",
     Dns: ["8.8.8.8", "8.8.4.4", "1.1.1.1"],
     PublishAllPorts: false,
     RestartPolicy: { Name: "unless-stopped" },
-    Memory: 2 * 1024 * 1024 * 1024,
-    MemorySwap: 2 * 1024 * 1024 * 1024,
-    NanoCpus: 2000000000,
+    Memory: resources.memory,
+    MemorySwap: resources.memory,
+    ShmSize: resources.shm,
+    NanoCpus: resources.nanoCpus,
     CpuShares: 1024,
     PidsLimit: 512,
     SecurityOpt: ["no-new-privileges:true"],
