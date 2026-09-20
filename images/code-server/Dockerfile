@@ -100,6 +100,10 @@ RUN curl -fsSL https://crystal-lang.org/install.sh | bash -s -- --channel=stable
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh
 
+RUN printf '[global]\nbreak-system-packages = true\n' > /etc/pip.conf
+
+RUN printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> /etc/bash.bashrc
+
 RUN ln -sf /app/code-server/bin/code-server /usr/local/bin/code
 
 COPY in-space.md /opt/in-space.md
