@@ -615,6 +615,9 @@ $: filteredSpaces = sortedSpaces.filter(space => {
               bind:value={newSpaceHomeDir}
               placeholder="/config/workspace"
             />
+            <p class="password-info">
+              This is what's used to identify this space later on your dashboard.
+            </p>
           </div>
         {:else}
           <div class="form-group"></div>
@@ -711,6 +714,7 @@ $: filteredSpaces = sortedSpaces.filter(space => {
               {new Date(space.created_at).toLocaleString()}
             </p>
             <p><strong>Last opened:</strong> {formatLastOpened(space.last_opened_at)}</p>
+            <p><strong>Directory:</strong> {space.workspace_dir || "N/A"}</p>
             {#if space.type === "code-server" && space.password}
               <p class="space-password">
                 <strong>Password:</strong>

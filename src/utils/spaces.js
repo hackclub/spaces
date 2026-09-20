@@ -314,13 +314,15 @@ export const createContainer = async (password, type, authorization, homeDir) =>
     throw new Error("Invalid authorization token");
   }
 
-  const membership = await getUserPrimaryMembership(user.id);
-  if (!membership) {
-    const verificationStatus = await ensureHackclubVerified(user);
-    if (!['verified', 'verified_eligible', 'verified_but_over_18'].includes(verificationStatus)) {
-      const error = new Error("You must be a verified Hack Club member or a club member to create a space. Please link your Hack Club account and complete verification, or link to a club.");
-      error.statusCode = 403;
-      throw error;
+  if (!user.is_admin) {
+    const membership = await getUserPrimaryMembership(user.id);
+    if (!membership) {
+      const verificationStatus = await ensureHackclubVerified(user);
+      if (!['verified', 'verified_eligible', 'verified_but_over_18'].includes(verificationStatus)) {
+        const error = new Error("You must be a verified Hack Club member or a club member to create a space. Please link your Hack Club account and complete verification, or link to a club.");
+        error.statusCode = 403;
+        throw error;
+      }
     }
   }
 
@@ -684,7 +686,7 @@ export const getUserSpaces = async (authorization) => {
   try {
     const spaces = await pg('spaces')
       .where('user_id', user.id)
-      .select(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'created_at', 'running', 'is_favorite', 'last_opened_at']);
+      .select(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'created_at', 'running', 'is_favorite', 'last_opened_at', 'workspace_dir']);
 
     const spacesWithStatus = spaces.map((space) => {
       return {
