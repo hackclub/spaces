@@ -29,6 +29,13 @@ app.get('/', (req, res) => {
 	});
 });
 
+app.get('/api/v1/up', (req, res) => {
+	res.status(200).json({
+		status: 'up',
+		service: 'api',
+	});
+});
+
 app.use('/api/v1', apiLimiter, api);
 app.use(notFound);
 app.use(errorHandler);

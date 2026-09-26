@@ -22,6 +22,7 @@ before(async () => {
 });
 
 after(async () => {
+  if (!server) return;
   await new Promise((resolve, reject) => {
     server.close((error) => error ? reject(error) : resolve());
   });
