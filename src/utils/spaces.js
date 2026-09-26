@@ -39,6 +39,22 @@ const sanitizeWorkspaceDir = (homeDir) => {
   return dir;
 };
 
+const resolveWorkspacePath = (volumePath, workspaceDir) => {
+  const relative = sanitizeWorkspaceDir(workspaceDir).replace(/^\/config\/?/, "");
+  if (!relative) {
+    return null;
+  }
+
+  const base = path.resolve(volumePath);
+  const target = path.resolve(base, relative);
+
+  if (target !== base && !target.startsWith(base + path.sep)) {
+    throw new Error("Workspace directory resolves outside the space volume");
+  }
+
+  return target;
+};
+
 const ensureImageExists = async (image) => {
   try {
     await docker.getImage(image).inspect();
@@ -204,9 +220,9 @@ export const recreateSpaceContainer = async (space, { start = true, password: ne
   const hostConfig = buildHostConfig(config, port, space.volume_path);
 
   if (space.volume_path && typeLower === "code-server") {
-    const relWorkspace = workspaceDir.replace(/^\/config\/?/, "");
-    if (relWorkspace) {
-      fs.mkdirSync(path.join(space.volume_path, relWorkspace), { recursive: true });
+    const workspacePath = resolveWorkspacePath(space.volume_path, workspaceDir);
+    if (workspacePath) {
+      fs.mkdirSync(workspacePath, { recursive: true });
     }
   }
 
@@ -374,9 +390,9 @@ export const createContainer = async (password, type, authorization, homeDir) =>
       // setup script's mkdir runs too late and code-server reports "workspace
       // not found".
       if (typeLower === "code-server") {
-        const relWorkspace = workspaceDir.replace(/^\/config\/?/, "");
-        if (relWorkspace) {
-          fs.mkdirSync(path.join(volumePath, relWorkspace), { recursive: true });
+        const workspacePath = resolveWorkspacePath(volumePath, workspaceDir);
+        if (workspacePath) {
+          fs.mkdirSync(workspacePath, { recursive: true });
         }
       }
     }

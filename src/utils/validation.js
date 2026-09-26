@@ -1,4 +1,5 @@
-export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_MAX_LENGTH = 254;
+export const EMAIL_REGEX = /^[^\s@]{1,64}@[^\s@.]{1,63}(?:\.[^\s@.]{1,63}){1,10}$/;
 export const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,30}$/;
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 72;
@@ -11,6 +12,9 @@ export function normalizeEmail(email) {
 export function validateEmail(email) {
   if (!email) return { valid: false, message: 'Email is required' };
   const normalized = normalizeEmail(email);
+  if (!normalized || normalized.length > EMAIL_MAX_LENGTH) {
+    return { valid: false, message: 'Invalid email format' };
+  }
   if (!EMAIL_REGEX.test(normalized)) {
     return { valid: false, message: 'Invalid email format' };
   }

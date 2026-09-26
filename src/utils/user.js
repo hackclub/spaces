@@ -1,4 +1,5 @@
 import pg from './db.js';
+import { EMAIL_REGEX, EMAIL_MAX_LENGTH } from './validation.js';
 
 export const getUser = async (authorization) => {
   if (!authorization) return null;
@@ -132,8 +133,7 @@ export const updateUser = async (authorization, updateData) => {
     const updates = {};
     
     if (updateData.email !== undefined) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(updateData.email)) {
+      if (typeof updateData.email !== 'string' || updateData.email.length > EMAIL_MAX_LENGTH || !EMAIL_REGEX.test(updateData.email)) {
         const error = new Error("Invalid email format");
         error.statusCode = 400;
         throw error;

@@ -34,7 +34,6 @@ router.get('/hackclub/login', async (req, res) => {
     });
 
     const url = new URL(HACKCLUB_AUTH_URL);
-    console.log(process.env.HACKCLUB_REDIRECT_URI)
     url.searchParams.set('client_id', process.env.HACKCLUB_CLIENT_ID);
     url.searchParams.set('redirect_uri', process.env.HACKCLUB_REDIRECT_URI);
     url.searchParams.set('response_type', 'code');
@@ -104,7 +103,7 @@ router.get('/callback', async (req, res) => {
     const { code, state, error: oauthError } = req.query;
 
     if (oauthError) {
-      console.error('OAuth error from Hack Club:', oauthError);
+      console.error('OAuth provider returned an error response');
       return res.redirect('/?error=oauth_denied');
     }
 
@@ -125,7 +124,6 @@ router.get('/callback', async (req, res) => {
 
     await pg('oauth_states').where({ state }).delete();
 
-    console.log('Exchanging code for token with redirect_uri:', process.env.HACKCLUB_REDIRECT_URI);
 
     const tokenBody = new URLSearchParams({
       client_id: process.env.HACKCLUB_CLIENT_ID,
