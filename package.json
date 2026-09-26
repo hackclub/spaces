@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "client-install": "cd client && npm install",
+    "test": "node --test test/*.test.js",
     "start": "node src/index.js",
     "serve:server": "nodemon src/index.js",
     "serve:client": "cd client && npm run dev",
