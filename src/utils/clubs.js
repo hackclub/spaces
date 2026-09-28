@@ -117,20 +117,12 @@ export async function checkMemberStatus(email) {
 
   try {
     const result = await callClubsAPI('/member/email', { email }, true);
-    
-    if (!result) {
+
+    if (!result || !result.club_name) {
       return { isMember: false, clubName: null };
     }
 
-    if (result._plainText) {
-      return { isMember: true, clubName: result._plainText };
-    }
-    
-    if (result.club_name) {
-      return { isMember: true, clubName: result.club_name };
-    }
-
-    return { isMember: false, clubName: null };
+    return { isMember: true, clubName: result.club_name };
   } catch (error) {
     console.error('Error checking member status:', error);
     return { isMember: false, clubName: null };
