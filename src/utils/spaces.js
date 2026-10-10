@@ -264,6 +264,36 @@ export const recreateSpaceContainer = async (space, { start = true, password: ne
   return { space: updated, container, password, workspaceDir };
 };
 
+// One-off fill for code-server spaces created before workspace_dir was stored.
+// Reads DEFAULT_WORKSPACE from each container's env; spaces whose container is
+// gone or has no such env are left null rather than guessed.
+export const backfillWorkspaceDirs = async () => {
+  const spaces = await pg('spaces')
+    .where('type', 'code-server')
+    .whereNull('workspace_dir')
+    .whereNotNull('container_id')
+    .select(['id', 'container_id']);
+
+  let filled = 0;
+  for (const space of spaces) {
+    try {
+      const info = await docker.getContainer(space.container_id).inspect();
+      const entry = (info?.Config?.Env || []).find((e) => e.startsWith('DEFAULT_WORKSPACE='));
+      if (!entry) continue;
+
+      const workspaceDir = sanitizeWorkspaceDir(entry.slice('DEFAULT_WORKSPACE='.length));
+      await pg('spaces').where('id', space.id).update({ workspace_dir: workspaceDir });
+      filled++;
+    } catch (err) {
+      if (err.statusCode !== 404) {
+        console.error(`Could not backfill workspace dir for space ${space.id}:`, err.message);
+      }
+    }
+  }
+
+  console.log(`Backfilled workspace_dir for ${filled}/${spaces.length} code-server spaces`);
+};
+
 export const changeSpacePassword = async (spaceId, newPassword, authorization) => {
   if (!spaceId) {
     throw new Error("Space ID is required");
