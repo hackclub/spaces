@@ -1,25 +1,22 @@
-import Docker from "dockerode";
-import getPort from "get-port";
 import pg from "./db.js";
 import { getUser, checkUserSpaceLimit, ensureHackclubVerified } from "./user.js";
 import { getUserPrimaryMembership } from "./clubs.js";
-import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import crypto from "crypto";
-
-const VOLUME_BASE_PATH = process.env.VOLUME_BASE_PATH;
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const docker = new Docker();
+import {
+  CODE_SERVER_PORT,
+  SANDBOX_IMAGE,
+  SANDBOX_ROOT,
+  sandboxNameFor,
+  createSandbox,
+  findSandbox,
+  setupCodeServer,
+  startCodeServer,
+  ensureHackatime
+} from "./sandboxes.js";
 
 const DEFAULT_WORKSPACE_DIR = "/config/workspace";
 
-// Sanitize a user-provided home/workspace directory for code-server.
-// The path must live under /config so it persists on the mounted volume,
-// and is stripped of any characters that could be unsafe in a shell command.
 const sanitizeWorkspaceDir = (homeDir) => {
   if (!homeDir || typeof homeDir !== "string" || !homeDir.trim()) {
     return DEFAULT_WORKSPACE_DIR;
@@ -39,260 +36,15 @@ const sanitizeWorkspaceDir = (homeDir) => {
   return dir;
 };
 
-const resolveWorkspacePath = (volumePath, workspaceDir) => {
-  const relative = sanitizeWorkspaceDir(workspaceDir).replace(/^\/config\/?/, "");
-  if (!relative) {
-    return null;
-  }
+const toSandboxPath = (workspaceDir) => `${SANDBOX_ROOT}${sanitizeWorkspaceDir(workspaceDir).slice("/config".length)}`;
 
-  const base = path.resolve(volumePath);
-  const target = path.resolve(base, relative);
-
-  if (target !== base && !target.startsWith(base + path.sep)) {
-    throw new Error("Workspace directory resolves outside the space volume");
-  }
-
-  return target;
-};
-
-const ensureImageExists = async (image) => {
-  try {
-    await docker.getImage(image).inspect();
-  } catch (err) {
-    if (err.statusCode !== 404) {
-      throw err;
-    }
-
-    console.log(`Docker image ${image} not found locally, pulling...`);
-    const stream = await docker.pull(image);
-    await new Promise((resolve, reject) => {
-      docker.modem.followProgress(stream, (pullErr) => {
-        if (pullErr) {
-          reject(pullErr);
-        } else {
-          resolve();
-        }
-      });
-    });
-    console.log(`Docker image ${image} pulled successfully`);
-  }
-};
-
-const CODE_SERVER_IMAGE = process.env.CODE_SERVER_IMAGE || "linuxserver/code-server";
-
-const GB = 1024 * 1024 * 1024;
-const MB = 1024 * 1024;
-
-const EDITOR_RESOURCES = { memory: 2 * GB, shm: 512 * MB, nanoCpus: 2000000000 };
-const GUI_RESOURCES = { memory: 4 * GB, shm: 1 * GB, nanoCpus: 2000000000 };
-
-const containerConfigs = {
+const spaceConfigs = {
   "code-server": {
-    image: CODE_SERVER_IMAGE,
-    port: "8443/tcp",
-    env: (password, port, workspaceDir = DEFAULT_WORKSPACE_DIR) => [
-      `PASSWORD=${password}`,
-      `DEFAULT_WORKSPACE=${workspaceDir}`
-    ],
-    resources: EDITOR_RESOURCES,
     description: "VS Code Server"
-  },
-  "blender": {
-    image: "linuxserver/blender",
-    port: "3000/tcp",
-    env: (password) => [`PASSWORD=${password}`],
-    resources: GUI_RESOURCES,
-    description: "Blender 3D"
-  },
-  "kicad": {
-    image: "linuxserver/kicad",
-    port: "3001/tcp",
-    env: (password) => [`PASSWORD=${password}`],
-    resources: GUI_RESOURCES,
-    description: "KiCad PCB Design"
-  },
-  "freecad": {
-    image: "linuxserver/freecad",
-    port: "3001/tcp",
-    env: (password) => [`PASSWORD=${password}`],
-    resources: GUI_RESOURCES,
-    description: "FreeCAD is a general-purpose parametric 3D computer-aided design (CAD) modeler and a building information modeling (BIM) software application with finite element method (FEM) support."
   }
 };
 
-const BASIC_AUTH_TYPES = ["kicad", "blender", "freecad"];
-
-const buildAccessUrl = (typeLower, port, password) => {
-  let access_url;
-
-  if (process.env.DOCKER === 'false') {
-    access_url = `${process.env.SERVER_URL}:${port}`;
-  } else if (typeLower === 'kicad') {
-    access_url = `${process.env.SERVER_URL}/kicad/space/${port}/`;
-  } else if (typeLower === 'freecad') {
-    access_url = `${process.env.SERVER_URL}/freecad/space/${port}/`;
-  } else {
-    access_url = `${process.env.SERVER_URL}/space/${port}/`;
-  }
-
-  if (BASIC_AUTH_TYPES.includes(typeLower)) {
-    const urlObj = new URL(access_url);
-    urlObj.username = "abc";
-    urlObj.password = password;
-    access_url = urlObj.toString();
-  }
-
-  return access_url;
-};
-
-const buildHostConfig = (config, port, volumePath) => {
-  const resources = config.resources || EDITOR_RESOURCES;
-
-  const hostConfig = {
-    PortBindings: { [config.port]: [{ HostPort: `${port}` }] },
-    NetworkMode: "bridge",
-    Dns: ["8.8.8.8", "8.8.4.4", "1.1.1.1"],
-    PublishAllPorts: false,
-    RestartPolicy: { Name: "unless-stopped" },
-    Memory: resources.memory,
-    MemorySwap: resources.memory,
-    ShmSize: resources.shm,
-    NanoCpus: resources.nanoCpus,
-    CpuShares: 1024,
-    PidsLimit: 512,
-    SecurityOpt: ["no-new-privileges:true"],
-    ReadonlyRootfs: false,
-    CapDrop: ["ALL"],
-    CapAdd: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID", "NET_BIND_SERVICE"]
-  };
-
-  if (volumePath) {
-    hostConfig.Binds = [`${volumePath}:/config`];
-  }
-
-  return hostConfig;
-};
-
-export const recreateSpaceContainer = async (space, { start = true, password: newPassword = null } = {}) => {
-  const typeLower = (space.type || "").toLowerCase();
-  const config = containerConfigs[typeLower];
-  if (!config) {
-    throw new Error(`Cannot recreate space ${space.id}: unknown type "${space.type}"`);
-  }
-
-  const password = newPassword || space.password || crypto.randomBytes(16).toString('hex');
-  let workspaceDir = space.workspace_dir || null;
-
-  if (space.container_id) {
-    try {
-      const stale = docker.getContainer(space.container_id);
-
-      if (!workspaceDir) {
-        try {
-          const info = await stale.inspect();
-          const entry = (info?.Config?.Env || []).find((e) => e.startsWith('DEFAULT_WORKSPACE='));
-          if (entry) {
-            workspaceDir = sanitizeWorkspaceDir(entry.slice('DEFAULT_WORKSPACE='.length));
-            console.log(`Recovered workspace dir for space ${space.id}: ${workspaceDir}`);
-          }
-        } catch (inspectErr) {
-          if (inspectErr.statusCode !== 404) {
-            console.error(`Could not inspect container for space ${space.id}:`, inspectErr.message);
-          }
-        }
-      }
-
-      await stale.remove({ force: true });
-    } catch (err) {
-      if (err.statusCode !== 404) {
-        console.error(`Failed to remove stale container for space ${space.id}:`, err.message);
-      }
-    }
-  }
-
-  if (!workspaceDir) {
-    workspaceDir = DEFAULT_WORKSPACE_DIR;
-  }
-
-  await ensureImageExists(config.image);
-
-  const port = await getPort();
-  const hostConfig = buildHostConfig(config, port, space.volume_path);
-
-  if (space.volume_path && typeLower === "code-server") {
-    const workspacePath = resolveWorkspacePath(space.volume_path, workspaceDir);
-    if (workspacePath) {
-      fs.mkdirSync(workspacePath, { recursive: true });
-    }
-  }
-
-  const container = await docker.createContainer({
-    Image: config.image,
-    Env: [...config.env(password, port, workspaceDir), "SELKIES_FILE_TRANSFERS=upload,download", "SELKIES_UI_SIDEBAR_SHOW_FILES=True"],
-    ExposedPorts: { [config.port]: {} },
-    HostConfig: hostConfig,
-  });
-
-  if (start) {
-    await container.start();
-  }
-
-  const access_url = buildAccessUrl(typeLower, port, password);
-
-  const updateData = {
-    container_id: container.id,
-    image: config.image,
-    port,
-    access_url,
-    password,
-    workspace_dir: workspaceDir,
-    running: start
-  };
-
-  if (start) {
-    updateData.started_at = new Date();
-    updateData.last_opened_at = new Date();
-  }
-
-  const [updated] = await pg('spaces')
-    .where('id', space.id)
-    .update(updateData)
-    .returning(['id', 'container_id', 'type', 'port', 'access_url', 'password', 'running']);
-
-  console.log(`Recreated container for space ${space.id} on image ${config.image}`);
-
-  return { space: updated, container, password, workspaceDir };
-};
-
-// One-off fill for code-server spaces created before workspace_dir was stored.
-// Reads DEFAULT_WORKSPACE from each container's env; spaces whose container is
-// gone or has no such env are left null rather than guessed.
-export const backfillWorkspaceDirs = async () => {
-  const spaces = await pg('spaces')
-    .where('type', 'code-server')
-    .whereNull('workspace_dir')
-    .whereNotNull('container_id')
-    .select(['id', 'container_id']);
-
-  let filled = 0;
-  for (const space of spaces) {
-    try {
-      const info = await docker.getContainer(space.container_id).inspect();
-      const entry = (info?.Config?.Env || []).find((e) => e.startsWith('DEFAULT_WORKSPACE='));
-      if (!entry) continue;
-
-      const workspaceDir = sanitizeWorkspaceDir(entry.slice('DEFAULT_WORKSPACE='.length));
-      await pg('spaces').where('id', space.id).update({ workspace_dir: workspaceDir });
-      filled++;
-    } catch (err) {
-      if (err.statusCode !== 404) {
-        console.error(`Could not backfill workspace dir for space ${space.id}:`, err.message);
-      }
-    }
-  }
-
-  console.log(`Backfilled workspace_dir for ${filled}/${spaces.length} code-server spaces`);
-};
+const UNAVAILABLE_TYPES = ["blender", "kicad", "freecad"];
 
 export const changeSpacePassword = async (spaceId, newPassword, authorization) => {
   if (!spaceId) {
@@ -338,10 +90,22 @@ export const changeSpacePassword = async (spaceId, newPassword, authorization) =
   }
 
   const wasRunning = Boolean(space.running);
-  const { space: updated } = await recreateSpaceContainer(space, {
-    start: wasRunning,
-    password: newPassword
-  });
+  const updateData = { password: newPassword };
+
+  if (wasRunning) {
+    const sandbox = await findSandbox(space.container_id);
+    if (sandbox) {
+      updateData.access_url = await startCodeServer(sandbox, {
+        password: newPassword,
+        workspacePath: toSandboxPath(space.workspace_dir)
+      });
+    }
+  }
+
+  const [updated] = await pg('spaces')
+    .where('id', space.id)
+    .update(updateData)
+    .returning(['id', 'access_url', 'running']);
 
   return {
     message: wasRunning
@@ -387,100 +151,57 @@ export const createContainer = async (password, type, authorization, homeDir) =>
 
   await checkUserSpaceLimit(user.id);
 
-  const config = containerConfigs[type.toLowerCase()];
-  if (!config) {
-    const error = new Error("Invalid container type");
-    error.validTypes = Object.keys(containerConfigs);
+  const typeLower = type.toLowerCase();
+
+  if (UNAVAILABLE_TYPES.includes(typeLower)) {
+    const error = new Error("This type of space isn't available yet while Spaces moves to its new home. VS Code spaces work.");
+    error.statusCode = 400;
     throw error;
   }
 
-  const typeLower = type.toLowerCase();
-  password = crypto.randomBytes(16).toString('hex');
+  const config = spaceConfigs[typeLower];
+  if (!config) {
+    const error = new Error("Invalid container type");
+    error.validTypes = Object.keys(spaceConfigs);
+    throw error;
+  }
 
-  const workspaceDir = typeLower === "code-server"
-    ? sanitizeWorkspaceDir(homeDir)
-    : DEFAULT_WORKSPACE_DIR;
+  password = crypto.randomBytes(16).toString('hex');
+  const workspaceDir = sanitizeWorkspaceDir(homeDir);
+  const sandboxName = sandboxNameFor(crypto.randomUUID());
+
+  let sandbox = null;
 
   try {
-    const port = await getPort();
+    sandbox = await createSandbox(sandboxName);
 
-    let volumePath = null;
-    const hostConfig = buildHostConfig(config, port, null);
-
-    await ensureImageExists(config.image);
-
-    if (VOLUME_BASE_PATH) {
-      const spaceUuid = crypto.randomUUID();
-      volumePath = path.join(VOLUME_BASE_PATH, user.id.toString(), spaceUuid);
-      fs.mkdirSync(volumePath, { recursive: true });
-      hostConfig.Binds = [`${volumePath}:/config`];
-
-      // Pre-create the workspace directory on the host volume (which is mounted
-      // at /config) so code-server finds it the moment it starts. Otherwise the
-      // setup script's mkdir runs too late and code-server reports "workspace
-      // not found".
-      if (typeLower === "code-server") {
-        const workspacePath = resolveWorkspacePath(volumePath, workspaceDir);
-        if (workspacePath) {
-          fs.mkdirSync(workspacePath, { recursive: true });
-        }
-      }
-    }
-
-    const container = await docker.createContainer({
-      Image: config.image,
-      Env: [...config.env(password, port, workspaceDir), "SELKIES_FILE_TRANSFERS=upload,download", "SELKIES_UI_SIDEBAR_SHOW_FILES=True"],
-      ExposedPorts: { [config.port]: {} },
-      HostConfig: hostConfig,
+    await setupCodeServer(sandbox, {
+      workspacePath: toSandboxPath(workspaceDir),
+      hackatimeApiKey: user.hackatime_api_key,
+      extensions: user.vscode_extensions
     });
 
-    await container.start();
-
-    if (type.toLowerCase() === "code-server") {
-      try {
-        console.log("Running setup script for code-server container...");
-        const setupScriptPath = path.join(__dirname, "../../code-server-setup.sh");
-        const setupScript = fs.readFileSync(setupScriptPath, "utf8").replace(/\r\n/g, '\n');
-
-        const hackatimeApiKey = user.hackatime_api_key || "";
-        const sanitizedApiKey = hackatimeApiKey.replace(/[^a-zA-Z0-9._\s-]/g, '');
-        const exec = await container.exec({
-          Cmd: ["bash", "-c", `cat > /tmp/setup.sh << 'EOF'\n${setupScript}\nEOF\nchmod +x /tmp/setup.sh && /tmp/setup.sh '${sanitizedApiKey}' '${(user.vscode_extensions || "").replace(/[^a-zA-Z0-9.-]/g, "")}' '${workspaceDir}' > /app/postinstall.log 2>&1`],
-          AttachStdout: true,
-          AttachStderr: true,
-        });
-
-        const stream = await exec.start();
-        stream.pipe(process.stdout);
-
-        console.log("Setup script executed successfully");
-      } catch (setupErr) {
-        console.error("Failed to run setup script (container will still be created):", setupErr);
-      }
-    }
-
-    const access_url = buildAccessUrl(typeLower, port, password);
-
-    const insertData = {
-      user_id: user.id,
-      container_id: container.id,
-      type: type.toLowerCase(),
-      description: config.description,
-      image: config.image,
-      port,
-      access_url: access_url,
-      running: true,
-      started_at: new Date(),
-      last_opened_at: new Date(),
-      volume_path: volumePath,
-      workspace_dir: workspaceDir,
-      password
-    };
+    const access_url = await startCodeServer(sandbox, {
+      password,
+      workspacePath: toSandboxPath(workspaceDir)
+    });
 
     const [newSpace] = await pg('spaces')
-      .insert(insertData)
+      .insert({
+        user_id: user.id,
+        container_id: sandboxName,
+        type: typeLower,
+        description: config.description,
+        image: SANDBOX_IMAGE,
+        port: CODE_SERVER_PORT,
+        access_url,
+        running: true,
+        started_at: new Date(),
+        last_opened_at: new Date(),
+        workspace_dir: workspaceDir,
+        password
+      })
       .returning(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'running']);
-
 
     const result = {
       message: "Container created successfully",
@@ -499,7 +220,14 @@ export const createContainer = async (password, type, authorization, homeDir) =>
 
     return result;
   } catch (err) {
-    console.error("Docker error:", err);
+    console.error("Sandbox error:", err);
+
+    if (sandbox) {
+      await sandbox.delete().catch((deleteErr) => {
+        console.error(`Failed to clean up sandbox ${sandboxName}:`, deleteErr.message);
+      });
+    }
+
     throw new Error("Failed to create container");
   }
 };
@@ -530,7 +258,6 @@ export const startContainer = async (spaceId, authorization) => {
       throw error;
     }
 
-    // Check if user already has a running space
     const runningSpace = await pg('spaces')
       .where('user_id', user.id)
       .where('running', true)
@@ -543,54 +270,32 @@ export const startContainer = async (spaceId, authorization) => {
       throw error;
     }
 
-    let container;
-    let containerMissing = !space.container_id;
-
-    if (space.container_id) {
-      container = docker.getContainer(space.container_id);
-      try {
-        await container.inspect();
-      } catch (err) {
-        if (err.statusCode !== 404) {
-          throw err;
-        }
-        containerMissing = true;
-      }
+    const sandbox = await findSandbox(space.container_id);
+    if (!sandbox) {
+      const error = new Error("This space's machine could not be found");
+      error.statusCode = 404;
+      throw error;
     }
 
-    if (containerMissing || space.image !== containerConfigs[(space.type || "").toLowerCase()]?.image) {
-      console.log(`Rebuilding container for space ${space.id} (missing=${containerMissing})`);
-      const recreated = await recreateSpaceContainer(space);
-      container = recreated.container;
-    } else {
-      await container.start();
+    const password = space.password || crypto.randomBytes(16).toString('hex');
+
+    const access_url = await startCodeServer(sandbox, {
+      password,
+      workspacePath: toSandboxPath(space.workspace_dir)
+    });
+
+    if (user.hackatime_api_key) {
+      await ensureHackatime(sandbox, user.hackatime_api_key);
     }
 
-    if (space.type === "code-server" && user.hackatime_api_key) {
-      try {
-        console.log("Setting up Hackatime for code-server container...");
-        const hackatimeApiKey = user.hackatime_api_key;
-        const sanitizedApiKey = hackatimeApiKey.replace(/[^a-zA-Z0-9\-_]/g, '');
-        const exec = await container.exec({
-          Cmd: ["bash", "-c", `if ! command -v terminal-wakatime >/dev/null 2>&1; then curl -fsSL https://hack.club/setup/install.sh | bash -s -- '${sanitizedApiKey}' --yes; fi`],
-          AttachStdout: true,
-          AttachStderr: true,
-        });
-        const stream = await exec.start();
-        stream.pipe(process.stdout);
-        console.log("Hackatime setup executed successfully");
-      } catch (hackatimeErr) {
-        console.error("Failed to set up Hackatime (container will still start):", hackatimeErr);
-      }
-    }
-
-    // Update running status and started_at timestamp in database
     await pg('spaces')
       .where('id', spaceId)
       .update({
         running: true,
         started_at: new Date(),
-        last_opened_at: new Date()
+        last_opened_at: new Date(),
+        access_url,
+        password
       });
 
     return {
@@ -599,19 +304,9 @@ export const startContainer = async (spaceId, authorization) => {
       containerId: space.container_id,
     };
   } catch (err) {
-    console.error("Docker error:", err);
+    console.error("Sandbox error:", err);
 
-    if (err.statusCode === 404) {
-      const error = new Error(err.message || "Container not found");
-      error.statusCode = 404;
-      throw error;
-    }
-    if (err.statusCode === 304) {
-      const error = new Error("Container is already running");
-      error.statusCode = 400;
-      throw error;
-    }
-    if (err.statusCode === 400) {
+    if (err.statusCode === 404 || err.statusCode === 400) {
       throw err;
     }
 
@@ -645,10 +340,10 @@ export const stopContainer = async (spaceId, authorization) => {
       throw error;
     }
 
-    const container = docker.getContainer(space.container_id);
-
-    await container.inspect();
-    await container.stop();
+    const sandbox = await findSandbox(space.container_id);
+    if (sandbox) {
+      await sandbox.stop();
+    }
 
     await pg('spaces')
       .where('id', spaceId)
@@ -662,17 +357,10 @@ export const stopContainer = async (spaceId, authorization) => {
       containerId: space.container_id,
     };
   } catch (err) {
-    console.error("Docker error:", err);
+    console.error("Sandbox error:", err);
 
     if (err.statusCode === 404) {
-      const error = new Error(err.message || "Container not found");
-      error.statusCode = 404;
-      throw error;
-    }
-    if (err.statusCode === 304) {
-      const error = new Error("Container is already stopped");
-      error.statusCode = 400;
-      throw error;
+      throw err;
     }
 
     throw new Error("Failed to stop container");
@@ -705,8 +393,12 @@ export const getContainerStatus = async (spaceId, authorization) => {
       throw error;
     }
 
-    const container = docker.getContainer(space.container_id);
-    const info = await container.inspect();
+    const sandbox = await findSandbox(space.container_id);
+    if (!sandbox) {
+      const error = new Error("Container not found");
+      error.statusCode = 404;
+      throw error;
+    }
 
     return {
       spaceId: space.id,
@@ -714,18 +406,16 @@ export const getContainerStatus = async (spaceId, authorization) => {
       type: space.type,
       description: space.description,
       accessUrl: space.access_url,
-      status: info.State.Status,
-      running: info.State.Running,
-      startedAt: info.State.StartedAt,
-      finishedAt: info.State.FinishedAt,
+      status: sandbox.status,
+      running: sandbox.status === "running",
+      startedAt: space.started_at,
+      finishedAt: null,
     };
   } catch (err) {
-    console.error("Docker error:", err);
+    console.error("Sandbox error:", err);
 
     if (err.statusCode === 404) {
-      const error = new Error(err.message || "Container not found");
-      error.statusCode = 404;
-      throw error;
+      throw err;
     }
 
     throw new Error("Failed to get container status");
@@ -761,7 +451,6 @@ export const getUserSpaces = async (authorization) => {
   }
 };
 
-// Get spaces by user ID directly
 export const getSpacesByUserId = async (userId) => {
   if (!userId) {
     throw new Error("User ID is required");
@@ -811,28 +500,9 @@ export const deleteSpace = async (spaceId, authorization, { isAdmin = false } = 
       throw error;
     }
 
-    const container = docker.getContainer(space.container_id);
-
-    try {
-      await container.inspect();
-      await container.stop();
-    } catch (err) {
-      console.log("Container already stopped or doesn't exist, continuing with deletion");
-    }
-
-    try {
-      await container.remove();
-    } catch (err) {
-      console.error("Failed to remove container:", err);
-    }
-
-    if (space.volume_path) {
-      try {
-        fs.rmSync(space.volume_path, { recursive: true, force: true });
-        console.log(`Removed volume directory: ${space.volume_path}`);
-      } catch (err) {
-        console.error("Failed to remove volume directory:", err);
-      }
+    const sandbox = await findSandbox(space.container_id);
+    if (sandbox) {
+      await sandbox.delete();
     }
 
     await pg('spaces')

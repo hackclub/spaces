@@ -1,61 +1,58 @@
-import Docker from "dockerode";
 import pg from "./db.js";
-
-const docker = new Docker();
+import { findSandbox } from "./sandboxes.js";
 
 const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
 
 export const stopExpiredSpaces = async () => {
+  const summary = { stopped: 0, reconciled: 0, failed: 0 };
+
   try {
     const threeHoursAgo = new Date(Date.now() - THREE_HOURS_MS);
-    
-    const expiredSpaces = await pg('spaces')
+
+    const runningSpaces = await pg('spaces')
       .where('running', true)
-      .where('started_at', '<', threeHoursAgo)
       .select(['id', 'container_id', 'user_id', 'type', 'started_at']);
 
-    if (expiredSpaces.length === 0) {
-      console.log('[Auto-stop] No expired spaces found');
-      return;
-    }
-
-    console.log(`[Auto-stop] Found ${expiredSpaces.length} expired space(s) to stop`);
-
-    for (const space of expiredSpaces) {
+    for (const space of runningSpaces) {
       try {
-        const container = docker.getContainer(space.container_id);
-        
-        await container.inspect();
-        await container.stop();
-        
+        const sandbox = await findSandbox(space.container_id);
+        const expired = space.started_at && new Date(space.started_at) < threeHoursAgo;
+
+        if (sandbox && sandbox.status === "running" && !expired) {
+          continue;
+        }
+
+        if (sandbox && sandbox.status === "running") {
+          await sandbox.stop();
+          summary.stopped++;
+          console.log(`[Auto-stop] Stopped space ${space.id} (sandbox ${space.container_id}) - runtime exceeded 3 hours`);
+        } else {
+          summary.reconciled++;
+          console.log(`[Auto-stop] Space ${space.id} was already stopped, updated database status`);
+        }
+
         await pg('spaces')
           .where('id', space.id)
           .update({ running: false });
-        
-        console.log(`[Auto-stop] Stopped space ${space.id} (container ${space.container_id}) - runtime exceeded 3 hours`);
       } catch (err) {
-        if (err.statusCode === 304) {
-          await pg('spaces')
-            .where('id', space.id)
-            .update({ running: false });
-          console.log(`[Auto-stop] Space ${space.id} was already stopped, updated database status`);
-        } else {
-          console.error(`[Auto-stop] Failed to stop space ${space.id}:`, err.message);
-        }
+        summary.failed++;
+        console.error(`[Auto-stop] Failed to stop space ${space.id}:`, err.message);
       }
     }
   } catch (err) {
     console.error('[Auto-stop] Error in stopExpiredSpaces:', err);
   }
+
+  return summary;
 };
 
 export const startAutoStopJob = () => {
   const INTERVAL_MS = 5 * 60 * 1000;
-  
+
   console.log('[Auto-stop] Starting auto-stop job - checking every 5 minutes for spaces running > 3 hours');
-  
+
   stopExpiredSpaces();
-  
+
   setInterval(() => {
     stopExpiredSpaces();
   }, INTERVAL_MS);

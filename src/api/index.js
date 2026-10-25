@@ -4,6 +4,7 @@ import users from './users/users.route.js';
 import admin from './admin/admin.route.js';
 import oauth from './oauth/oauth.route.js';
 import clubs from './clubs/clubs.route.js';
+import cron from './cron/cron.route.js';
 
 const router = express.Router();
 
@@ -25,5 +26,6 @@ router.use('/users/', users);
 router.use('/admin/', admin);
 router.use('/oauth/', oauth);
 router.use('/clubs/', clubs);
+router.use('/cron/', cron);
 
 export default router;

@@ -1,7 +1,5 @@
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
-const normaliseIp = typeof ipKeyGenerator === 'function' ? ipKeyGenerator : (ip) => ip;
-
 export const requesterKey = (req) => {
   const token = req.headers?.authorization || req.cookies?.auth_token;
   if (token) return `user:${token}`;
@@ -11,7 +9,7 @@ export const requesterKey = (req) => {
     return `email:${email.trim().toLowerCase()}`;
   }
 
-  return `ip:${normaliseIp(req.ip)}`;
+  return `ip:${ipKeyGenerator(req.ip)}`;
 };
 
 export const apiLimiter = rateLimit({

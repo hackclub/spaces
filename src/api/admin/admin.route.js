@@ -1,44 +1,11 @@
 import express from 'express';
-import fs from 'fs';
-import Docker from 'dockerode';
 import pg from '../../utils/db.js';
 import { requireAdmin } from '../../middlewares/admin.middleware.js';
 import { deleteSpace } from '../../utils/spaces.js';
 
 const router = express.Router();
-const docker = new Docker();
 
 const INACTIVE_DAYS = 90;
-
-const getDiskUsage = async (mountPath) => {
-  try {
-    const stats = await fs.promises.statfs(mountPath);
-    const total = stats.blocks * stats.bsize;
-    const free = stats.bavail * stats.bsize;
-    return { path: mountPath, total, free, used: total - free };
-  } catch (err) {
-    console.error(`Failed to read disk usage for ${mountPath}:`, err.message);
-    return null;
-  }
-};
-
-const getDockerUsage = async () => {
-  try {
-    const df = await docker.df();
-    const sum = (items, key) => (items || []).reduce((acc, item) => acc + (item[key] || 0), 0);
-    return {
-      images: { count: (df.Images || []).length, size: df.LayersSize ?? sum(df.Images, 'Size') },
-      containers: { count: (df.Containers || []).length, size: sum(df.Containers, 'SizeRw') },
-      volumes: {
-        count: (df.Volumes || []).length,
-        size: (df.Volumes || []).reduce((acc, v) => acc + (v.UsageData?.Size > 0 ? v.UsageData.Size : 0), 0)
-      }
-    };
-  } catch (err) {
-    console.error('Failed to read docker disk usage:', err.message);
-    return null;
-  }
-};
 
 router.post('/analytics', requireAdmin, async (req, res) => {
   try {
@@ -54,13 +21,6 @@ router.post('/analytics', requireAdmin, async (req, res) => {
       ])
       .count('id as count');
 
-    const volumePath = process.env.VOLUME_BASE_PATH;
-    const [rootDisk, volumeDisk, dockerUsage] = await Promise.all([
-      getDiskUsage('/'),
-      volumePath ? getDiskUsage(volumePath) : Promise.resolve(null),
-      getDockerUsage()
-    ]);
-
     res.status(200).json({
       success: true,
       data: {
@@ -69,11 +29,7 @@ router.post('/analytics', requireAdmin, async (req, res) => {
         activeSpaces: parseInt(activeSpaces.count),
         inactiveSpaces: parseInt(inactiveSpaces.count),
         inactiveDays: INACTIVE_DAYS,
-        storage: {
-          root: rootDisk,
-          volume: volumeDisk,
-          docker: dockerUsage
-        }
+        storage: null
       }
     });
   } catch (error) {
@@ -170,7 +126,7 @@ router.post('/users/:userId/delete', requireAdmin, async (req, res) => {
     const userSpaces = await pg('spaces').where('user_id', userId);
     for (const space of userSpaces) {
       try {
-        await deleteSpace(space.id);
+        await deleteSpace(space.id, null, { isAdmin: true });
       } catch (error) {
         console.error(`Error deleting space ${space.id}:`, error);
       }
