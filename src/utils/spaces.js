@@ -440,6 +440,7 @@ export const getUserSpaces = async (authorization) => {
     const spacesWithStatus = spaces.map((space) => {
       return {
         ...space,
+        workspace_dir: space.workspace_dir ? toSandboxPath(space.workspace_dir) : null,
         status: space.running ? 'running' : 'stopped'
       };
     });

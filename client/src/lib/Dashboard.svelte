@@ -778,6 +778,9 @@
                   <strong>Last opened:</strong>
                   {formatLastOpened(space.last_opened_at)}
                 </p>
+                {#if space.type === "code-server" && space.workspace_dir}
+                  <p><strong>Directory:</strong> {space.workspace_dir}</p>
+                {/if}
                 {#if space.type === "code-server" && space.password}
                   <p class="space-password">
                     <strong>Password:</strong>
