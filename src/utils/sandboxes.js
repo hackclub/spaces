@@ -3,6 +3,8 @@ import { Sandbox } from "@vercel/sandbox";
 export const CODE_SERVER_PORT = 8080;
 export const SANDBOX_IMAGE = "vercel/sandbox/universal";
 export const SANDBOX_ROOT = "/vercel/sandbox";
+export const SANDBOX_REGION = "arn1";
+export const SANDBOX_FAILOVER_REGIONS = ["fra1"];
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
@@ -29,6 +31,8 @@ export const createSandbox = (name) => Sandbox.create({
   ...credentials(),
   name,
   image: SANDBOX_IMAGE,
+  region: SANDBOX_REGION,
+  failoverRegions: SANDBOX_FAILOVER_REGIONS,
   ports: [CODE_SERVER_PORT],
   timeout: SESSION_TIMEOUT_MS,
   resources: { vcpus: VCPUS },
