@@ -1,16 +1,26 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run vercel-build",
   "regions": ["arn1"],
+  "services": {
+    "app": {
+      "root": ".",
+      "framework": "express",
+      "buildCommand": "npm run migrate"
+    },
+    "client": {
+      "root": "client",
+      "framework": "vite",
+      "rewrites": [
+        { "source": "/godot/", "destination": "/godot/index.html" },
+        { "source": "/((?!godot/).*)", "destination": "/index.html" }
+      ]
+    }
+  },
   "crons": [
     { "path": "/api/v1/cron/auto-stop", "schedule": "*/5 * * * *" }
   ],
   "redirects": [
     { "source": "/godot", "destination": "/godot/", "permanent": false }
-  ],
-  "rewrites": [
-    { "source": "/godot/", "destination": "/godot/index.html" },
-    { "source": "/((?!api/|godot/).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -20,5 +30,9 @@
         { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
       ]
     }
+  ],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "app" } },
+    { "source": "/(.*)", "destination": { "service": "client" } }
   ]
 }

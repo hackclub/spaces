@@ -6,8 +6,6 @@
   "type": "module",
   "scripts": {
     "client-install": "cd client && npm install",
-    "build:client": "cd client && npm install --include=dev && npm run build -- --outDir ../public --emptyOutDir && node -e \"require('fs').cpSync('../playground/godot', '../public/godot', { recursive: true })\"",
-    "vercel-build": "npm run migrate && npm run build:client",
     "test": "node --test",
     "start": "node src/index.js",
     "serve:server": "nodemon src/index.js",
