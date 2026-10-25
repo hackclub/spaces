@@ -167,24 +167,26 @@
     const loginUrl = new URL(space.access_url, window.location.origin);
     loginUrl.pathname = `${loginUrl.pathname.replace(/\/$/, "")}/login`;
 
-    fetch(loginUrl.toString(), {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      credentials: "include",
-      body: new URLSearchParams({
-        password: space.password,
-        base: ".",
-      }).toString(),
-    })
-      .catch((err) => {
-        console.error(
-          "Auto-login failed, falling back to the login page:",
-          err,
-        );
-      })
-      .finally(() => {
-        tab.location.href = space.access_url;
-      });
+    try {
+      const doc = tab.document;
+      const form = doc.createElement("form");
+      form.method = "POST";
+      form.action = loginUrl.toString();
+
+      for (const [name, value] of Object.entries({ password: space.password, base: "." })) {
+        const input = doc.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+
+      (doc.body || doc.documentElement).appendChild(form);
+      form.submit();
+    } catch (err) {
+      console.error("Auto-login failed, falling back to the login page:", err);
+      tab.location.href = space.access_url;
+    }
   }
 
   async function copyPassword(password) {
