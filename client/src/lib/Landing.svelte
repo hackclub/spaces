@@ -157,6 +157,7 @@
         <a href="https://hackclub.com/slack" target="_blank" rel="noopener noreferrer">Slack</a>
         <a href="https://hackclub.com/clubs" target="_blank" rel="noopener noreferrer">Start a Club</a>
       </p>
+      <p>Build 2026-10-25</p>
     </div>
   </footer>
 </div>
