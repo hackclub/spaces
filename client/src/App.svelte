@@ -72,7 +72,7 @@
     }
 </script>
 
-<main>
+<main class:has-theme-switcher={isAuthenticated && userData.user}>
     {#if isAuthenticated && userData.user}
         <ThemeSwitcher />
         {#if showAdminPanel && userData.user.is_admin}
@@ -148,6 +148,11 @@
     main {
         width: 100%;
         min-height: 100vh;
+        box-sizing: border-box;
+    }
+
+    main.has-theme-switcher {
+        padding-bottom: 76px;
     }
 
     .nav-header,
