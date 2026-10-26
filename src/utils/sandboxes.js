@@ -27,15 +27,15 @@ const credentials = () => {
 
 export const sandboxNameFor = (uuid) => `space-${uuid}`;
 
-export const createSandbox = (name) => Sandbox.create({
+export const createSandbox = (name, { port = CODE_SERVER_PORT, vcpus = VCPUS } = {}) => Sandbox.create({
   ...credentials(),
   name,
   image: SANDBOX_IMAGE,
   region: SANDBOX_REGION,
   failoverRegions: SANDBOX_FAILOVER_REGIONS,
-  ports: [CODE_SERVER_PORT],
+  ports: [port],
   timeout: SESSION_TIMEOUT_MS,
-  resources: { vcpus: VCPUS },
+  resources: { vcpus },
   persistent: true,
   snapshotExpiration: 0,
   keepLastSnapshots: { count: 1, deleteEvicted: true },
@@ -137,4 +137,65 @@ export const startCodeServer = async (sandbox, { password, workspacePath }) => {
   );
 
   return sandbox.domain(CODE_SERVER_PORT);
+};
+
+export const GUI_PORT = 3000;
+export const GUI_VCPUS = 2;
+const GUI_CONFIG_PATH = `${SANDBOX_ROOT}/config`;
+const GUI_CONTAINER = "space-app";
+
+const START_DOCKER = [
+  "pgrep -x containerd >/dev/null || (containerd >/var/log/containerd.log 2>&1 &)",
+  "for i in $(seq 1 40); do [ -S /run/containerd/containerd.sock ] && break; sleep 0.25; done",
+  "pgrep -x dockerd >/dev/null || (dockerd --containerd=/run/containerd/containerd.sock >/var/log/dockerd.log 2>&1 &)",
+  "for i in $(seq 1 60); do docker info >/dev/null 2>&1 && exit 0; sleep 1; done",
+  "exit 1"
+].join("; ");
+
+const guiAccessUrl = (domain, password) => {
+  const url = new URL(domain);
+  url.username = "abc";
+  url.password = password;
+  return url.toString();
+};
+
+export const setupGuiApp = async (sandbox, { image }) => {
+  await run(
+    sandbox,
+    "command -v dockerd >/dev/null 2>&1 || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker.io)",
+    { sudo: true }
+  );
+  await run(sandbox, START_DOCKER, { sudo: true, timeoutMs: 2 * MINUTE });
+  await run(sandbox, 'docker pull -q "$IMAGE"', { sudo: true, env: { IMAGE: image }, timeoutMs: 10 * MINUTE });
+  await run(sandbox, 'mkdir -p "$CONFIG" && chown 1000:1000 "$CONFIG"', { sudo: true, env: { CONFIG: GUI_CONFIG_PATH } });
+};
+
+export const startGuiApp = async (sandbox, { image, password }) => {
+  await run(sandbox, START_DOCKER, { sudo: true, timeoutMs: 2 * MINUTE });
+
+  await run(
+    sandbox,
+    [
+      `docker rm -f ${GUI_CONTAINER} >/dev/null 2>&1 || true`,
+      `docker run -d --name ${GUI_CONTAINER} -p ${GUI_PORT}:3000 -e PUID=1000 -e PGID=1000 -e PASSWORD="$SPACE_PASSWORD" -e SELKIES_FILE_TRANSFERS=upload,download -e SELKIES_UI_SIDEBAR_SHOW_FILES=True --shm-size=1g -v "$CONFIG":/config "$IMAGE" >/dev/null`
+    ].join("; "),
+    { sudo: true, env: { SPACE_PASSWORD: password, CONFIG: GUI_CONFIG_PATH, IMAGE: image }, timeoutMs: 2 * MINUTE }
+  );
+
+  try {
+    await run(
+      sandbox,
+      [
+        `for i in $(seq 1 120); do code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${GUI_PORT}/); [ "$code" != 000 ] && break; sleep 0.5; done`,
+        `[ "$code" = 401 ] || { echo "desktop answered $code without a password"; exit 2; }`,
+        `[ "$(curl -s -o /dev/null -w '%{http_code}' -u "abc:$SPACE_PASSWORD" http://127.0.0.1:${GUI_PORT}/)" = 200 ] || { echo "desktop rejected the space password"; exit 3; }`
+      ].join("; "),
+      { env: { SPACE_PASSWORD: password }, timeoutMs: 2 * MINUTE }
+    );
+  } catch (err) {
+    await run(sandbox, `docker rm -f ${GUI_CONTAINER} >/dev/null 2>&1 || true`, { sudo: true }).catch(() => {});
+    throw err;
+  }
+
+  return guiAccessUrl(sandbox.domain(GUI_PORT), password);
 };

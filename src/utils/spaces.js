@@ -5,6 +5,8 @@ import path from "path";
 import crypto from "crypto";
 import {
   CODE_SERVER_PORT,
+  GUI_PORT,
+  GUI_VCPUS,
   SANDBOX_IMAGE,
   SANDBOX_ROOT,
   sandboxNameFor,
@@ -12,6 +14,8 @@ import {
   findSandbox,
   setupCodeServer,
   startCodeServer,
+  setupGuiApp,
+  startGuiApp,
   ensureHackatime
 } from "./sandboxes.js";
 
@@ -40,11 +44,35 @@ const toSandboxPath = (workspaceDir) => `${SANDBOX_ROOT}${sanitizeWorkspaceDir(w
 
 const spaceConfigs = {
   "code-server": {
+    kind: "editor",
     description: "VS Code Server"
+  },
+  "blender": {
+    kind: "gui",
+    image: "linuxserver/blender",
+    description: "Blender 3D"
+  },
+  "kicad": {
+    kind: "gui",
+    image: "linuxserver/kicad",
+    description: "KiCad PCB Design"
+  },
+  "freecad": {
+    kind: "gui",
+    image: "linuxserver/freecad",
+    description: "FreeCAD is a general-purpose parametric 3D computer-aided design (CAD) modeler and a building information modeling (BIM) software application with finite element method (FEM) support."
   }
 };
 
-const UNAVAILABLE_TYPES = ["blender", "kicad", "freecad"];
+const configFor = (type) => spaceConfigs[(type || "").toLowerCase()];
+
+const startSpaceApp = (sandbox, space, password) => {
+  const config = configFor(space.type);
+  if (config?.kind === "gui") {
+    return startGuiApp(sandbox, { image: config.image, password });
+  }
+  return startCodeServer(sandbox, { password, workspacePath: toSandboxPath(space.workspace_dir) });
+};
 
 export const changeSpacePassword = async (spaceId, newPassword, authorization) => {
   if (!spaceId) {
@@ -95,10 +123,7 @@ export const changeSpacePassword = async (spaceId, newPassword, authorization) =
   if (wasRunning) {
     const sandbox = await findSandbox(space.container_id);
     if (sandbox) {
-      updateData.access_url = await startCodeServer(sandbox, {
-        password: newPassword,
-        workspacePath: toSandboxPath(space.workspace_dir)
-      });
+      updateData.access_url = await startSpaceApp(sandbox, space, newPassword);
     }
   }
 
@@ -153,12 +178,6 @@ export const createContainer = async (password, type, authorization, homeDir) =>
 
   const typeLower = type.toLowerCase();
 
-  if (UNAVAILABLE_TYPES.includes(typeLower)) {
-    const error = new Error("This type of space isn't available yet while Spaces moves to its new home. VS Code spaces work.");
-    error.statusCode = 400;
-    throw error;
-  }
-
   const config = spaceConfigs[typeLower];
   if (!config) {
     const error = new Error("Invalid container type");
@@ -166,25 +185,27 @@ export const createContainer = async (password, type, authorization, homeDir) =>
     throw error;
   }
 
+  const isGui = config.kind === "gui";
   password = crypto.randomBytes(16).toString('hex');
-  const workspaceDir = sanitizeWorkspaceDir(homeDir);
+  const workspaceDir = isGui ? DEFAULT_WORKSPACE_DIR : sanitizeWorkspaceDir(homeDir);
   const sandboxName = sandboxNameFor(crypto.randomUUID());
 
   let sandbox = null;
 
   try {
-    sandbox = await createSandbox(sandboxName);
+    sandbox = await createSandbox(sandboxName, isGui ? { port: GUI_PORT, vcpus: GUI_VCPUS } : {});
 
-    await setupCodeServer(sandbox, {
-      workspacePath: toSandboxPath(workspaceDir),
-      hackatimeApiKey: user.hackatime_api_key,
-      extensions: user.vscode_extensions
-    });
+    if (isGui) {
+      await setupGuiApp(sandbox, { image: config.image });
+    } else {
+      await setupCodeServer(sandbox, {
+        workspacePath: toSandboxPath(workspaceDir),
+        hackatimeApiKey: user.hackatime_api_key,
+        extensions: user.vscode_extensions
+      });
+    }
 
-    const access_url = await startCodeServer(sandbox, {
-      password,
-      workspacePath: toSandboxPath(workspaceDir)
-    });
+    const access_url = await startSpaceApp(sandbox, { type: typeLower, workspace_dir: workspaceDir }, password);
 
     const [newSpace] = await pg('spaces')
       .insert({
@@ -192,8 +213,8 @@ export const createContainer = async (password, type, authorization, homeDir) =>
         container_id: sandboxName,
         type: typeLower,
         description: config.description,
-        image: SANDBOX_IMAGE,
-        port: CODE_SERVER_PORT,
+        image: isGui ? config.image : SANDBOX_IMAGE,
+        port: isGui ? GUI_PORT : CODE_SERVER_PORT,
         access_url,
         running: true,
         started_at: new Date(),
@@ -279,12 +300,9 @@ export const startContainer = async (spaceId, authorization) => {
 
     const password = space.password || crypto.randomBytes(16).toString('hex');
 
-    const access_url = await startCodeServer(sandbox, {
-      password,
-      workspacePath: toSandboxPath(space.workspace_dir)
-    });
+    const access_url = await startSpaceApp(sandbox, space, password);
 
-    if (user.hackatime_api_key) {
+    if (configFor(space.type)?.kind !== "gui" && user.hackatime_api_key) {
       await ensureHackatime(sandbox, user.hackatime_api_key);
     }
 
