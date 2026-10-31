@@ -6,6 +6,7 @@
   import { themes } from "../themes.js";
   import FlagIcon from "../assets/flag.svg?raw";
   import ShareWithClubToggle from "./ShareWithClubToggle.svelte";
+  import ProgressNotice from "./ProgressNotice.svelte";
   import { userData } from "../stores/user.svelte";
 
   export let spaces = [];
@@ -20,6 +21,13 @@
   let loading = false;
   let actionLoading = {};
   let actionError = {};
+
+  const GUI_TYPES = ["kicad", "blender", "freecad"];
+  const isGuiType = (type) => GUI_TYPES.includes((type || "").toLowerCase());
+  const createSteps = (type) =>
+    isGuiType(type)
+      ? ["Creating your machine...", "Downloading the app, this is the slow part...", "Starting the desktop..."]
+      : ["Creating your machine...", "Installing VS Code...", "Starting VS Code..."];
   let dropdownOpen = false;
   let clubData = null;
   let spaceShareStatus = {};
@@ -666,6 +674,14 @@
         <button class="btn-primary" on:click={createSpace} disabled={loading}>
           {loading ? "Creating..." : "Create Space"}
         </button>
+
+        {#if loading}
+          <ProgressNotice
+            expectedSeconds={isGuiType(newSpaceType) ? 90 : 25}
+            steps={createSteps(newSpaceType)}
+            note="Setting up a new space takes a little while, up to about 2 minutes for Blender, KiCad and FreeCAD. It's only slow the first time: after that, your space starts in seconds."
+          />
+        {/if}
       </div>
     {/if}
 
@@ -866,6 +882,14 @@
                 <div class="error-message small">
                   {actionError[space.id]}
                 </div>
+              {/if}
+
+              {#if actionLoading[space.id] === "starting"}
+                <ProgressNotice
+                  expectedSeconds={isGuiType(space.type) ? 90 : 30}
+                  steps={["Starting your machine...", isGuiType(space.type) ? "Starting the desktop..." : "Starting VS Code..."]}
+                  note="The first start after Spaces moved can take up to a minute while it sets things up. After that, starting takes a few seconds."
+                />
               {/if}
 
               <div class="space-actions">
