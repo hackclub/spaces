@@ -4,6 +4,7 @@
   export let expectedSeconds = 60;
   export let steps = [];
   export let note = "";
+  export let done = false;
 
   let elapsed = 0;
   let timer;
@@ -17,9 +18,9 @@
 
   onDestroy(() => clearInterval(timer));
 
-  $: percent = Math.round(95 * (1 - Math.exp((-2.5 * elapsed) / expectedSeconds)));
+  $: percent = done ? 100 : Math.round(95 * (1 - Math.exp((-2.5 * elapsed) / expectedSeconds)));
   $: stepIndex = Math.min(steps.length - 1, Math.floor((elapsed / expectedSeconds) * steps.length));
-  $: label = steps[stepIndex] || "";
+  $: label = done ? "Ready!" : steps[stepIndex] || "";
 </script>
 
 <div class="progress-notice" role="status" aria-live="polite">
@@ -27,7 +28,7 @@
     <div class="progress-label">{label}</div>
   {/if}
   <div class="progress-track">
-    <div class="progress-fill" style="width: {percent}%"></div>
+    <div class="progress-fill" class:done style="width: {percent}%"></div>
   </div>
   {#if note}
     <p class="progress-note">{note}</p>
@@ -61,6 +62,10 @@
     background: var(--blue);
     border-radius: 4px;
     transition: width 0.25s linear;
+  }
+
+  .progress-fill.done {
+    transition: width 0.3s ease-out;
   }
 
   .progress-note {

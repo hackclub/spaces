@@ -22,6 +22,10 @@
   let actionLoading = {};
   let actionError = {};
 
+  let createDone = false;
+  let startDone = {};
+  const holdFinishedBar = () => new Promise((resolve) => setTimeout(resolve, 800));
+
   const GUI_TYPES = ["kicad", "blender", "freecad"];
   const isGuiType = (type) => GUI_TYPES.includes((type || "").toLowerCase());
   const createSteps = (type) =>
@@ -262,6 +266,8 @@
       const data = await response.json();
 
       if (response.ok) {
+        createDone = true;
+        await holdFinishedBar();
         showCreateForm = false;
         newSpaceHomeDir = "";
         await loadSpaces();
@@ -279,6 +285,7 @@
       error = ERROR_MESSAGES.NETWORK_ERROR;
     } finally {
       loading = false;
+      createDone = false;
     }
   }
 
@@ -313,6 +320,9 @@
       const data = await response.json();
 
       if (response.ok) {
+        startDone[spaceId] = true;
+        startDone = startDone;
+        await holdFinishedBar();
         await loadSpaces();
       } else {
         if (data.error?.includes("only have one space running")) {
@@ -328,6 +338,8 @@
     } finally {
       delete actionLoading[spaceId];
       actionLoading = actionLoading;
+      delete startDone[spaceId];
+      startDone = startDone;
     }
   }
 
@@ -679,6 +691,7 @@
           <ProgressNotice
             expectedSeconds={isGuiType(newSpaceType) ? 90 : 25}
             steps={createSteps(newSpaceType)}
+            done={createDone}
             note="Setting up a new space takes a little while, up to about 2 minutes for Blender, KiCad and FreeCAD. It's only slow the first time: after that, your space starts in seconds."
           />
         {/if}
@@ -888,6 +901,7 @@
                 <ProgressNotice
                   expectedSeconds={isGuiType(space.type) ? 90 : 30}
                   steps={["Starting your machine...", isGuiType(space.type) ? "Starting the desktop..." : "Starting VS Code..."]}
+                  done={Boolean(startDone[space.id])}
                   note="The first start after Spaces moved can take up to a minute while it sets things up. After that, starting takes a few seconds."
                 />
               {/if}
