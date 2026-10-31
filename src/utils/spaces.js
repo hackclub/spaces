@@ -42,7 +42,7 @@ const sanitizeWorkspaceDir = (homeDir) => {
 
 const toSandboxPath = (workspaceDir) => `${SANDBOX_ROOT}${sanitizeWorkspaceDir(workspaceDir).slice("/config".length)}`;
 
-const spaceConfigs = {
+export const spaceConfigs = {
   "code-server": {
     kind: "editor",
     description: "VS Code Server"

@@ -100,8 +100,10 @@ export const ensureHackatime = async (sandbox, apiKey) => {
   }
 };
 
+const INSTALL_CODE_SERVER = "command -v code-server >/dev/null 2>&1 || curl -fsSL https://code-server.dev/install.sh | sh";
+
 export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey, extensions }) => {
-  await run(sandbox, "command -v code-server >/dev/null 2>&1 || curl -fsSL https://code-server.dev/install.sh | sh", { sudo: true });
+  await run(sandbox, INSTALL_CODE_SERVER, { sudo: true });
   await run(sandbox, 'mkdir -p "$WORKSPACE"', { env: { WORKSPACE: workspacePath } });
 
   if (sanitizeHackatimeKey(hackatimeApiKey)) {
@@ -115,6 +117,8 @@ export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey,
 };
 
 export const startCodeServer = async (sandbox, { password, workspacePath }) => {
+  await run(sandbox, INSTALL_CODE_SERVER, { sudo: true });
+  await run(sandbox, 'mkdir -p "$WORKSPACE"', { env: { WORKSPACE: workspacePath } });
   await run(sandbox, "pkill -f '[/]usr/lib/code-server/' || true");
 
   await sandbox.runCommand({
@@ -166,12 +170,12 @@ export const setupGuiApp = async (sandbox, { image }) => {
     { sudo: true }
   );
   await run(sandbox, START_DOCKER, { sudo: true, timeoutMs: 2 * MINUTE });
-  await run(sandbox, 'docker pull -q "$IMAGE"', { sudo: true, env: { IMAGE: image }, timeoutMs: 10 * MINUTE });
+  await run(sandbox, 'docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull -q "$IMAGE"', { sudo: true, env: { IMAGE: image }, timeoutMs: 10 * MINUTE });
   await run(sandbox, 'mkdir -p "$CONFIG" && chown 1000:1000 "$CONFIG"', { sudo: true, env: { CONFIG: GUI_CONFIG_PATH } });
 };
 
 export const startGuiApp = async (sandbox, { image, password }) => {
-  await run(sandbox, START_DOCKER, { sudo: true, timeoutMs: 2 * MINUTE });
+  await setupGuiApp(sandbox, { image });
 
   await run(
     sandbox,
