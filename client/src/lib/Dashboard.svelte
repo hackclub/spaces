@@ -240,19 +240,19 @@
 
   async function createSpace() {
     error = "";
+
+    const body = { type: newSpaceType };
+    if (!isGuiType(newSpaceType)) {
+      if (!newSpaceName.trim()) {
+        error = "Give your space a name.";
+        return;
+      }
+      body.name = newSpaceName.trim();
+    }
+
     loading = true;
 
     try {
-      const body = { type: newSpaceType };
-      if (
-        newSpaceType !== "kicad" &&
-        newSpaceType !== "blender" &&
-        newSpaceType !== "freecad"
-      ) {
-        if (newSpaceName.trim()) {
-          body.name = newSpaceName.trim();
-        }
-      }
 
       const response = await fetch(`${API_BASE}/spaces/create`, {
         method: "POST",
@@ -655,17 +655,19 @@
 
         {#if newSpaceType !== "kicad" && newSpaceType !== "blender" && newSpaceType !== "freecad"}
           <div class="form-group">
-            <label class="form-label" for="spaceName">Name (optional)</label>
+            <label class="form-label" for="spaceName">Name</label>
             <p class="password-info">
               Name your space after what you're working on. It shows on your
               dashboard, and Hackatime uses it to track time for this project,
-              so give each project its own name.
+              so give each project its own name. Use letters, numbers, dashes,
+              underscores or dots.
             </p>
             <input
               class="form-input"
               id="spaceName"
               type="text"
               maxlength="64"
+              required
               bind:value={newSpaceName}
               placeholder="my-project"
             />

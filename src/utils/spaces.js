@@ -43,16 +43,16 @@ const sanitizeWorkspaceDir = (homeDir) => {
 const sanitizeSpaceName = (name) => {
   const cleaned = (typeof name === "string" ? name : "")
     .trim()
-    .replace(/s+/g, "-")
+    .replace(/\s+/g, "-")
     .replace(/[^a-zA-Z0-9_.-]/g, "")
-    .replace(/^.+/, "")
+    .replace(/^\.+/, "")
     .slice(0, 64);
-  return cleaned || "workspace";
+  return cleaned;
 };
 
 const spaceNameFor = (workspaceDir) => path.posix.basename(sanitizeWorkspaceDir(workspaceDir));
 
-const toSandboxPath = (workspaceDir) => `${SANDBOX_ROOT}${sanitizeWorkspaceDir(workspaceDir).slice("/config".length)}`;
+export const toSandboxPath = (workspaceDir) => `${SANDBOX_ROOT}${sanitizeWorkspaceDir(workspaceDir).slice("/config".length)}`;
 
 export const spaceConfigs = {
   "code-server": {
@@ -199,7 +199,13 @@ export const createContainer = async (password, type, authorization, name) => {
 
   const isGui = config.kind === "gui";
   password = crypto.randomBytes(16).toString('hex');
-  const workspaceDir = isGui ? DEFAULT_WORKSPACE_DIR : `/config/${sanitizeSpaceName(name)}`;
+  const spaceName = isGui ? null : sanitizeSpaceName(name);
+  if (!isGui && !spaceName) {
+    const error = new Error("Give your space a name, using letters, numbers, dashes, underscores or dots.");
+    error.statusCode = 400;
+    throw error;
+  }
+  const workspaceDir = isGui ? DEFAULT_WORKSPACE_DIR : `/config/${spaceName}`;
   const sandboxName = sandboxNameFor(crypto.randomUUID());
 
   let sandbox = null;
