@@ -236,7 +236,7 @@
       {#if step === 'signup'}
         <div class="verification-notice">
           <p class="verification-title">Club membership verified</p>
-          <p class="verification-text">You are {membershipInfo?.isLeader ? 'a leader' : 'a member'} of <strong>{membershipInfo?.clubName}</strong></p>
+          <p class="verification-text">Your email is on a Hack Club club's member list. Enter the code we sent to finish signing up.</p>
         </div>
 
         <form on:submit|preventDefault={handleSignup}>

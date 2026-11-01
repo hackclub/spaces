@@ -248,8 +248,8 @@ router.post('/club-member/check', async (req, res) => {
     }
     const email = emailValidation.normalized;
 
-    const { isMember, clubName: memberClubName } = await checkMemberStatus(email);
-    const { isLeader, clubName: leaderClubName } = await checkLeaderStatus(email);
+    const { isMember } = await checkMemberStatus(email);
+    const { isLeader } = await checkLeaderStatus(email);
 
     if (!isMember && !isLeader) {
       return res.status(404).json({
@@ -265,7 +265,6 @@ router.post('/club-member/check', async (req, res) => {
       data: {
         isMember: isMember || isLeader,
         isLeader,
-        clubName: leaderClubName || memberClubName,
         hasExistingAccount: !!existingUser,
         hasPasswordAuth: existingUser?.password_hash ? true : false
       }
