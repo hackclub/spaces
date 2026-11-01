@@ -47,7 +47,7 @@ router.get('/send', (req, res) => {
 });
 
 // POST /api/v1/users/send
-router.post('/send', /* strictLimiter, */ async (req, res) => {
+router.post('/send', strictLimiter, async (req, res) => {
   try {
     const { email: rawEmail, mode } = req.body;
 
@@ -85,6 +85,12 @@ router.post('/send', /* strictLimiter, */ async (req, res) => {
 
   } catch (error) {
     console.error('Error in /send route:', error);
+    if (error.statusCode === 429) {
+      return res.status(429).json({
+        success: false,
+        message: error.message
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Failed to send verification code',
@@ -94,7 +100,7 @@ router.post('/send', /* strictLimiter, */ async (req, res) => {
 });
 
 // POST /api/v1/users/signup 
-router.post('/signup', /* authLimiter, */ async (req, res) => {
+router.post('/signup', authLimiter, async (req, res) => {
   try {
     const { email: rawEmail, username: rawUsername, verificationCode } = req.body;
 
@@ -195,7 +201,7 @@ router.post('/signup', /* authLimiter, */ async (req, res) => {
 });
 
 // POST /api/v1/users/login
-router.post('/login', /* authLimiter, */ async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const { email: rawEmail, verificationCode } = req.body;
 
@@ -400,7 +406,7 @@ router.put('/update', async (req, res) => {
 });
 
 // POST /api/v1/users/verify-email-change
-router.post('/verify-email-change', async (req, res) => {
+router.post('/verify-email-change', authLimiter, async (req, res) => {
   try {
     const authorization = req.authToken;
     const { newEmail, verificationCode } = req.body;

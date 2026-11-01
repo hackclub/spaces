@@ -12,6 +12,15 @@ export const requesterKey = (req) => {
   return `ip:${ipKeyGenerator(req.ip)}`;
 };
 
+export const anonymousKey = (req) => {
+  const email = req.body?.email;
+  if (typeof email === 'string' && email.length <= 254) {
+    return `email:${email.trim().toLowerCase()}`;
+  }
+
+  return `ip:${ipKeyGenerator(req.ip)}`;
+};
+
 export const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 300,
@@ -33,7 +42,7 @@ export const apiLimiter = rateLimit({
 export const strictLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 3,
-  keyGenerator: requesterKey,
+  keyGenerator: anonymousKey,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -51,7 +60,7 @@ export const strictLimiter = rateLimit({
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
-  keyGenerator: requesterKey,
+  keyGenerator: anonymousKey,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
