@@ -25,6 +25,17 @@ const router = express.Router();
 
 router.use(extractAuth);
 
+const sendError = (res, err) => {
+  if (err.statusCode) {
+    return res.status(err.statusCode).json({ error: err.message });
+  }
+  if (/required|Missing|Invalid authorization/.test(err.message)) {
+    return res.status(400).json({ error: err.message });
+  }
+  console.error(err);
+  res.status(500).json({ error: "Something went wrong. Please try again." });
+};
+
 const withoutCredentials = (url) => {
   if (!url) return null;
   try {
@@ -52,8 +63,7 @@ router.post("/create", containerOpsLimiter, async (req, res) => {
       });
     }
     
-    const statusCode = err.statusCode || (err.message.includes("Missing") || err.message.includes("Invalid authorization") ? 400 : 500);
-    res.status(statusCode).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -66,8 +76,7 @@ router.post("/password/:spaceId", containerOpsLimiter, async (req, res) => {
     const result = await changeSpacePassword(spaceId, password, authorization);
     res.json(result);
   } catch (err) {
-    const statusCode = err.statusCode || (err.message.includes("required") || err.message.includes("Missing") || err.message.includes("Invalid authorization") ? 400 : 500);
-    res.status(statusCode).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -79,8 +88,7 @@ router.post("/start/:spaceId", containerOpsLimiter, async (req, res) => {
     const result = await startContainer(spaceId, authorization);
     res.json(result);
   } catch (err) {
-    const statusCode = err.statusCode || (err.message.includes("required") || err.message.includes("Missing") || err.message.includes("Invalid authorization") ? 400 : 500);
-    res.status(statusCode).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -92,8 +100,7 @@ router.post("/stop/:spaceId", containerOpsLimiter, async (req, res) => {
     const result = await stopContainer(spaceId, authorization);
     res.json(result);
   } catch (err) {
-    const statusCode = err.statusCode || (err.message.includes("required") || err.message.includes("Missing") || err.message.includes("Invalid authorization") ? 400 : 500);
-    res.status(statusCode).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -105,8 +112,7 @@ router.get("/status/:spaceId", containerOpsLimiter, async (req, res) => {
     const result = await getContainerStatus(spaceId, authorization);
     res.json(result);
   } catch (err) {
-    const statusCode = err.statusCode || (err.message.includes("required") || err.message.includes("Missing") || err.message.includes("Invalid authorization") ? 400 : 500);
-    res.status(statusCode).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -121,8 +127,7 @@ router.get("/list", async (req, res) => {
       spaces
     });
   } catch (err) {
-    const statusCode = err.message.includes("Missing") || err.message.includes("Invalid authorization") ? 400 : 500;
-    res.status(statusCode).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -134,8 +139,7 @@ router.delete("/delete/:spaceId", containerOpsLimiter, async (req, res) => {
     const result = await deleteSpace(spaceId, authorization);
     res.json(result);
   } catch (err) {
-    const statusCode = err.statusCode || (err.message.includes("required") || err.message.includes("Missing") || err.message.includes("Invalid authorization") ? 400 : 500);
-    res.status(statusCode).json({ error: err.message });
+    sendError(res, err);
   }
 });
 router.post("/:spaceId/favorite", async (req, res) => {
@@ -157,7 +161,7 @@ router.post("/:spaceId/favorite", async (req, res) => {
 
     res.json({ success: true, is_favorite: updated.is_favorite });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
