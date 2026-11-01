@@ -1,3 +1,4 @@
+import fs from "fs";
 import { Sandbox, Snapshot } from "@vercel/sandbox";
 
 export const CODE_SERVER_PORT = 8080;
@@ -117,9 +118,23 @@ export const ensureHackatime = async (sandbox, apiKey) => {
 
 const INSTALL_CODE_SERVER = "command -v code-server >/dev/null 2>&1 || curl -fsSL https://code-server.dev/install.sh | sh";
 
+const WELCOME_FILE = new URL("../../in-space.md", import.meta.url);
+
+export const writeWelcomeFile = async (sandbox, workspacePath, fileName) => {
+  try {
+    const content = fs.readFileSync(WELCOME_FILE, "utf8");
+    await run(sandbox, 'mkdir -p "$WORKSPACE" && { [ -e "$WORKSPACE/$FILE" ] || printf "%s" "$CONTENT" > "$WORKSPACE/$FILE"; }', {
+      env: { WORKSPACE: workspacePath, FILE: fileName, CONTENT: content }
+    });
+  } catch (err) {
+    console.error(`Failed to write ${fileName}:`, err.message);
+  }
+};
+
 export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey, extensions }) => {
   await run(sandbox, INSTALL_CODE_SERVER, { sudo: true });
   await run(sandbox, 'mkdir -p "$WORKSPACE"', { env: { WORKSPACE: workspacePath } });
+  await writeWelcomeFile(sandbox, workspacePath, "README.md");
 
   if (sanitizeHackatimeKey(hackatimeApiKey)) {
     await ensureHackatime(sandbox, hackatimeApiKey);

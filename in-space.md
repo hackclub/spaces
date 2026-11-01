@@ -1,102 +1,74 @@
-### Hi! Welcome to your VS-Code Space!
+### Hi! Welcome to your VS Code Space!
 
-You can use this just like you would vs-code on your own computer! For security reasons, we can not give you root access to the container, but we have preinstalled a number of development tools for you!
+You can use this just like VS Code on your own computer. Your space is a full Linux machine (Ubuntu) that's yours alone, and you have admin access, so you can install whatever you need with `sudo`.
 
-#### Pre-installed tools:
-If a tool you need is not listed, attempt to install it using one of the package managers listed, and if that is not possible, ask in #spaces on slack and I can probably add the tool!
+#### Good to know
 
-If a tool listed here is not working, wait a few minutes and try again! The installation is ran in the background upon space creation to minimize space creation times, so you might have to wait a minute or two for all tools to become available
+- **Your space stops by itself after 3 hours.** Everything is saved when it stops: your files, the tools you install and your settings. Start it again from the dashboard and you're right back where you left off.
+- **Only one space can run at a time.** Stop this one before starting another.
+- **Previewing a website you're building:** run it, then open `/proxy/<port>/` on this space's address, for example `/proxy/3000/` for something running on port 3000.
 
-##### Hackatime
+#### Hackatime
 
-Make sure to set your hackatime api key in settings! if you have done that, Hackatime has been auto installed and set up for you, and will be tracking your time
+If you added your Hackatime API key in Settings before creating this space, Hackatime is already set up and tracking your time, under this space's name. If you added it later, install the "WakaTime" extension and paste your key when it asks.
+
+#### Already installed
 
 ##### General
 ```
 git
-github-cli
+github-cli (gh)
 curl
 wget
 nano
 vim
-unzip
 zip
-build-essentials
-cmake
-pkg-config
+unzip
 jq
 tree
-htop
 tmux
 less
-ripgrep
-fd-find
+ripgrep (rg)
 rsync
-openssh-client
-apt-transport-https
-ca-certificates
-gnupg
 ```
-##### Python:
+
+##### Python
 ```
 python3
-python3-pip
-python3-venv
-python3-dev
-python3-setuptools
+pip
 uv
 ```
 
-##### Javascript:
+##### JavaScript
 ```
-nodejs
+node
 npm
-yarn
 pnpm
+bun
 ```
 
-##### Java:
-```
-openjdk-17-jdk
-openjdk-17-jre
-```
-
-##### Rust:
-```
-rust
-cargo
-```
-
-##### PHP:
-```
-php 
-php-cli 
-php-common 
-php-curl 
-php-json 
-php-mbstring 
-php-xml 
-php-zip
-```
-
-##### Database:
+##### Database
 ```
 sqlite3
-postgresql-client
-mysql-client
-redis-tools
 ```
 
-##### Ruby:
-```
-ruby
-rails
-```
+#### Installing more
 
-###### Other:
-```
-go
-crystal
-ffmpeg
-imagemagick
-```
+Use `apt` for anything else. Some common ones:
+
+| What | Command |
+|---|---|
+| C/C++ compilers and `make` (many npm and pip packages need these) | `sudo apt install -y build-essential cmake pkg-config` |
+| Java | `sudo apt install -y openjdk-21-jdk` |
+| Go | `sudo apt install -y golang` |
+| Rust | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
+| PHP | `sudo apt install -y php-cli` |
+| Ruby | `sudo apt install -y ruby-full` |
+| Yarn | `npm install -g yarn` |
+| PostgreSQL, MySQL and Redis clients | `sudo apt install -y postgresql-client mysql-client redis-tools` |
+| ffmpeg and ImageMagick | `sudo apt install -y ffmpeg imagemagick` |
+| htop | `sudo apt install -y htop` |
+
+Run `sudo apt update` first if a package isn't found.
+
+If something you need won't install, or isn't working, ask in #spaces on Slack!

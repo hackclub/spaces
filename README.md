@@ -9,7 +9,7 @@ Spaces is a web app that creates secure cloud based development environments, ac
 - **Each space is a Vercel Sandbox**, a small virtual machine named `space-<uuid>`. Sandboxes are persistent: when a space stops, Vercel saves a snapshot of its disk, and the next start resumes from it. Only the latest snapshot is kept, and it never expires.
   - Sandboxes run in Stockholm (`arn1`), with Frankfurt (`fra1`) as a fallback.
   - A session lasts at most 3 hours. A Vercel cron job calls `/api/v1/cron/auto-stop` every 5 minutes to stop spaces that have run longer and to fix the database for spaces that already stopped.
-- **VS Code spaces** run [code-server](https://github.com/coder/code-server) directly in the sandbox. It's installed on first start, and the user's files live in `/vercel/sandbox/<space name>`.
+- **VS Code spaces** run [code-server](https://github.com/coder/code-server) directly in the sandbox, on Vercel's default `universal` image. code-server is installed on first start, and the user's files live in `/vercel/sandbox/<space name>`. New spaces get [in-space.md](in-space.md) as their `README.md`, which lists the tools the image includes and how to install more with `sudo apt`. Spaces copied from the old server get it as `WELCOME.md`, so their own README is left alone.
 - **Blender, KiCad and FreeCAD spaces** run Docker inside the sandbox, with the [linuxserver.io](https://www.linuxserver.io/) image for each app. The app's files live in `/vercel/sandbox/config`. The browser logs in with HTTP basic auth: username `abc`, with the space's password.
 - **Database:** PostgreSQL, hosted on Hack Club's Orchard. Migrations run with knex on every deploy.
 - **Login:** email codes (sent through an Airtable automation on the "Spaces Emails" table), Hack Club Auth (OAuth at auth.hackclub.com), or email and password for club members. Club membership and leader status come from the Clubs API.
@@ -136,7 +136,7 @@ Creating a space needs a verified Hack Club account or a club membership. Only o
     "name": "my-project"
   }
   ```
-  `name` is optional and only used by VS Code spaces. It names the project folder, which Hackatime uses as the project name.
+  `name` is required for VS Code spaces and ignored for the others. It names the project folder, which Hackatime uses as the project name. Spaces become `-`, and anything other than letters, numbers, `-`, `_` and `.` is removed. A name with nothing left after that is refused.
 - **Response**:
   ```json
   {

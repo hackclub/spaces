@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import knex from "knex";
 import pg from "../src/utils/db.js";
-import { spaceConfigs } from "../src/utils/spaces.js";
+import { spaceConfigs, toSandboxPath } from "../src/utils/spaces.js";
 import {
   CODE_SERVER_PORT,
   GUI_PORT,
@@ -12,7 +12,8 @@ import {
   SANDBOX_ROOT,
   sandboxNameFor,
   createSandbox,
-  findSandbox
+  findSandbox,
+  writeWelcomeFile
 } from "../src/utils/sandboxes.js";
 
 const args = process.argv.slice(2);
@@ -123,6 +124,7 @@ const copySpace = async (space, { redo }) => {
     } else {
       await streamFolder(sandbox, space.volume_path, SANDBOX_ROOT, { sudo: false });
       await runOrThrow(sandbox, MOVE_EDITOR_STATE);
+      await writeWelcomeFile(sandbox, toSandboxPath(space.workspace_dir), "WELCOME.md");
     }
     await sandbox.update({ tags: MIGRATED_TAGS });
     await sandbox.stop();
@@ -176,7 +178,7 @@ const selectSpaces = (db) => {
     query = query.limit(LIMIT);
   }
 
-  return query.select(["id", "user_id", "type", "volume_path", "container_id"]);
+  return query.select(["id", "user_id", "type", "volume_path", "container_id", "workspace_dir"]);
 };
 
 const main = async () => {
