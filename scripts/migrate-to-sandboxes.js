@@ -1,5 +1,9 @@
-import { spawn } from "child_process";
+import { spawn, execFileSync } from "child_process";
+import crypto from "crypto";
 import fs from "fs";
+import https from "https";
+import net from "net";
+import os from "os";
 import path from "path";
 import knex from "knex";
 import pg from "../src/utils/db.js";
@@ -30,6 +34,8 @@ const LIMIT = value("--limit") ? Number(value("--limit")) : null;
 const ONLY_ID = value("--id") ? Number(value("--id")) : null;
 const REDO_SINCE = value("--redo-since") ? new Date(value("--redo-since")) : null;
 const LOG_FILE = value("--log") || "migration-log.jsonl";
+const FILE_SERVER_HOST = process.env.FILE_SERVER_HOST;
+const FILE_SERVER_PORT = Number(process.env.FILE_SERVER_PORT || 8443);
 
 const MIGRATED_TAGS = { app: "spaces", migrated: "yes" };
 const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
@@ -61,36 +67,105 @@ const runOrThrow = async (sandbox, script, { sudo = false } = {}) => {
   }
 };
 
-const streamFolder = async (sandbox, folder, dest, { sudo }) => {
+const fileServer = {
+  token: crypto.randomBytes(32).toString("hex"),
+  folders: new Map(),
+  cert: null,
+  server: null
+};
+
+const makeCertificate = (host) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "spaces-migration-"));
+  const keyPath = path.join(dir, "key.pem");
+  const certPath = path.join(dir, "cert.pem");
+  const altName = net.isIP(host) ? `IP:${host}` : `DNS:${host}`;
+  execFileSync("openssl", [
+    "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes", "-days", "2",
+    "-subj", "/CN=spaces-migration", "-addext", `subjectAltName=${altName}`,
+    "-keyout", keyPath, "-out", certPath
+  ], { stdio: "ignore" });
+  const pair = { key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath, "utf8") };
+  fs.rmSync(dir, { recursive: true, force: true });
+  return pair;
+};
+
+const hasToken = (header) => {
+  const expected = Buffer.from(`Bearer ${fileServer.token}`);
+  const given = Buffer.from(header || "");
+  return given.length === expected.length && crypto.timingSafeEqual(given, expected);
+};
+
+const serveFolder = (req, res) => {
+  const match = /^\/spaces\/(\d+)$/.exec(req.url || "");
+  const folder = match ? fileServer.folders.get(Number(match[1])) : null;
+  if (req.method !== "GET" || !hasToken(req.headers.authorization) || !folder) {
+    res.writeHead(404).end();
+    return;
+  }
+
   const tar = spawn("tar", ["-C", folder, "--warning=no-file-changed", "-I", "gzip -1", "-cf", "-", "."], { stdio: ["ignore", "pipe", "pipe"] });
   let tarErrors = "";
   tar.stderr.on("data", (chunk) => { tarErrors += chunk; });
-  const tarExit = new Promise((resolve) => tar.on("close", resolve));
+  res.writeHead(200, { "content-type": "application/gzip" });
+  tar.stdout.pipe(res, { end: false });
+  req.on("close", () => tar.kill());
+  tar.on("close", (code) => {
+    if (code === 0 || code === 1) {
+      res.end();
+    } else {
+      console.error(`reading ${folder} failed (tar ${code}): ${tarErrors.slice(-500)}`);
+      res.destroy();
+    }
+  });
+};
 
-  let result;
-  try {
-    result = await sandbox.runCommand({
-      cmd: "bash",
-      args: ["-c", 'mkdir -p "$DEST" && tar -xzf - -C "$DEST" --no-same-owner'],
-      env: { DEST: dest },
-      sudo,
-      stdin: tar.stdout,
-      timeoutMs: THREE_HOURS_MS
-    });
-  } catch (err) {
-    tar.kill();
-    throw err;
+const startFileServer = async (spaces) => {
+  if (!FILE_SERVER_HOST) {
+    throw new Error("FILE_SERVER_HOST must be set to this server's public address");
   }
+  for (const space of spaces) {
+    fileServer.folders.set(space.id, space.volume_path);
+  }
+  const { key, cert } = makeCertificate(FILE_SERVER_HOST);
+  fileServer.cert = cert;
+  fileServer.server = https.createServer({ key, cert }, serveFolder);
+  await new Promise((resolve, reject) => {
+    fileServer.server.once("error", reject);
+    fileServer.server.listen(FILE_SERVER_PORT, "0.0.0.0", resolve);
+  });
+  console.log(`serving files on https://${FILE_SERVER_HOST}:${FILE_SERVER_PORT}`);
+};
+
+const stopFileServer = () => {
+  if (fileServer.server) {
+    fileServer.server.closeAllConnections();
+    fileServer.server.close();
+  }
+};
+
+const DOWNLOAD_FOLDER = `
+set -o pipefail
+CA_FILE=$(mktemp)
+printf '%s' "$CA" > "$CA_FILE"
+mkdir -p "$DEST" && curl -fsS --connect-timeout 20 --cacert "$CA_FILE" -H "Authorization: Bearer $TOKEN" "$URL" | tar -xzf - -C "$DEST" --no-same-owner
+status=$?
+rm -f "$CA_FILE"
+exit $status
+`;
+
+const downloadFolder = async (sandbox, space, dest, { sudo }) => {
+  const url = `https://${net.isIPv6(FILE_SERVER_HOST) ? `[${FILE_SERVER_HOST}]` : FILE_SERVER_HOST}:${FILE_SERVER_PORT}/spaces/${space.id}`;
+  const result = await sandbox.runCommand({
+    cmd: "bash",
+    args: ["-c", DOWNLOAD_FOLDER],
+    env: { DEST: dest, CA: fileServer.cert, TOKEN: fileServer.token, URL: url },
+    sudo,
+    timeoutMs: THREE_HOURS_MS
+  });
 
   if (result.exitCode !== 0) {
-    tar.kill();
     const output = await result.output("both").catch(() => "");
-    throw new Error(`unpacking in the sandbox failed (${result.exitCode}): ${output.slice(-500)}`);
-  }
-
-  const tarCode = await tarExit;
-  if (tarCode !== 0 && tarCode !== 1) {
-    throw new Error(`reading the folder failed (tar ${tarCode}): ${tarErrors.slice(-500)}`);
+    throw new Error(`downloading the folder failed (${result.exitCode}): ${output.slice(-500)}`);
   }
 };
 
@@ -119,10 +194,10 @@ const copySpace = async (space, { redo }) => {
 
   try {
     if (isGui) {
-      await streamFolder(sandbox, space.volume_path, `${SANDBOX_ROOT}/config`, { sudo: true });
+      await downloadFolder(sandbox, space, `${SANDBOX_ROOT}/config`, { sudo: true });
       await runOrThrow(sandbox, `chown -R 1000:1000 ${SANDBOX_ROOT}/config`, { sudo: true });
     } else {
-      await streamFolder(sandbox, space.volume_path, SANDBOX_ROOT, { sudo: false });
+      await downloadFolder(sandbox, space, SANDBOX_ROOT, { sudo: false });
       await runOrThrow(sandbox, MOVE_EDITOR_STATE);
       await writeWelcomeFile(sandbox, toSandboxPath(space.workspace_dir), "WELCOME.md");
     }
@@ -194,6 +269,10 @@ const main = async () => {
     return;
   }
 
+  if (!LINK) {
+    await startFileServer(spaces);
+  }
+
   const counts = {};
   let finished = 0;
 
@@ -224,6 +303,7 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
+    stopFileServer();
     await source.destroy();
     await pg.destroy();
   });
