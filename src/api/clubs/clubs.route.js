@@ -61,6 +61,13 @@ router.post('/link', async (req, res) => {
       });
     }
 
+    if (role === 'leader' && !user.hackclub_id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Club leaders need a Hack Club account. Link it in Settings, then link your club again.'
+      });
+    }
+
     const club = await getOrCreateClubByName(clubName);
     if (!club) {
       return res.status(500).json({
@@ -182,7 +189,8 @@ router.get('/me', async (req, res) => {
           name: membership.club_name,
           displayName: membership.display_name || membership.club_name,
           country: membership.country,
-          role: membership.role,
+          role: membership.role === 'leader' && !user.hackclub_id ? 'member' : membership.role,
+          leaderNeedsHackClub: membership.role === 'leader' && !user.hackclub_id,
           isPrimary: membership.is_primary,
           lastVerifiedAt: membership.last_verified_at,
           metadata: metadata ? {
@@ -342,7 +350,7 @@ router.get('/me/members', async (req, res) => {
       });
     }
 
-    if (membership.role !== 'leader') {
+    if (membership.role !== 'leader' || !user.hackclub_id) {
       return res.status(403).json({
         success: false,
         message: 'Only club leaders can view member list'

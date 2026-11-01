@@ -234,6 +234,13 @@
           </span>
         </div>
 
+        {#if clubData.leaderNeedsHackClub}
+          <p class="info-text">
+            You lead this club. Link your Hack Club account in Settings to
+            see spaces your members share with you.
+          </p>
+        {/if}
+
         <div class="club-details">
           {#if clubData.country}
             <div class="detail-row">

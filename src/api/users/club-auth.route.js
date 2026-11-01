@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import pg from '../../utils/db.js';
 import { checkMemberStatus, checkLeaderStatus, getOrCreateClubByName, linkUserToClub } from '../../utils/clubs.js';
 import { checkEmail } from '../../utils/airtable.js';
+import { authLimiter } from '../../middlewares/rate-limit.middleware.js';
 import { validateEmail, validateUsername, validatePassword, normalizeEmail } from '../../utils/validation.js';
 
 const router = express.Router();
@@ -12,7 +13,7 @@ const SALT_ROUNDS = 12;
 
 const randomToken = () => crypto.randomBytes(32).toString('hex');
 
-router.post('/club-member/signup', async (req, res) => {
+router.post('/club-member/signup', authLimiter, async (req, res) => {
   try {
     const { email: rawEmail, username: rawUsername, password, verificationCode } = req.body;
 
@@ -57,18 +58,24 @@ router.post('/club-member/signup', async (req, res) => {
       });
     }
 
-    const { isMember, clubName: memberClubName } = await checkMemberStatus(email);
-    const { isLeader, clubName: leaderClubName } = await checkLeaderStatus(email);
+    const { isMember, clubName } = await checkMemberStatus(email);
+    const { isLeader } = await checkLeaderStatus(email);
 
-    if (!isMember && !isLeader) {
+    if (isLeader) {
       return res.status(403).json({
         success: false,
-        message: 'No club membership found for this email. You must be a registered club member or leader to sign up with this method.'
+        message: 'Club leaders sign in with their Hack Club account. Go back and choose Continue with Hack Club.'
       });
     }
 
-    const clubName = leaderClubName || memberClubName;
-    const role = isLeader ? 'leader' : 'member';
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'No club membership found for this email. You must be a registered club member to sign up with this method.'
+      });
+    }
+
+    const role = 'member';
 
     const existingUser = await pg('users')
       .where('email', email)
@@ -100,7 +107,7 @@ router.post('/club-member/signup', async (req, res) => {
       try {
         const club = await getOrCreateClubByName(clubName);
         if (club) {
-          await linkUserToClub(newUser.id, club.id, role, role === 'leader' ? 'leader_email' : 'member_lookup');
+          await linkUserToClub(newUser.id, club.id, role, 'member_lookup');
         }
       } catch (clubError) {
         console.error('Error linking user to club:', clubError);
@@ -148,7 +155,7 @@ router.post('/club-member/signup', async (req, res) => {
   }
 });
 
-router.post('/club-member/login', async (req, res) => {
+router.post('/club-member/login', authLimiter, async (req, res) => {
   try {
     const { email: rawEmail, password } = req.body;
 

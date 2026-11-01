@@ -37,6 +37,8 @@
           step = 'login';
         } else if (membershipInfo.hasExistingAccount) {
           error = 'This email already has an account using a different login method. Please use email verification or Hack Club OAuth.';
+        } else if (membershipInfo.isLeader) {
+          error = 'Club leaders sign in with their Hack Club account. Go back and choose Continue with Hack Club.';
         } else {
           step = 'signup';
           await sendCode();

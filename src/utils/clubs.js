@@ -255,8 +255,10 @@ export async function getLeaderMemberships(userId) {
 
   const memberships = await pg('user_club_memberships')
     .join('clubs', 'user_club_memberships.club_id', 'clubs.id')
+    .join('users', 'user_club_memberships.user_id', 'users.id')
     .where('user_club_memberships.user_id', userId)
     .where('user_club_memberships.role', 'leader')
+    .whereNotNull('users.hackclub_id')
     .select(
       'user_club_memberships.*',
       'clubs.club_name',
