@@ -158,6 +158,7 @@ export const startCodeServer = async (sandbox, { password, workspacePath }) => {
       "--auth", "password",
       "--disable-telemetry",
       "--disable-update-check",
+      "--ignore-last-opened",
       workspacePath
     ],
     env: { PASSWORD: password },
