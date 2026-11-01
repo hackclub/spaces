@@ -1,18 +1,31 @@
 # Spaces
 Spaces is a web app that creates secure cloud based development environments, accessible through a web browser. The goal of this project is to allow people to create amazing projects no matter what hardware they have access to. Spaces was developed by [Ivie Fonner](https://github.com/charmunks/), [Arnav](https://github.com/arnavravinder) and [Hack Club](https://github.com/hackclub/)
 
-## Setup:
-### Manual Setup:
-#### Prerequisites: 
-Before installing, you must have:
-- Docker installed and the daemon running
-- Node.js (v18.x or higher) and npm installed
-- PostgreSQL database set up and accessible
-- Airtable account with API key and base ID for email verification
+## How it works
 
-#### Installation: 
+- **Website and API** run on Vercel as two services from this repo ([vercel.json](vercel.json)):
+  - `app`: the Express API in [src/](src/), served under `/api`.
+  - `client`: the Svelte website in [client/](client/), served for every other path.
+- **Each space is a Vercel Sandbox**, a small virtual machine named `space-<uuid>`. Sandboxes are persistent: when a space stops, Vercel saves a snapshot of its disk, and the next start resumes from it. Only the latest snapshot is kept, and it never expires.
+  - Sandboxes run in Stockholm (`arn1`), with Frankfurt (`fra1`) as a fallback.
+  - A session lasts at most 3 hours. A Vercel cron job calls `/api/v1/cron/auto-stop` every 5 minutes to stop spaces that have run longer and to fix the database for spaces that already stopped.
+- **VS Code spaces** run [code-server](https://github.com/coder/code-server) directly in the sandbox. It's installed on first start, and the user's files live in `/vercel/sandbox/<space name>`.
+- **Blender, KiCad and FreeCAD spaces** run Docker inside the sandbox, with the [linuxserver.io](https://www.linuxserver.io/) image for each app. The app's files live in `/vercel/sandbox/config`. The browser logs in with HTTP basic auth: username `abc`, with the space's password.
+- **Database:** PostgreSQL, hosted on Hack Club's Orchard. Migrations run with knex on every deploy.
+- **Login:** email codes (sent through an Airtable automation on the "Spaces Emails" table), Hack Club Auth (OAuth at auth.hackclub.com), or email and password for club members. Club membership and leader status come from the Clubs API.
+
+## Local setup
+
+### Prerequisites
+- Node.js 22 or newer and npm
+- A PostgreSQL database
+- An Airtable base with the "Spaces Emails" table, and a token for it
+- A Vercel access token, team and project to create sandboxes in. Use a separate project from production, because every space you create locally is a real sandbox.
+
+### Installation
 ```bash
-git clone https://github.com/hackclub/spaces-new.git
+git clone https://github.com/hackclub/spaces.git
+cd spaces
 
 cp example.env .env # fill out the .env
 
@@ -23,385 +36,192 @@ npm run client-install
 npm run migrate
 ```
 
-#### Running the server/client:
-```
-# run both client and server
+### Running the API and website
+```bash
+# run both
 npm run dev
 
-# Or you can run the backend and client separately
-# run only backend
-npm run serve:server
-
-# run only client 
-npm run serve:client
+# or run them separately
+npm run serve:server   # API on http://localhost:3000
+npm run serve:client   # website on http://localhost:5173, which forwards /api to the API
 ```
 
-### Docker Setup:
+The local API also runs the auto-stop job every 5 minutes, since the Vercel cron job only exists in production.
 
-#### Prerequisites: 
-Before installing, you must have:
-- Docker and docker-compose installed and the daemon running
-- PostgreSQL database set up and accessible
-- Airtable account with API key and base ID for email verification
-
-#### Installation:
+### Dev account
 ```bash
-git clone https://github.com/hackclub/spaces-new.git
-
-cp example.env .env # make sure to set DOCKER=true
-
-docker compose up --build
-# server is now live at localhost:2593
-```
-
-### .env setup:
-
-```bash
-# postgres database connection 
-PG_CONNECTION_STRING=your-postgres-db-url
-# airtable credentials for email otps
-AIRTABLE_API_KEY=your-airtable-pat
-AIRTABLE_BASE_ID=your-airtable-base-id
-
-# Server configuration
-PORT=3000
-NODE_ENV=development
-
-# Frontend configuration
-FRONTEND_URL=http://localhost:5173
-
-# Server URL for container access URLs
-SERVER_URL=http://localhost
-
-# Set to 'true' if running in Docker, 'false' for manual setup
-DOCKER=false
-```
-
-# Testing changes...
-Create a developer account to actually test your changes
-```
 npm run create-fake-user
 ```
 
-Then, visit whatever port/url your frontend is on and run this in the console and refresh the page
+That creates an admin account with the login token `w`. To log in as it, run this in the browser console on the local website and refresh:
+```js
+document.cookie = "auth_token=w; path=/"
 ```
-localStorage.setItem("auth_token", "w")
-```
 
+### Environment variables
 
-**Required Environment Variables:**
-- `PG_CONNECTION_STRING` - PostgreSQL database connection URL
-- `AIRTABLE_API_KEY` - Airtable API key for email verification
-- `AIRTABLE_BASE_ID` - Airtable base ID for storing verification codes
-- `PORT` - Backend server port (default: 3000)
-- `DOCKER` - Must be 'true' for Docker setup, 'false' for manual setup
-- `SERVER_URL` - Base URL for container access (e.g., http://localhost or your domain)
-- `FRONTEND_URL` - Frontend URL for CORS (default: http://localhost:5173)
-- `NODE_ENV` - Environment mode: 'development' or 'production'
+| Variable | Required | Description |
+|---|---|---|
+| `PG_CONNECTION_STRING` | yes | PostgreSQL connection URL |
+| `AIRTABLE_API_KEY` | yes | Airtable token with access to the Spaces base |
+| `AIRTABLE_BASE_ID` | yes | ID of the Airtable base with the "Spaces Emails" table |
+| `HACKCLUB_CLIENT_ID` | yes | Hack Club Auth OAuth app ID |
+| `HACKCLUB_CLIENT_SECRET` | yes | Hack Club Auth OAuth app secret |
+| `HACKCLUB_REDIRECT_URI` | yes | OAuth callback, `<site>/api/v1/oauth/callback`. It must also be allowed in the OAuth app. |
+| `HACKCLUB_CLUBS_API_KEY` | yes | Key for the Clubs API (club membership and leader lookups) |
+| `FRONTEND_URL` | yes | The website's address, used for CORS |
+| `CRON_SECRET` | production | Shared secret for the auto-stop cron job. Vercel sends it automatically. |
+| `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID` | local only | Credentials for creating sandboxes outside Vercel. On Vercel, sandboxes use the deployment's built-in OIDC login, so leave these unset there. |
+| `SANDBOX_VCPUS` | no | vCPUs for VS Code spaces (default 2) |
+| `SPACES_CREATION_PAUSED` | no | Set to `true` to stop new spaces from being created |
+| `PORT` | no | Local API port (default 3000) |
+| `NODE_ENV` | no | `development` or `production` |
 
-## API Documentation:
+## Deploying
 
-By default the API will be accessible at `/api/v1`
+Vercel deploys the production branch automatically on every push. The build runs `npm run migrate` first, so new migrations apply before the new code goes live. Production environment variables are set in the Vercel project's settings.
+
+## Scripts
+
+- [scripts/migrate-to-sandboxes.js](scripts/migrate-to-sandboxes.js): one-time copy of spaces from the old Docker server into sandboxes. Run it on the old server. Flags: `--dry-run`, `--link`, `--concurrency`, `--limit`, `--id`, `--redo-since <ISO time>`, `--log`.
+- [scripts/spaces-backup.sh](scripts/spaces-backup.sh): nightly database backup on the old Docker server, until it's retired.
+
+## API Documentation
+
+The API is served at `/api/v1`.
 
 ### Authentication
 
-All API endpoints that require authentication expect an `authorization` token in the request headers or body. This token is obtained during login/signup and must be included in subsequent requests.
+Logging in sets an `auth_token` cookie, which the website sends automatically. Other clients can send the same token in the `Authorization` header instead. Each user has one token at a time: logging in again or signing out replaces it.
 
 ### Users API (`/api/v1/users`)
 
-#### Send Verification Code
-- **POST** `/api/v1/users/send`
-- **Description**: Send a verification code to the provided email address
-- **Body**:
-  ```json
-  {
-    "email": "user@example.com"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Verification code sent successfully",
-    "data": {
-      "email": "user@example.com"
-    }
-  }
-  ```
+| Method | Path | Description |
+|---|---|---|
+| POST | `/send` | Email a 6-digit login code. Body: `{ "email" }`. Limited to one per minute and five per hour per address. |
+| POST | `/signup` | Create an account. Body: `{ "email", "username", "verificationCode" }` |
+| POST | `/login` | Log in. Body: `{ "email", "verificationCode" }` |
+| POST | `/signout` | Sign out and replace the login token |
+| GET | `/me` | The logged-in user |
+| PUT | `/update` | Change username, Hackatime API key or VS Code extensions. Body: any of `{ "username", "hackatime_api_key", "vscode_extensions" }` |
+| POST | `/update` | Change email. Body: `{ "email", "oldEmailVerificationCode", "emailVerificationCode" }`, with codes sent to both the current and the new address |
+| POST | `/verify-email-change` | Change email with a code from the new address only. Body: `{ "newEmail", "verificationCode" }` |
+| POST | `/club-member/check` | Whether an email is in a club. Body: `{ "email" }`. Returns `isMember`, `isLeader`, `hasExistingAccount` and `hasPasswordAuth`, but not the club's name. |
+| POST | `/club-member/signup` | Create an account as a club member. Body: `{ "email", "username", "password", "verificationCode" }`. Club leaders must use Hack Club Auth. |
+| POST | `/club-member/login` | Log in with email and password. Body: `{ "email", "password" }` |
 
-#### Sign Up
-- **POST** `/api/v1/users/signup`
-- **Description**: Create a new user account with email verification
-- **Body**:
-  ```json
-  {
-    "email": "user@example.com",
-    "username": "myusername",
-    "verificationCode": "123456"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "success": true,
-    "message": "User created successfully",
-    "data": {
-      "id": 1,
-      "email": "user@example.com",
-      "username": "myusername",
-      "authorization": "auth_token_here"
-    }
-  }
-  ```
+Codes allow five wrong guesses, expire after 5 minutes and work once.
 
-#### Login
-- **POST** `/api/v1/users/login`
-- **Description**: Login with email and verification code
-- **Body**:
-  ```json
-  {
-    "email": "user@example.com",
-    "code": "123456"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Login successful",
-    "data": {
-      "email": "user@example.com",
-      "username": "myusername",
-      "authorization": "new_auth_token_here"
-    }
-  }
-  ```
+### Hack Club Auth (`/api/v1/oauth`)
 
-#### Club Member Check
-- **POST** `/api/v1/users/club-member/check`
-- **Description**: Check if an email is associated with a Hack Club club membership
-- **Body**:
-  ```json
-  {
-    "email": "member@school.edu"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "success": true,
-    "data": {
-      "isMember": true,
-      "isLeader": false,
-      "clubName": "Example High School Hack Club",
-      "hasExistingAccount": false,
-      "hasPasswordAuth": false
-    }
-  }
-  ```
-
-#### Club Member Sign Up
-- **POST** `/api/v1/users/club-member/signup`
-- **Description**: Create a new account as a verified club member (requires valid club membership)
-- **Body**:
-  ```json
-  {
-    "email": "member@school.edu",
-    "username": "myusername",
-    "password": "securepassword123"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Account created successfully",
-    "data": {
-      "email": "member@school.edu",
-      "username": "myusername",
-      "authorization": "auth_token_here",
-      "club_name": "Example High School Hack Club",
-      "club_role": "member"
-    }
-  }
-  ```
-
-#### Club Member Login
-- **POST** `/api/v1/users/club-member/login`
-- **Description**: Login with email and password (for accounts created via club member signup)
-- **Body**:
-  ```json
-  {
-    "email": "member@school.edu",
-    "password": "securepassword123"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Login successful",
-    "data": {
-      "email": "member@school.edu",
-      "username": "myusername",
-      "authorization": "new_auth_token_here"
-    }
-  }
-  ```
-
-#### Sign Out
-- **POST** `/api/v1/users/signout`
-- **Description**: Sign out and invalidate the current authorization token
-- **Body**:
-  ```json
-  {
-    "authorization": "current_auth_token"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "success": true,
-    "message": "Sign out successful",
-    "data": {
-      "email": "user@example.com"
-    }
-  }
-  ```
+| Method | Path | Description |
+|---|---|---|
+| GET | `/hackclub/login` | Start logging in with Hack Club |
+| POST | `/hackclub/link` | Start linking a Hack Club account to the logged-in user. Returns `{ "url" }` to send the browser to. |
+| GET | `/callback` | Where Hack Club sends the browser back. The `state` must match the cookie set by the request that started the flow. |
+| GET | `/status` | Whether the user's Hack Club account is linked, and its verification status |
+| POST | `/refresh-verification` | Re-check the verification status with Hack Club |
+| POST | `/unlink` | Unlink the Hack Club account |
 
 ### Spaces API (`/api/v1/spaces`)
 
-#### Create Container
+Creating a space needs a verified Hack Club account or a club membership. Only one space can run at a time.
+
+#### Create a space
 - **POST** `/api/v1/spaces/create`
-- **Description**: Create a new containerized workspace
-- **Headers**: 
-  - `authorization: your_auth_token`
 - **Body**:
   ```json
   {
-    "password": "container_password",
-    "type": "code-server"
+    "type": "code-server",
+    "name": "my-project"
   }
   ```
-- **Valid Types**: `code-server`, `blender`, `kicad`, `freecad`
+  `name` is optional and only used by VS Code spaces. It names the project folder, which Hackatime uses as the project name.
 - **Response**:
   ```json
   {
-    "message": "Container created successfully",
+    "message": "Space created successfully",
     "spaceId": 1,
-    "containerId": "docker_container_id",
+    "containerId": "space-0b6c5f0e-1d6e-4c1a-9a43-3f1f2f0c9e27",
     "type": "code-server",
     "description": "VS Code Server",
-    "image": "linuxserver/code-server",
+    "image": "vercel/sandbox/universal",
     "port": 8080,
-    "accessUrl": "http://localhost:8080"
+    "accessUrl": "https://sb-xxxx.vercel.run",
+    "password": "generated-password"
   }
   ```
+  `containerId` is the sandbox's name.
 
-#### Start Container
-- **POST** `/api/v1/spaces/start/:spaceId`
-- **Description**: Start an existing container
-- **Headers**: 
-  - `authorization: your_auth_token`
-- **Parameters**:
-  - `spaceId`: The ID of the space to start
-- **Response**:
-  ```json
-  {
-    "message": "Container started successfully",
-    "spaceId": 1,
-    "containerId": "docker_container_id"
-  }
-  ```
+#### Other space routes
 
-#### Stop Container
-- **POST** `/api/v1/spaces/stop/:spaceId`
-- **Description**: Stop a running container
-- **Headers**: 
-  - `authorization: your_auth_token`
-- **Parameters**:
-  - `spaceId`: The ID of the space to stop
-- **Response**:
-  ```json
-  {
-    "message": "Container stopped successfully",
-    "spaceId": 1,
-    "containerId": "docker_container_id"
-  }
-  ```
+| Method | Path | Description |
+|---|---|---|
+| POST | `/start/:spaceId` | Start a space. Returns `{ "message", "spaceId", "containerId" }`. |
+| POST | `/stop/:spaceId` | Stop a space. Vercel saves its snapshot. |
+| GET | `/status/:spaceId` | `{ "spaceId", "containerId", "type", "description", "accessUrl", "status", "running", "startedAt" }` |
+| GET | `/list` | The user's spaces, each with `id`, `type`, `name`, `access_url`, `password`, `running`, `is_favorite`, `last_opened_at` and `status` |
+| POST | `/password/:spaceId` | Change a space's password. Body: `{ "password" }` (8 to 128 characters). A running space restarts its app. |
+| DELETE | `/delete/:spaceId` | Delete a space and its sandbox |
+| POST | `/:spaceId/favorite` | Toggle favourite |
+| POST | `/:spaceId/share/club` | Share with or unshare from the user's club leaders. Body: `{ "share": true }` |
+| GET | `/:spaceId/share/status` | Whether the space is shared |
+| GET | `/shared-with-me` | For club leaders: spaces their members shared. Links are returned without passwords. |
 
-#### Get Container Status
-- **GET** `/api/v1/spaces/status/:spaceId`
-- **Description**: Get the current status of a container
-- **Headers**: 
-  - `authorization: your_auth_token`
-- **Parameters**:
-  - `spaceId`: The ID of the space to check
-- **Response**:
-  ```json
-  {
-    "spaceId": 1,
-    "containerId": "docker_container_id",
-    "type": "code-server",
-    "description": "VS Code Server",
-    "accessUrl": "http://localhost:8080",
-    "status": "running",
-    "running": true,
-    "startedAt": "2023-01-01T00:00:00.000Z",
-    "finishedAt": "0001-01-01T00:00:00Z"
-  }
-  ```
+### Space types
 
-#### List User Spaces
-- **GET** `/api/v1/spaces/list`
-- **Description**: Get all spaces owned by the authenticated user
-- **Headers**: 
-  - `authorization: your_auth_token`
-- **Response**:
-  ```json
-  {
-    "message": "Spaces retrieved successfully",
-    "spaces": [
-      {
-        "id": 1,
-        "type": "code-server",
-        "description": "VS Code Server",
-        "image": "linuxserver/code-server",
-        "port": 8080,
-        "access_url": "http://localhost:8080",
-        "created_at": "2023-01-01T00:00:00.000Z"
-      }
-    ]
-  }
-  ```
+| Type | Description | Runs |
+|---|---|---|
+| `code-server` | VS Code | code-server in the sandbox |
+| `blender` | Blender 3D | `linuxserver/blender` in Docker |
+| `kicad` | KiCad PCB Design | `linuxserver/kicad` in Docker |
+| `freecad` | CAD software | `linuxserver/freecad` in Docker |
 
-### Container Types
+### Clubs API (`/api/v1/clubs`)
 
-| Type | Description | Image | 
-|------|-------------|-------|
-| `code-server` | VS Code Server | `linuxserver/code-server` | 
-| `blender` | Blender 3D | `linuxserver/blender` | 
-| `kicad` | KiCad PCB Design | `linuxserver/kicad` | 
-| `freecad` | CAD software | `linuxserver/freecad` | 
+| Method | Path | Description |
+|---|---|---|
+| POST | `/link` | Link the user to their club, found by email. Linking as a leader needs a linked Hack Club account. |
+| POST | `/unlink` | Unlink from the club |
+| GET | `/me` | The user's club and role |
+| GET | `/me/details` | More details about the club |
+| GET | `/me/ships` | The club's shipped projects |
+| GET | `/me/members` | For leaders with a linked Hack Club account: the club's members |
 
-### Error Responses
+### Admin API (`/api/v1/admin`)
 
-All endpoints return consistent error responses:
+Admin only. Every route is a POST.
 
-```json
-{
-  "success": false,
-  "message": "Error description",
-  "error": "Detailed error (development only)"
-}
-```
+| Path | Description |
+|---|---|
+| `/analytics` | User and space counts, plus sandbox and snapshot storage stats from Vercel |
+| `/users` | All users with their space counts |
+| `/spaces` | All spaces with their owner and sandbox name |
+| `/users/:userId/update` | Change `max_spaces` or `is_admin` |
+| `/users/:userId/delete` | Delete a user and their spaces |
+| `/spaces/:spaceId/delete` | Delete a space |
+| `/spaces/delete-inactive` | Delete spaces stopped for 90 days or more |
+
+### Other
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/up` | Health check |
+| GET | `/api/v1/cron/auto-stop` | Auto-stop job. Needs `Authorization: Bearer <CRON_SECRET>`. |
+
+### Errors
+
+Errors come back as JSON, with `error` or `message` describing the problem. Unexpected failures return a generic message, and the details go to the server logs.
 
 Common HTTP status codes:
-- `400`: Bad Request (missing/invalid parameters)
-- `401`: Unauthorized (invalid/missing auth token)
-- `404`: Not Found (resource doesn't exist)
-- `409`: Conflict (duplicate email/username)
+- `400`: Bad Request (missing or invalid parameters)
+- `401`: Unauthorized (missing or invalid login)
+- `403`: Forbidden (not allowed, for example not verified)
+- `404`: Not Found
+- `409`: Conflict (email or username already taken)
+- `429`: Too Many Requests (rate limited)
 - `500`: Internal Server Error
+- `503`: Space creation is paused
 
 <div align="center">
   <a href="https://moonshot.hackclub.com" target="_blank">
