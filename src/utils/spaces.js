@@ -40,6 +40,18 @@ const sanitizeWorkspaceDir = (homeDir) => {
   return dir;
 };
 
+const sanitizeSpaceName = (name) => {
+  const cleaned = (typeof name === "string" ? name : "")
+    .trim()
+    .replace(/s+/g, "-")
+    .replace(/[^a-zA-Z0-9_.-]/g, "")
+    .replace(/^.+/, "")
+    .slice(0, 64);
+  return cleaned || "workspace";
+};
+
+const spaceNameFor = (workspaceDir) => path.posix.basename(sanitizeWorkspaceDir(workspaceDir));
+
 const toSandboxPath = (workspaceDir) => `${SANDBOX_ROOT}${sanitizeWorkspaceDir(workspaceDir).slice("/config".length)}`;
 
 export const spaceConfigs = {
@@ -142,7 +154,7 @@ export const changeSpacePassword = async (spaceId, newPassword, authorization) =
   };
 };
 
-export const createContainer = async (password, type, authorization, homeDir) => {
+export const createContainer = async (password, type, authorization, name) => {
   if (process.env.SPACES_CREATION_PAUSED === 'true') {
     const error = new Error("Space creation is temporarily paused for maintenance. Your existing spaces are unaffected.");
     error.statusCode = 503;
@@ -187,7 +199,7 @@ export const createContainer = async (password, type, authorization, homeDir) =>
 
   const isGui = config.kind === "gui";
   password = crypto.randomBytes(16).toString('hex');
-  const workspaceDir = isGui ? DEFAULT_WORKSPACE_DIR : sanitizeWorkspaceDir(homeDir);
+  const workspaceDir = isGui ? DEFAULT_WORKSPACE_DIR : `/config/${sanitizeSpaceName(name)}`;
   const sandboxName = sandboxNameFor(crypto.randomUUID());
 
   let sandbox = null;
@@ -455,10 +467,10 @@ export const getUserSpaces = async (authorization) => {
       .where('user_id', user.id)
       .select(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'created_at', 'running', 'is_favorite', 'last_opened_at', 'workspace_dir']);
 
-    const spacesWithStatus = spaces.map((space) => {
+    const spacesWithStatus = spaces.map(({ workspace_dir, ...space }) => {
       return {
         ...space,
-        workspace_dir: space.workspace_dir ? toSandboxPath(space.workspace_dir) : null,
+        name: spaceNameFor(workspace_dir),
         status: space.running ? 'running' : 'stopped'
       };
     });

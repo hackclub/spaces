@@ -16,7 +16,7 @@
 
   let showCreateForm = false;
   let newSpaceType = "code-server";
-  let newSpaceHomeDir = "";
+  let newSpaceName = "";
   let error = "";
   let loading = false;
   let actionLoading = {};
@@ -249,8 +249,8 @@
         newSpaceType !== "blender" &&
         newSpaceType !== "freecad"
       ) {
-        if (newSpaceHomeDir.trim()) {
-          body.homeDir = newSpaceHomeDir.trim();
+        if (newSpaceName.trim()) {
+          body.name = newSpaceName.trim();
         }
       }
 
@@ -269,7 +269,7 @@
         createDone = true;
         await holdFinishedBar();
         showCreateForm = false;
-        newSpaceHomeDir = "";
+        newSpaceName = "";
         await loadSpaces();
       } else {
         if (
@@ -519,6 +519,7 @@
     const matchesSearch =
       !q ||
       String(space.id).includes(q) ||
+      space.name?.toLowerCase().includes(q) ||
       space.type?.toLowerCase().includes(q) ||
       statusText.includes(q);
 
@@ -654,26 +655,20 @@
 
         {#if newSpaceType !== "kicad" && newSpaceType !== "blender" && newSpaceType !== "freecad"}
           <div class="form-group">
-            <label class="form-label" for="homeDir"
-              >Home Directory (optional)</label
-            >
+            <label class="form-label" for="spaceName">Name (optional)</label>
             <p class="password-info">
-              The home folder name. Must live under
-              <code>/config</code> so it persists. Defaults to
-              <code>/config/workspace</code>. If you are using hackatime, you
-              should put different folder names for each project.
+              Name your space after what you're working on. It shows on your
+              dashboard, and Hackatime uses it to track time for this project,
+              so give each project its own name.
             </p>
             <input
               class="form-input"
-              id="homeDir"
+              id="spaceName"
               type="text"
-              bind:value={newSpaceHomeDir}
-              placeholder="/config/workspace"
+              maxlength="64"
+              bind:value={newSpaceName}
+              placeholder="my-project"
             />
-            <p class="password-info">
-              This is what's used to identify this space later on your
-              dashboard.
-            </p>
           </div>
         {:else}
           <div class="form-group"></div>
@@ -705,7 +700,7 @@
         <input
           class="search-input"
           type="text"
-          placeholder="Search by ID, type, or status..."
+          placeholder="Search by name, ID, type, or status..."
           bind:value={searchQuery}
         />
 
@@ -809,8 +804,8 @@
                   <strong>Last opened:</strong>
                   {formatLastOpened(space.last_opened_at)}
                 </p>
-                {#if space.type === "code-server" && space.workspace_dir}
-                  <p><strong>Directory:</strong> {space.workspace_dir}</p>
+                {#if space.type === "code-server" && space.name}
+                  <p><strong>Name:</strong> {space.name}</p>
                 {/if}
                 {#if space.type === "code-server" && space.password}
                   <p class="space-password">
