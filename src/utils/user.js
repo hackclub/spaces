@@ -1,5 +1,5 @@
 import pg from './db.js';
-import { EMAIL_REGEX, EMAIL_MAX_LENGTH } from './validation.js';
+import { EMAIL_REGEX, EMAIL_MAX_LENGTH, validateUsername } from './validation.js';
 
 export const getUser = async (authorization) => {
   if (!authorization) return null;
@@ -153,15 +153,16 @@ export const updateUser = async (authorization, updateData) => {
       updates.email = updateData.email;
     }
     
-    if (updateData.username !== undefined) {
-      if (updateData.username.length > 100) {
-        const error = new Error("Username must be 100 characters or less");
+    if (updateData.username !== undefined && updateData.username !== user.username) {
+      const usernameValidation = validateUsername(updateData.username);
+      if (!usernameValidation.valid) {
+        const error = new Error(usernameValidation.message);
         error.statusCode = 400;
         throw error;
       }
       
       const existingUsername = await pg('users')
-        .where('username', updateData.username)
+        .where('username', usernameValidation.normalized)
         .whereNot('id', user.id)
         .first();
       
@@ -171,7 +172,7 @@ export const updateUser = async (authorization, updateData) => {
         throw error;
       }
       
-      updates.username = updateData.username;
+      updates.username = usernameValidation.normalized;
     }
     
     if (updateData.hackatime_api_key !== undefined) {
