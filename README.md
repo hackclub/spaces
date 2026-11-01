@@ -105,7 +105,6 @@ Logging in sets an `auth_token` cookie, which the website sends automatically. O
 | GET | `/me` | The logged-in user |
 | PUT | `/update` | Change username, Hackatime API key or VS Code extensions. Body: any of `{ "username", "hackatime_api_key", "vscode_extensions" }` |
 | POST | `/update` | Change email. Body: `{ "email", "oldEmailVerificationCode", "emailVerificationCode" }`, with codes sent to both the current and the new address |
-| POST | `/verify-email-change` | Change email with a code from the new address only. Body: `{ "newEmail", "verificationCode" }` |
 | POST | `/club-member/check` | Whether an email is in a club. Body: `{ "email" }`. Returns `isMember`, `isLeader`, `hasExistingAccount` and `hasPasswordAuth`, but not the club's name. |
 | POST | `/club-member/signup` | Create an account as a club member. Body: `{ "email", "username", "password", "verificationCode" }`. Club leaders must use Hack Club Auth. |
 | POST | `/club-member/login` | Log in with email and password. Body: `{ "email", "password" }` |
