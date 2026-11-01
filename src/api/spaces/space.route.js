@@ -25,6 +25,18 @@ const router = express.Router();
 
 router.use(extractAuth);
 
+const withoutCredentials = (url) => {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    parsed.username = "";
+    parsed.password = "";
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+};
+
 router.post("/create", containerOpsLimiter, async (req, res) => {
   const { password, type, name, homeDir } = req.body;
   const authorization = req.authToken;
@@ -325,7 +337,7 @@ router.get("/shared-with-me", async (req, res) => {
           id: space.space_id,
           type: space.type,
           description: space.description,
-          accessUrl: space.access_url,
+          accessUrl: withoutCredentials(space.access_url),
           running: space.running,
           createdAt: space.created_at,
           owner: {
