@@ -169,6 +169,25 @@ const downloadFolder = async (sandbox, space, dest, { sudo }) => {
   }
 };
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const deleteAndWait = async (sandbox, name) => {
+  try {
+    await sandbox.delete();
+  } catch (err) {
+    if (err?.response?.status !== 404) {
+      throw err;
+    }
+  }
+  for (let attempt = 0; attempt < 60; attempt++) {
+    if (!(await findSandbox(name))) {
+      return;
+    }
+    await sleep(2000);
+  }
+  throw new Error(`sandbox ${name} was still there 2 minutes after deleting it`);
+};
+
 const isMigrated = (sandbox) => sandbox?.tags?.migrated === "yes";
 
 const copySpace = async (space, { redo }) => {
@@ -186,7 +205,7 @@ const copySpace = async (space, { redo }) => {
     return "skipped";
   }
   if (existing) {
-    await existing.delete();
+    await deleteAndWait(existing, name);
   }
 
   const isGui = config.kind === "gui";
