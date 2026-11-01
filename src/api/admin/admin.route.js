@@ -2,6 +2,7 @@ import express from 'express';
 import pg from '../../utils/db.js';
 import { requireAdmin } from '../../middlewares/admin.middleware.js';
 import { deleteSpace } from '../../utils/spaces.js';
+import { getSandboxStats } from '../../utils/sandboxes.js';
 
 const router = express.Router();
 
@@ -9,6 +10,10 @@ const INACTIVE_DAYS = 90;
 
 router.post('/analytics', requireAdmin, async (req, res) => {
   try {
+    const sandboxStats = getSandboxStats().catch((error) => {
+      console.error('Error fetching sandbox stats:', error);
+      return null;
+    });
     const [userCount] = await pg('users').count('id as count');
     const [spaceCount] = await pg('spaces').count('id as count');
     const [activeSpaces] = await pg('spaces')
@@ -29,7 +34,7 @@ router.post('/analytics', requireAdmin, async (req, res) => {
         activeSpaces: parseInt(activeSpaces.count),
         inactiveSpaces: parseInt(inactiveSpaces.count),
         inactiveDays: INACTIVE_DAYS,
-        storage: null
+        sandboxes: await sandboxStats
       }
     });
   } catch (error) {
@@ -75,7 +80,7 @@ router.post('/users', requireAdmin, async (req, res) => {
 router.post('/spaces', requireAdmin, async (req, res) => {
   try {
     const spaces = await pg('spaces')
-      .select('spaces.id', 'spaces.type', 'spaces.port', 'spaces.running', 'spaces.started_at', 'spaces.user_id', 'users.username', 'users.email')
+      .select('spaces.id', 'spaces.type', 'spaces.container_id', 'spaces.running', 'spaces.started_at', 'spaces.user_id', 'users.username', 'users.email')
       .join('users', 'spaces.user_id', 'users.id')
       .orderBy('spaces.id', 'desc');
 

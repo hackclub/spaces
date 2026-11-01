@@ -2,9 +2,6 @@
   import { onMount } from 'svelte';
   import { API_BASE } from '../config.js';
 
-  const emptyDisk = { path: '', total: 0, free: 0, used: 0 };
-  const emptyDockerEntry = { count: 0, size: 0 };
-
   let analytics = {
     totalUsers: 0,
     totalSpaces: 0,
@@ -12,15 +9,7 @@
     inactiveSpaces: 0,
     inactiveDays: 90
   };
-  let storage = {
-    root: { ...emptyDisk },
-    volume: { ...emptyDisk },
-    docker: {
-      images: { ...emptyDockerEntry },
-      containers: { ...emptyDockerEntry },
-      volumes: { ...emptyDockerEntry }
-    }
-  };
+  let sandboxStats = null;
   let users = [];
   let spaces = [];
   let loading = false;
@@ -102,20 +91,6 @@
     return `${scaled.toFixed(scaled >= 10 || exponent === 0 ? 0 : 1)} ${units[exponent]}`;
   }
 
-  $: diskCards = [
-    { label: 'System Disk', disk: storage.root },
-    { label: 'User Data', disk: storage.volume }
-  ]
-    .filter(entry => (entry.disk?.total ?? 0) > 0)
-    .map(entry => ({
-      label: entry.label,
-      path: entry.disk?.path ?? '',
-      used: entry.disk?.used ?? 0,
-      total: entry.disk?.total ?? 0,
-      free: entry.disk?.free ?? 0,
-      percent: Math.round(((entry.disk?.used ?? 0) / (entry.disk?.total || 1)) * 100)
-    }));
-
   $: filteredUsers = users.filter((user) => {
     if (!userSearch) return true;
     const search = userSearch.toLowerCase();
@@ -170,15 +145,7 @@
       const data = await response.json();
       if (response.ok) {
         analytics = data.data;
-        storage = {
-          root: data.data.storage?.root ?? { ...emptyDisk },
-          volume: data.data.storage?.volume ?? { ...emptyDisk },
-          docker: data.data.storage?.docker ?? {
-            images: { ...emptyDockerEntry },
-            containers: { ...emptyDockerEntry },
-            volumes: { ...emptyDockerEntry }
-          }
-        };
+        sandboxStats = data.data.sandboxes ?? null;
       }
     } catch (err) {
       console.error('Failed to load analytics:', err);
@@ -337,38 +304,27 @@
         </div>
       </div>
 
-      {#if storage}
-        <h2 class="section-heading">Storage</h2>
+      <h2 class="section-heading">Sandboxes</h2>
+      {#if sandboxStats}
         <div class="analytics">
-          {#each diskCards as disk}
-            <div class="stat-card">
-              <h3>{disk.label}</h3>
-              <p class="stat" class:stat-warn={disk.percent >= 80} class:stat-danger={disk.percent >= 90}>
-                {disk.percent}%
-              </p>
-              <p class="stat-sub">{formatBytes(disk.used)} of {formatBytes(disk.total)} used</p>
-              <p class="stat-sub">{formatBytes(disk.free)} free</p>
-            </div>
-          {/each}
-
-          {#if storage.docker}
-            <div class="stat-card">
-              <h3>Docker Images</h3>
-              <p class="stat">{formatBytes(storage.docker.images.size)}</p>
-              <p class="stat-sub">{storage.docker.images.count} image(s)</p>
-            </div>
-            <div class="stat-card">
-              <h3>Docker Containers</h3>
-              <p class="stat">{formatBytes(storage.docker.containers.size)}</p>
-              <p class="stat-sub">{storage.docker.containers.count} container(s)</p>
-            </div>
-            <div class="stat-card">
-              <h3>Docker Volumes</h3>
-              <p class="stat">{formatBytes(storage.docker.volumes.size)}</p>
-              <p class="stat-sub">{storage.docker.volumes.count} volume(s)</p>
-            </div>
-          {/if}
+          <div class="stat-card">
+            <h3>Sandboxes</h3>
+            <p class="stat">{sandboxStats.sandboxes}</p>
+            <p class="stat-sub">{sandboxStats.running} running now</p>
+          </div>
+          <div class="stat-card">
+            <h3>Snapshot Storage</h3>
+            <p class="stat">{formatBytes(sandboxStats.snapshotBytes)}</p>
+            <p class="stat-sub">{sandboxStats.snapshots} snapshot(s)</p>
+          </div>
+          <div class="stat-card">
+            <h3>Average per Snapshot</h3>
+            <p class="stat">{formatBytes(sandboxStats.snapshots ? sandboxStats.snapshotBytes / sandboxStats.snapshots : 0)}</p>
+            <p class="stat-sub">saved when a space stops</p>
+          </div>
         </div>
+      {:else}
+        <p class="stat-sub">Couldn't load sandbox stats from Vercel.</p>
       {/if}
     {/if}
 
@@ -459,7 +415,7 @@
               <th>Email</th>
               <th>Status</th>
               <th>Last Turned On</th>
-              <th>Port</th>
+              <th>Sandbox</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -473,7 +429,7 @@
                 <td>{space.email}</td>
                 <td>{space.running ? 'Running' : 'Stopped'}</td>
                 <td>{space.started_at ? new Date(space.started_at).toLocaleString() : 'Never'}</td>
-                <td>{space.port}</td>
+                <td class="sandbox-name">{space.container_id ?? '—'}</td>
                 <td>
                   <button on:click={() => deleteSpace(space.id)} class="delete-btn">Delete</button>
                 </td>
@@ -543,14 +499,6 @@
     margin: 0;
   }
 
-  .stat-warn {
-    color: #b26a00;
-  }
-
-  .stat-danger {
-    color: #c62828;
-  }
-
   .stat-sub {
     margin: 6px 0 0 0;
     font-size: 12px;
@@ -560,6 +508,11 @@
   .section-heading {
     margin: 32px 0 16px 0;
     font-size: 18px;
+  }
+
+  .sandbox-name {
+    font-family: monospace;
+    font-size: 12px;
   }
 
   .result-count {

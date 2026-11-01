@@ -1,4 +1,4 @@
-import { Sandbox } from "@vercel/sandbox";
+import { Sandbox, Snapshot } from "@vercel/sandbox";
 
 export const CODE_SERVER_PORT = 8080;
 export const SANDBOX_IMAGE = "vercel/sandbox/universal";
@@ -41,6 +41,21 @@ export const createSandbox = (name, { port = CODE_SERVER_PORT, vcpus = VCPUS } =
   keepLastSnapshots: { count: 1, deleteEvicted: true },
   tags: { app: "spaces" }
 });
+
+export const getSandboxStats = async () => {
+  const [sandboxes, snapshots] = await Promise.all([
+    Sandbox.list({ ...credentials(), tags: { app: "spaces" } }).then((result) => result.toArray()),
+    Snapshot.list({ ...credentials() }).then((result) => result.toArray())
+  ]);
+  const stored = snapshots.filter((snapshot) => snapshot.status === "created");
+
+  return {
+    sandboxes: sandboxes.length,
+    running: sandboxes.filter((sandbox) => sandbox.status === "running").length,
+    snapshots: stored.length,
+    snapshotBytes: stored.reduce((total, snapshot) => total + snapshot.sizeBytes, 0)
+  };
+};
 
 export const findSandbox = async (name) => {
   if (!name) {
