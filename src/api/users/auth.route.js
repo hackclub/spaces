@@ -16,10 +16,17 @@ const randomToken = () => {
 router.get("/me", async (req, res) => {
   try {
     const authorization = req.authToken;
+    if (!authorization) {
+      return res.status(401).json({ success: false });
+    }
 
     const user = await pg('users')
       .where('authorization', authorization)
       .first();
+
+    if (!user) {
+      return res.status(401).json({ success: false });
+    }
 
     return res.status(200).json({
       success: true,
