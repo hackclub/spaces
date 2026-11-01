@@ -82,11 +82,11 @@ export const containerOpsLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    error: 'Too many container operations. Please try again in 1 minute.'
+    error: 'Too many space actions. Please try again in 1 minute.'
   },
   handler: (req, res) => {
     res.status(429).json({
-      error: 'Too many container operations. Please try again in 1 minute.'
+      error: 'Too many space actions. Please try again in 1 minute.'
     });
   }
 });

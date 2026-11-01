@@ -162,7 +162,7 @@ export const createContainer = async (password, type, authorization, name) => {
   }
 
   if (!type) {
-    throw new Error("Missing container type");
+    throw new Error("Missing space type");
   }
 
   if (!authorization) {
@@ -192,7 +192,7 @@ export const createContainer = async (password, type, authorization, name) => {
 
   const config = spaceConfigs[typeLower];
   if (!config) {
-    const error = new Error("Invalid container type");
+    const error = new Error("Invalid space type");
     error.validTypes = Object.keys(spaceConfigs);
     throw error;
   }
@@ -237,7 +237,7 @@ export const createContainer = async (password, type, authorization, name) => {
       .returning(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'running']);
 
     const result = {
-      message: "Container created successfully",
+      message: "Space created successfully",
       spaceId: newSpace.id,
       containerId: newSpace.container_id,
       type: newSpace.type,
@@ -261,7 +261,7 @@ export const createContainer = async (password, type, authorization, name) => {
       });
     }
 
-    throw new Error("Failed to create container");
+    throw new Error("Failed to create space");
   }
 };
 
@@ -329,7 +329,7 @@ export const startContainer = async (spaceId, authorization) => {
       });
 
     return {
-      message: "Container started successfully",
+      message: "Space started successfully",
       spaceId: space.id,
       containerId: space.container_id,
     };
@@ -340,7 +340,7 @@ export const startContainer = async (spaceId, authorization) => {
       throw err;
     }
 
-    throw new Error("Failed to start container");
+    throw new Error("Failed to start space");
   }
 };
 
@@ -382,7 +382,7 @@ export const stopContainer = async (spaceId, authorization) => {
       });
 
     return {
-      message: "Container stopped successfully",
+      message: "Space stopped successfully",
       spaceId: space.id,
       containerId: space.container_id,
     };
@@ -393,7 +393,7 @@ export const stopContainer = async (spaceId, authorization) => {
       throw err;
     }
 
-    throw new Error("Failed to stop container");
+    throw new Error("Failed to stop space");
   }
 };
 
@@ -425,7 +425,7 @@ export const getContainerStatus = async (spaceId, authorization) => {
 
     const sandbox = await findSandbox(space.container_id);
     if (!sandbox) {
-      const error = new Error("Container not found");
+      const error = new Error("This space's machine could not be found");
       error.statusCode = 404;
       throw error;
     }
@@ -448,7 +448,7 @@ export const getContainerStatus = async (spaceId, authorization) => {
       throw err;
     }
 
-    throw new Error("Failed to get container status");
+    throw new Error("Failed to get space status");
   }
 };
 
