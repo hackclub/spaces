@@ -51,6 +51,7 @@
         'oauth_state_expired': 'Session expired. Please try again.',
         'oauth_token_failed': 'Failed to complete authorization. Please try again.',
         'oauth_hackclub_already_linked': 'This Hack Club account is already linked to another user.',
+        'oauth_link_user_mismatch': 'You are logged into a different Spaces account than the one that started linking. Log in again and retry.',
         'oauth_callback_failed': 'Something went wrong. Please try again.'
       };
       error = errorMessages[oauthError] || 'OAuth error. Please try again.';

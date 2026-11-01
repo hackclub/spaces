@@ -13,6 +13,26 @@ const HACKCLUB_ME_URL = 'https://auth.hackclub.com/api/v1/me';
 
 const randomToken = () => crypto.randomBytes(32).toString('hex');
 
+const STATE_COOKIE = 'oauth_state';
+const STATE_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: 'lax',
+  secure: process.env.NODE_ENV === 'production',
+  path: '/api/v1/oauth'
+};
+
+const setStateCookie = (res, state) => {
+  res.cookie(STATE_COOKIE, state, { ...STATE_COOKIE_OPTIONS, maxAge: 10 * 60 * 1000 });
+};
+
+const stateMatchesCookie = (req, state) => {
+  const cookie = req.cookies?.[STATE_COOKIE];
+  if (typeof cookie !== 'string' || typeof state !== 'string') return false;
+  const a = Buffer.from(cookie);
+  const b = Buffer.from(state);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+};
+
 const generateState = () => crypto.randomBytes(32).toString('hex');
 
 async function cleanupExpiredStates() {
@@ -40,6 +60,7 @@ router.get('/hackclub/login', async (req, res) => {
     url.searchParams.set('scope', 'email name verification_status');
     url.searchParams.set('state', state);
 
+    setStateCookie(res, state);
     res.redirect(url.toString());
   } catch (error) {
     console.error('Error initiating OAuth login:', error);
@@ -91,6 +112,7 @@ router.post('/hackclub/link', async (req, res) => {
     url.searchParams.set('scope', 'email name verification_status');
     url.searchParams.set('state', state);
 
+    setStateCookie(res, state);
     res.json({ success: true, url: url.toString() });
   } catch (error) {
     console.error('Error initiating OAuth link:', error);
@@ -110,6 +132,11 @@ router.get('/callback', async (req, res) => {
     if (!code || !state) {
       return res.redirect('/?error=oauth_invalid_response');
     }
+
+    if (!stateMatchesCookie(req, state)) {
+      return res.redirect('/?error=oauth_invalid_state');
+    }
+    res.clearCookie(STATE_COOKIE, STATE_COOKIE_OPTIONS);
 
     const stateRow = await pg('oauth_states').where({ state }).first();
     if (!stateRow) {
@@ -180,6 +207,11 @@ router.get('/callback', async (req, res) => {
 
       if (!currentUser) {
         return res.redirect('/?error=oauth_link_user_not_found');
+      }
+
+      const sessionUser = await getUser(req.authToken);
+      if (sessionUser && sessionUser.id !== currentUser.id) {
+        return res.redirect('/?error=oauth_link_user_mismatch');
       }
 
       const existingWithHackclubId = await pg('users')
