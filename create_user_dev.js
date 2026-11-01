@@ -15,11 +15,11 @@ function askQuestion(question) {
 }
 
 async function main() {
-    const email = await askQuestion("What's the email you used to sign up to Hack Club? Make sure that account is idv verified. I could disable the check the backend does for account verificaton during dev but I'm too lazy :P")
+    const email = (await askQuestion("Email for the dev account (press Enter for random@example.com): ")).trim() || "random@example.com"
 
     const [newUser] = await pg('users')
         .insert({
-            email: "random@example.com",
+            email,
             username: "supercool",
             authorization: "w",
             max_spaces: 3,
@@ -30,6 +30,7 @@ async function main() {
 
     console.log("user created!")
     console.dir(newUser)
+    console.log('Log in by running this in your browser console on the dev site, then refresh: document.cookie = "auth_token=w; path=/"')
     process.exit(0)
 }
 main()

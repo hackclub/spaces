@@ -2,7 +2,7 @@ import app from './app.js';
 import pg from './utils/db.js';
 import { startAutoStopJob } from './utils/auto-stop.js';
 
-const port = process.env.PORT || 5678;
+const port = process.env.PORT || 3000;
 
 async function main() {
 	await pg.migrate.latest({
