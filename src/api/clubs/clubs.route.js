@@ -14,10 +14,12 @@ import {
   unlinkUserFromClub
 } from '../../utils/clubs.js';
 import { extractAuth } from '../../middlewares/auth.middleware.js';
+import { clubsLimiter } from '../../middlewares/rate-limit.middleware.js';
 
 
 const router = express.Router();
 router.use(extractAuth);
+router.use(clubsLimiter);
 
 router.get('/', (req, res) => {
   res.status(200).json({

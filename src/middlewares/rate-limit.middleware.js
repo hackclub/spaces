@@ -93,7 +93,7 @@ export const containerOpsLimiter = rateLimit({
 
 export const clubsLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  max: 30,
+  max: 60,
   keyGenerator: requesterKey,
   standardHeaders: true,
   legacyHeaders: false,
