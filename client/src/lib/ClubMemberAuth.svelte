@@ -10,6 +10,8 @@
   let username = '';
   let password = '';
   let confirmPassword = '';
+  let verificationCode = '';
+  let codeSent = false;
   let error = '';
   let loading = false;
   let membershipInfo = null;
@@ -37,6 +39,7 @@
           error = 'This email already has an account using a different login method. Please use email verification or Hack Club OAuth.';
         } else {
           step = 'signup';
+          await sendCode();
         }
       } else {
         error = data.message || 'No club membership found for this email';
@@ -45,6 +48,31 @@
       error = ERROR_MESSAGES.NETWORK_ERROR;
     } finally {
       loading = false;
+    }
+  }
+
+  async function sendCode() {
+    error = '';
+    codeSent = false;
+
+    try {
+      const response = await fetch(`${API_BASE}/users/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        codeSent = true;
+      } else {
+        error = data.message || 'Failed to send verification code';
+      }
+    } catch (err) {
+      error = ERROR_MESSAGES.NETWORK_ERROR;
     }
   }
 
@@ -70,7 +98,7 @@
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ email, username, password }),
+        body: JSON.stringify({ email, username, password, verificationCode: parseInt(verificationCode) }),
       });
 
       const data = await response.json();
@@ -137,6 +165,8 @@
     step = 'email';
     password = '';
     confirmPassword = '';
+    verificationCode = '';
+    codeSent = false;
     error = '';
     membershipInfo = null;
   }
@@ -209,6 +239,26 @@
 
         <form on:submit|preventDefault={handleSignup}>
           <div class="form-group">
+            <label class="form-label" for="verificationCode">
+              Verification code
+            </label>
+            <input
+              class="form-input"
+              id="verificationCode"
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              bind:value={verificationCode}
+              required
+              maxlength="6"
+              placeholder="6-digit code"
+            />
+            {#if codeSent}
+              <p class="verification-text">We emailed a code to <strong>{email}</strong>. It expires in 5 minutes.</p>
+            {/if}
+          </div>
+
+          <div class="form-group">
             <label class="form-label" for="username">
               Username
             </label>
@@ -256,8 +306,12 @@
             <div class="error-message">{error}</div>
           {/if}
 
-          <button class="primary-button" type="submit" disabled={loading || !username || !password || !confirmPassword}>
+          <button class="primary-button" type="submit" disabled={loading || !verificationCode || !username || !password || !confirmPassword}>
             {loading ? 'Creating Account...' : 'Create Account'}
+          </button>
+
+          <button class="secondary-button" type="button" on:click={sendCode} disabled={loading}>
+            Resend code
           </button>
 
           <button class="secondary-button" type="button" on:click={resetToEmail}>

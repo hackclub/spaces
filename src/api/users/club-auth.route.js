@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import pg from '../../utils/db.js';
 import { checkMemberStatus, checkLeaderStatus, getOrCreateClubByName, linkUserToClub } from '../../utils/clubs.js';
+import { checkEmail } from '../../utils/airtable.js';
 import { validateEmail, validateUsername, validatePassword, normalizeEmail } from '../../utils/validation.js';
 
 const router = express.Router();
@@ -13,7 +14,7 @@ const randomToken = () => crypto.randomBytes(32).toString('hex');
 
 router.post('/club-member/signup', async (req, res) => {
   try {
-    const { email: rawEmail, username: rawUsername, password } = req.body;
+    const { email: rawEmail, username: rawUsername, password, verificationCode } = req.body;
 
     const emailValidation = validateEmail(rawEmail);
     if (!emailValidation.valid) {
@@ -38,6 +39,21 @@ router.post('/club-member/signup', async (req, res) => {
       return res.status(400).json({
         success: false,
         message: passwordValidation.message
+      });
+    }
+
+    if (!verificationCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code is required'
+      });
+    }
+
+    const codeValid = await checkEmail(email, Number.parseInt(verificationCode, 10));
+    if (!codeValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification code'
       });
     }
 
