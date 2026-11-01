@@ -352,15 +352,18 @@ router.put('/update', async (req, res) => {
     const updates = {};
 
     if (username && username !== user.username) {
-      if (username.length > 100) {
+      const usernameValidation = validateUsername(username);
+      if (!usernameValidation.valid) {
         return res.status(400).json({
           success: false,
-          message: 'Username must be 100 characters or less'
+          message: usernameValidation.message
         });
       }
+      const newUsername = usernameValidation.normalized;
 
       const existingUser = await pg('users')
-        .where('username', username)
+        .where('username', newUsername)
+        .whereNot('id', user.id)
         .first();
 
       if (existingUser) {
@@ -369,7 +372,7 @@ router.put('/update', async (req, res) => {
           message: 'Username already taken'
         });
       }
-      updates.username = username;
+      updates.username = newUsername;
     }
 
     if (hackatime_api_key !== undefined) {
