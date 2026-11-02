@@ -3,6 +3,7 @@ import pg from '../../utils/db.js';
 import { requireAdmin } from '../../middlewares/admin.middleware.js';
 import { deleteSpace, spaceNameFor } from '../../utils/spaces.js';
 import { getSandboxStats } from '../../utils/sandboxes.js';
+import { getUsage } from '../../utils/space-runs.js';
 
 const router = express.Router();
 
@@ -37,6 +38,27 @@ router.post('/analytics', requireAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch analytics'
+    });
+  }
+});
+
+router.post('/usage', requireAdmin, async (req, res) => {
+  try {
+    const days = [1, 7, 30].includes(Number(req.body?.days)) ? Number(req.body.days) : 7;
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        days,
+        users: await getUsage(since)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching usage:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch usage'
     });
   }
 });

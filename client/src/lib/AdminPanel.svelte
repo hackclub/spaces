@@ -16,11 +16,16 @@
   let loadingSandboxStats = true;
   let loadingUsers = true;
   let loadingSpaces = true;
+  let loadingUsage = false;
+  let usage = null;
+  let usageDays = 7;
   let deletingInactive = false;
   export let url = '/admin';
   export let navigate = () => {};
 
-  const TABS = ['analytics', 'users', 'spaces'];
+  const TABS = ['analytics', 'users', 'spaces', 'usage'];
+  const USAGE_PERIODS = [1, 7, 30];
+  const HEAVY_HOURS_PER_DAY = 8;
   let activeTab = 'analytics';
   const PAGE_SIZE = 100;
   const VERIFIED_STATUSES = ['verified', 'verified_eligible', 'verified_but_over_18'];
@@ -148,6 +153,9 @@
       if (spaceStatus !== 'all') params.set('status', spaceStatus);
       if (spaceSort !== 'newest') params.set('sort', spaceSort);
     }
+    if (tab === 'usage' && usageDays !== 7) {
+      params.set('days', usageDays);
+    }
     const query = params.toString();
     return `/admin${tab === 'analytics' ? '' : `/${tab}`}${query ? `?${query}` : ''}`;
   }
@@ -167,6 +175,10 @@
       spaceType = params.get('type') ?? 'all';
       spaceStatus = params.get('status') in spaceStatuses ? params.get('status') : 'all';
       spaceSort = params.get('sort') in spaceSorts ? params.get('sort') : 'newest';
+    }
+    if (activeTab === 'usage') {
+      const days = Number(params.get('days'));
+      usageDays = USAGE_PERIODS.includes(days) ? days : 7;
     }
   }
 
@@ -219,7 +231,14 @@
   $: spaceTypes = [...new Set(spaces.map(space => space.type).filter(Boolean))].sort();
 
   $: applyUrl(url);
-  $: activeTab, userSearch, userFilter, userSort, spaceSearch, spaceType, spaceStatus, spaceSort, syncUrl();
+  $: activeTab, userSearch, userFilter, userSort, spaceSearch, spaceType, spaceStatus, spaceSort, usageDays, syncUrl();
+  $: if (activeTab === 'usage') loadUsage(usageDays);
+
+  function formatHours(hours = 0) {
+    return hours < 1 ? `${Math.round(hours * 60)} min` : `${hours.toFixed(1)} h`;
+  }
+
+  $: usageTotal = (usage?.users ?? []).reduce((sum, user) => sum + user.hours, 0);
 
   $: userSearch, userFilter, userSort, (userLimit = PAGE_SIZE);
   $: spaceSearch, spaceType, spaceStatus, spaceSort, (spaceLimit = PAGE_SIZE);
@@ -280,6 +299,26 @@
       sandboxStats = null;
     } finally {
       loadingSandboxStats = false;
+    }
+  }
+
+  async function loadUsage(days) {
+    loadingUsage = true;
+    try {
+      const response = await fetch(`${API_BASE}/admin/usage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ days })
+      });
+      const data = await response.json();
+      if (response.ok && data.data.days === usageDays) {
+        usage = data.data;
+      }
+    } catch (err) {
+      console.error('Failed to load usage:', err);
+    } finally {
+      loadingUsage = false;
     }
   }
 
@@ -414,6 +453,7 @@
     <button class:active={activeTab === 'analytics'} on:click={() => navigate(tabPath('analytics'))}>Analytics</button>
     <button class:active={activeTab === 'users'} on:click={() => navigate(tabPath('users'))}>Users</button>
     <button class:active={activeTab === 'spaces'} on:click={() => navigate(tabPath('spaces'))}>Spaces</button>
+    <button class:active={activeTab === 'usage'} on:click={() => navigate(tabPath('usage'))}>Usage</button>
   </div>
 
   {#if activeTab === 'analytics'}
@@ -652,6 +692,64 @@
       {/if}
     {/if}
   {/if}
+  {#if activeTab === 'usage'}
+    <div class="spaces-controls">
+      <select bind:value={usageDays} class="sort-select">
+        <option value={1}>Last 24 hours</option>
+        <option value={7}>Last 7 days</option>
+        <option value={30}>Last 30 days</option>
+      </select>
+      {#if usage && usage.days === usageDays}
+        <span class="result-count">
+          {usage.users.length} {usage.users.length === 1 ? 'person' : 'people'}, {formatHours(usageTotal)} in total
+        </span>
+      {/if}
+    </div>
+    <p class="stat-sub">
+      Time spaces were running, per person. Rows are highlighted when someone averaged more than {HEAVY_HOURS_PER_DAY} hours a day.
+      Recording started on 2 Nov 2026, so longer periods fill in over time.
+    </p>
+    {#if loadingUsage && !(usage && usage.days === usageDays)}
+      <p class="loading-note">Loading usage...</p>
+    {:else if usage}
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Running Time</th>
+              <th>Per Day</th>
+              <th>Starts</th>
+              <th>Longest Run</th>
+              <th>Days Active</th>
+              <th>Now</th>
+              <th>Last Started</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each usage.users as user (user.id)}
+              <tr class:heavy={user.hours / usage.days > HEAVY_HOURS_PER_DAY}>
+                <td><button class="link-btn" on:click={() => showSpacesOf(user)}>{user.username}</button></td>
+                <td>{user.email}</td>
+                <td>{formatHours(user.hours)}</td>
+                <td>{formatHours(user.hours / usage.days)}</td>
+                <td>{user.runs}</td>
+                <td>{formatHours(user.longest_hours)}</td>
+                <td>{user.active_days}</td>
+                <td>{user.running_now ? 'Running' : '—'}</td>
+                <td>{user.last_started ? new Date(user.last_started).toLocaleString() : '—'}</td>
+              </tr>
+            {:else}
+              <tr><td colspan="9">No spaces ran in this period.</td></tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {:else}
+      <p class="stat-sub">Couldn't load usage.</p>
+    {/if}
+  {/if}
 </div>
 
 <style>
@@ -784,6 +882,10 @@
     align-items: center;
     gap: 10px;
     margin-bottom: 15px;
+  }
+
+  tr.heavy td {
+    background-color: rgba(230, 126, 34, 0.15);
   }
 
   .loading-note {

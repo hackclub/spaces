@@ -1,6 +1,7 @@
 import pg from "./db.js";
 import { getUser, checkUserSpaceLimit, ensureHackclubVerified } from "./user.js";
 import { getUserPrimaryMembership } from "./clubs.js";
+import { recordRunStart, recordRunStop } from "./space-runs.js";
 import path from "path";
 import crypto from "crypto";
 import {
@@ -242,6 +243,8 @@ export const createContainer = async (password, type, authorization, name) => {
       })
       .returning(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'running']);
 
+    await recordRunStart({ id: newSpace.id, user_id: user.id, type: newSpace.type });
+
     const result = {
       message: "Space created successfully",
       spaceId: newSpace.id,
@@ -334,6 +337,8 @@ export const startContainer = async (spaceId, authorization) => {
         password
       });
 
+    await recordRunStart(space);
+
     return {
       message: "Space started successfully",
       spaceId: space.id,
@@ -386,6 +391,8 @@ export const stopContainer = async (spaceId, authorization) => {
       .update({
         running: false
       });
+
+    await recordRunStop(space.id, 'user');
 
     return {
       message: "Space stopped successfully",
@@ -541,6 +548,8 @@ export const deleteSpace = async (spaceId, authorization, { isAdmin = false } = 
     if (sandbox) {
       await sandbox.delete();
     }
+
+    await recordRunStop(space.id, 'deleted');
 
     await pg('spaces')
       .where('id', spaceId)

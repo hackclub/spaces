@@ -1,5 +1,6 @@
 import pg from "./db.js";
 import { findSandbox } from "./sandboxes.js";
+import { recordRunStop } from "./space-runs.js";
 
 const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
 
@@ -22,7 +23,9 @@ export const stopExpiredSpaces = async () => {
           continue;
         }
 
-        if (sandbox && sandbox.status === "running") {
+        const wasRunning = sandbox && sandbox.status === "running";
+
+        if (wasRunning) {
           await sandbox.stop();
           summary.stopped++;
           console.log(`[Auto-stop] Stopped space ${space.id} (sandbox ${space.container_id}) - runtime exceeded 3 hours`);
@@ -34,6 +37,8 @@ export const stopExpiredSpaces = async () => {
         await pg('spaces')
           .where('id', space.id)
           .update({ running: false });
+
+        await recordRunStop(space.id, wasRunning ? 'auto-stop' : 'timed-out', { timedOut: !wasRunning });
       } catch (err) {
         summary.failed++;
         console.error(`[Auto-stop] Failed to stop space ${space.id}:`, err.message);
