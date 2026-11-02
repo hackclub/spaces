@@ -66,7 +66,6 @@ router.post('/users', requireAdmin, async (req, res) => {
         'users.username',
         'users.max_spaces',
         'users.is_admin',
-        'users.created_at',
         'users.hackclub_verification_status',
         pg.raw('users.hackclub_id is not null as hackclub_linked'),
         pg.raw('users.password_hash is not null as has_password'),

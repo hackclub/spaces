@@ -461,7 +461,6 @@
               <th>Club</th>
               <th>Spaces</th>
               <th>Last Active</th>
-              <th>Joined</th>
               <th>Max Spaces</th>
               <th>Admin</th>
               <th>Actions</th>
@@ -484,7 +483,6 @@
                   {/if}
                 </td>
                 <td>{formatDate(user.last_active)}</td>
-                <td>{formatDate(user.created_at)}</td>
                 <td>
                   <input
                     type="number"
