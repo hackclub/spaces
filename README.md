@@ -193,9 +193,10 @@ Admin only. Every route is a POST.
 
 | Path | Description |
 |---|---|
-| `/analytics` | User and space counts, plus sandbox and snapshot storage stats from Vercel |
-| `/users` | All users with their space counts |
-| `/spaces` | All spaces with their owner and sandbox name |
+| `/analytics` | User and space counts |
+| `/sandbox-stats` | Sandbox and snapshot storage stats from Vercel. Slow, since it lists every sandbox and snapshot. |
+| `/users` | All users with their space counts, last activity, Hack Club status and club role |
+| `/spaces` | All spaces with their name, owner, dates and sandbox name |
 | `/users/:userId/update` | Change `max_spaces` or `is_admin` |
 | `/users/:userId/delete` | Delete a user and their spaces |
 | `/spaces/:spaceId/delete` | Delete a space |

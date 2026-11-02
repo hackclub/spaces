@@ -1,7 +1,7 @@
 import express from 'express';
 import pg from '../../utils/db.js';
 import { requireAdmin } from '../../middlewares/admin.middleware.js';
-import { deleteSpace } from '../../utils/spaces.js';
+import { deleteSpace, spaceNameFor } from '../../utils/spaces.js';
 import { getSandboxStats } from '../../utils/sandboxes.js';
 
 const router = express.Router();
@@ -10,10 +10,6 @@ const INACTIVE_DAYS = 90;
 
 router.post('/analytics', requireAdmin, async (req, res) => {
   try {
-    const sandboxStats = getSandboxStats().catch((error) => {
-      console.error('Error fetching sandbox stats:', error);
-      return null;
-    });
     const [userCount] = await pg('users').count('id as count');
     const [spaceCount] = await pg('spaces').count('id as count');
     const [activeSpaces] = await pg('spaces')
@@ -33,8 +29,7 @@ router.post('/analytics', requireAdmin, async (req, res) => {
         totalSpaces: parseInt(spaceCount.count),
         activeSpaces: parseInt(activeSpaces.count),
         inactiveSpaces: parseInt(inactiveSpaces.count),
-        inactiveDays: INACTIVE_DAYS,
-        sandboxes: await sandboxStats
+        inactiveDays: INACTIVE_DAYS
       }
     });
   } catch (error) {
@@ -46,27 +41,47 @@ router.post('/analytics', requireAdmin, async (req, res) => {
   }
 });
 
+router.post('/sandbox-stats', requireAdmin, async (req, res) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: await getSandboxStats()
+    });
+  } catch (error) {
+    console.error('Error fetching sandbox stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch sandbox stats'
+    });
+  }
+});
+
 router.post('/users', requireAdmin, async (req, res) => {
   try {
     const users = await pg('users')
-      .select('id', 'email', 'username', 'max_spaces', 'is_admin')
-      .orderBy('id', 'desc');
-
-    const usersWithSpaces = await Promise.all(
-      users.map(async (user) => {
-        const [spaceCount] = await pg('spaces')
-          .where('user_id', user.id)
-          .count('id as count');
-        return {
-          ...user,
-          spaceCount: parseInt(spaceCount.count)
-        };
-      })
-    );
+      .leftJoin('spaces', 'spaces.user_id', 'users.id')
+      .select(
+        'users.id',
+        'users.email',
+        'users.username',
+        'users.max_spaces',
+        'users.is_admin',
+        'users.created_at',
+        'users.hackclub_verification_status',
+        pg.raw('users.hackclub_id is not null as hackclub_linked'),
+        pg.raw('users.password_hash is not null as has_password'),
+        pg.raw("exists (select 1 from user_club_memberships m where m.user_id = users.id and m.role = 'leader') as club_leader"),
+        pg.raw('exists (select 1 from user_club_memberships m where m.user_id = users.id) as in_club'),
+        pg.raw('count(spaces.id)::int as "spaceCount"'),
+        pg.raw('(count(spaces.id) filter (where spaces.running))::int as "runningCount"'),
+        pg.raw('max(coalesce(spaces.last_opened_at, spaces.started_at)) as last_active')
+      )
+      .groupBy('users.id')
+      .orderBy('users.id', 'desc');
 
     res.status(200).json({
       success: true,
-      data: usersWithSpaces
+      data: users
     });
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -80,13 +95,16 @@ router.post('/users', requireAdmin, async (req, res) => {
 router.post('/spaces', requireAdmin, async (req, res) => {
   try {
     const spaces = await pg('spaces')
-      .select('spaces.id', 'spaces.type', 'spaces.container_id', 'spaces.running', 'spaces.started_at', 'spaces.user_id', 'users.username', 'users.email')
+      .select('spaces.id', 'spaces.type', 'spaces.container_id', 'spaces.running', 'spaces.started_at', 'spaces.last_opened_at', 'spaces.created_at', 'spaces.workspace_dir', 'spaces.is_favorite', 'spaces.user_id', 'users.username', 'users.email')
       .join('users', 'spaces.user_id', 'users.id')
       .orderBy('spaces.id', 'desc');
 
     res.status(200).json({
       success: true,
-      data: spaces
+      data: spaces.map(({ workspace_dir, ...space }) => ({
+        ...space,
+        name: space.type === 'code-server' && workspace_dir ? spaceNameFor(workspace_dir) : null
+      }))
     });
   } catch (error) {
     console.error('Error fetching spaces:', error);

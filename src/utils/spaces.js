@@ -50,7 +50,7 @@ const sanitizeSpaceName = (name) => {
   return cleaned;
 };
 
-const spaceNameFor = (workspaceDir) => path.posix.basename(sanitizeWorkspaceDir(workspaceDir));
+export const spaceNameFor = (workspaceDir) => path.posix.basename(sanitizeWorkspaceDir(workspaceDir));
 
 export const toSandboxPath = (workspaceDir) => `${SANDBOX_ROOT}${sanitizeWorkspaceDir(workspaceDir).slice("/config".length)}`;
 
