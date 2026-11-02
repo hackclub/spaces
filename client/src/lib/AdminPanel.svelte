@@ -17,6 +17,10 @@
   let loadingUsers = true;
   let loadingSpaces = true;
   let deletingInactive = false;
+  export let url = '/admin';
+  export let navigate = () => {};
+
+  const TABS = ['analytics', 'users', 'spaces'];
   let activeTab = 'analytics';
   const PAGE_SIZE = 100;
   const VERIFIED_STATUSES = ['verified', 'verified_eligible', 'verified_but_over_18'];
@@ -128,7 +132,49 @@
     spaceSearch = user.email;
     spaceType = 'all';
     spaceStatus = 'all';
-    activeTab = 'spaces';
+    navigate(tabPath('spaces'));
+  }
+
+  function tabPath(tab) {
+    const params = new URLSearchParams();
+    if (tab === 'users') {
+      if (userSearch) params.set('q', userSearch);
+      if (userFilter !== 'all') params.set('filter', userFilter);
+      if (userSort !== 'newest') params.set('sort', userSort);
+    }
+    if (tab === 'spaces') {
+      if (spaceSearch) params.set('q', spaceSearch);
+      if (spaceType !== 'all') params.set('type', spaceType);
+      if (spaceStatus !== 'all') params.set('status', spaceStatus);
+      if (spaceSort !== 'newest') params.set('sort', spaceSort);
+    }
+    const query = params.toString();
+    return `/admin${tab === 'analytics' ? '' : `/${tab}`}${query ? `?${query}` : ''}`;
+  }
+
+  function applyUrl(value) {
+    const parsed = new URL(value, window.location.origin);
+    const tab = parsed.pathname.split('/')[2];
+    const params = parsed.searchParams;
+    activeTab = TABS.includes(tab) ? tab : 'analytics';
+    if (activeTab === 'users') {
+      userSearch = params.get('q') ?? '';
+      userFilter = params.get('filter') in userFilters ? params.get('filter') : 'all';
+      userSort = params.get('sort') in userSorts ? params.get('sort') : 'newest';
+    }
+    if (activeTab === 'spaces') {
+      spaceSearch = params.get('q') ?? '';
+      spaceType = params.get('type') ?? 'all';
+      spaceStatus = params.get('status') in spaceStatuses ? params.get('status') : 'all';
+      spaceSort = params.get('sort') in spaceSorts ? params.get('sort') : 'newest';
+    }
+  }
+
+  function syncUrl() {
+    const next = tabPath(activeTab);
+    if (window.location.pathname + window.location.search !== next) {
+      history.replaceState(null, '', next);
+    }
   }
 
   const userFilters = {
@@ -171,6 +217,9 @@
   };
 
   $: spaceTypes = [...new Set(spaces.map(space => space.type).filter(Boolean))].sort();
+
+  $: applyUrl(url);
+  $: activeTab, userSearch, userFilter, userSort, spaceSearch, spaceType, spaceStatus, spaceSort, syncUrl();
 
   $: userSearch, userFilter, userSort, (userLimit = PAGE_SIZE);
   $: spaceSearch, spaceType, spaceStatus, spaceSort, (spaceLimit = PAGE_SIZE);
@@ -362,9 +411,9 @@
   <h1>Admin Panel</h1>
 
   <div class="tabs">
-    <button class:active={activeTab === 'analytics'} on:click={() => activeTab = 'analytics'}>Analytics</button>
-    <button class:active={activeTab === 'users'} on:click={() => activeTab = 'users'}>Users</button>
-    <button class:active={activeTab === 'spaces'} on:click={() => activeTab = 'spaces'}>Spaces</button>
+    <button class:active={activeTab === 'analytics'} on:click={() => navigate(tabPath('analytics'))}>Analytics</button>
+    <button class:active={activeTab === 'users'} on:click={() => navigate(tabPath('users'))}>Users</button>
+    <button class:active={activeTab === 'spaces'} on:click={() => navigate(tabPath('spaces'))}>Spaces</button>
   </div>
 
   {#if activeTab === 'analytics'}

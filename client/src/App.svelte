@@ -17,7 +17,15 @@
 
     let isAuthenticated = false;
     let spaces = [];
-    let showAdminPanel = false;
+    let url = window.location.pathname + window.location.search;
+    $: showAdminPanel = url === "/admin" || url.startsWith("/admin/") || url.startsWith("/admin?");
+
+    function navigate(to) {
+        if (to !== window.location.pathname + window.location.search) {
+            history.pushState(null, "", to);
+        }
+        url = to;
+    }
     let showSettings = false;
     let showClubs = false;
     let showAuth = false;
@@ -26,6 +34,10 @@
 
     onMount(async () => {
         applyTheme(get(currentTheme));
+
+        window.addEventListener("popstate", () => {
+            url = window.location.pathname + window.location.search;
+        });
 
         const originalFetch = window.fetch;
         window.fetch = async (...args) => {
@@ -87,11 +99,11 @@
         <ThemeSwitcher />
         {#if showAdminPanel && userData.user.is_admin}
             <div class="nav-header">
-                <button on:click={() => (showAdminPanel = false)}
+                <button on:click={() => navigate("/")}
                     >Back to Dashboard</button
                 >
             </div>
-            <AdminPanel />
+            <AdminPanel {url} {navigate} />
         {:else if showSettings}
             <div class="nav-header">
                 <button on:click={() => (showSettings = false)}
@@ -109,7 +121,7 @@
         {:else}
             {#if userData.user.is_admin}
                 <div class="admin-link">
-                    <button on:click={() => (showAdminPanel = true)}
+                    <button on:click={() => navigate("/admin")}
                         >Admin Panel</button
                     >
                 </div>
