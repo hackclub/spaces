@@ -1,6 +1,7 @@
 import express from "express";
 import crypto from "crypto";
 import { stopExpiredSpaces } from "../../utils/auto-stop.js";
+import { deleteExpiredSessions } from "../../utils/sessions.js";
 
 const router = express.Router();
 
@@ -14,7 +15,8 @@ router.get("/auto-stop", async (req, res) => {
   }
 
   const summary = await stopExpiredSpaces();
-  res.status(200).json({ success: true, ...summary });
+  const expiredSessions = await deleteExpiredSessions();
+  res.status(200).json({ success: true, ...summary, expiredSessions });
 });
 
 export default router;

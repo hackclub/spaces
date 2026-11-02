@@ -1,13 +1,12 @@
 import pg from './db.js';
 import { EMAIL_REGEX, EMAIL_MAX_LENGTH, validateUsername } from './validation.js';
+import { findSessionUser } from './sessions.js';
 
 export const getUser = async (authorization) => {
   if (!authorization) return null;
-  
+
   try {
-    const user = await pg('users')
-      .where('authorization', authorization)
-      .first();
+    const user = await findSessionUser(authorization);
 
     return user;
   } catch (error) {
@@ -120,9 +119,7 @@ export const updateUser = async (authorization, updateData) => {
   }
 
   try {
-    const user = await pg('users')
-      .where('authorization', authorization)
-      .first();
+    const user = await getUser(authorization);
 
     if (!user) {
       const error = new Error("User not found");
@@ -186,7 +183,7 @@ export const updateUser = async (authorization, updateData) => {
     }
 
     const [updatedUser] = await pg('users')
-      .where('authorization', authorization)
+      .where('id', user.id)
       .update(updates)
       .returning(['id', 'email', 'username', 'hackatime_api_key']);
 

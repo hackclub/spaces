@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import pg from '../../utils/db.js';
 import { getUser } from '../../utils/user.js';
 import { extractAuth } from '../../middlewares/auth.middleware.js';
+import { createSession, setSessionCookie } from '../../utils/sessions.js';
 
 const router = express.Router();
 router.use(extractAuth);
@@ -10,8 +11,6 @@ router.use(extractAuth);
 const HACKCLUB_AUTH_URL = 'https://auth.hackclub.com/oauth/authorize';
 const HACKCLUB_TOKEN_URL = 'https://auth.hackclub.com/oauth/token';
 const HACKCLUB_ME_URL = 'https://auth.hackclub.com/api/v1/me';
-
-const randomToken = () => crypto.randomBytes(32).toString('hex');
 
 const STATE_COOKIE = 'oauth_state';
 const STATE_COOKIE_OPTIONS = {
@@ -201,6 +200,7 @@ router.get('/callback', async (req, res) => {
     }
 
     let user;
+    let hasSession = false;
 
     if (stateRow.mode === 'link') {
       const currentUser = await pg('users').where({ id: stateRow.user_id }).first();
@@ -213,6 +213,7 @@ router.get('/callback', async (req, res) => {
       if (sessionUser && sessionUser.id !== currentUser.id) {
         return res.redirect('/?error=oauth_link_user_mismatch');
       }
+      hasSession = Boolean(sessionUser);
 
       const existingWithHackclubId = await pg('users')
         .where({ hackclub_id: hackclubId })
@@ -255,35 +256,25 @@ router.get('/callback', async (req, res) => {
           username = username + crypto.randomBytes(4).toString('hex');
         }
 
-        const authToken = randomToken();
-
         const [newUser] = await pg('users')
           .insert({
             email,
             username,
-            authorization: authToken,
             max_spaces: 3,
             is_admin: false,
             hackclub_id: hackclubId,
             hackclub_verification_status: verificationStatus,
             hackclub_linked_at: new Date()
           })
-          .returning(['id', 'email', 'username', 'authorization', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
+          .returning(['id', 'email', 'username', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
 
         user = newUser;
       }
     }
 
-    const newAuthToken = randomToken();
-    await pg('users').where({ id: user.id }).update({ authorization: newAuthToken });
-    user = await pg('users').where({ id: user.id }).first();
-
-    res.cookie('auth_token', newAuthToken, {
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production'
-    });
+    if (!hasSession) {
+      setSessionCookie(res, await createSession(user.id), { sameSite: 'lax' });
+    }
 
     res.redirect("/#oauth_success=true");
 

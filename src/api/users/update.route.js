@@ -1,7 +1,6 @@
 import express from 'express';
-import { updateUser } from '../../utils/user.js';
+import { updateUser, getUser } from '../../utils/user.js';
 import { checkEmail } from '../../utils/airtable.js';
-import pg from '../../utils/db.js';
 
 const router = express.Router();
 
@@ -17,7 +16,7 @@ router.post('/', async (req, res) => {
       });
     }
     
-    const user = await pg('users').where('authorization', authorization).first();
+    const user = await getUser(authorization);
     if (!user) {
       return res.status(401).json({
         success: false,

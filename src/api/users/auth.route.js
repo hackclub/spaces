@@ -1,17 +1,14 @@
 import express from 'express';
 import { sendEmail, checkEmail } from '../../utils/airtable.js';
 import pg from '../../utils/db.js';
-import crypto from 'crypto';
 import { strictLimiter, authLimiter } from '../../middlewares/rate-limit.middleware.js';
 import { validateEmail, validateUsername, normalizeEmail } from '../../utils/validation.js';
 import { extractAuth } from '../../middlewares/auth.middleware.js';
+import { getUser } from '../../utils/user.js';
+import { createSession, deleteSession, setSessionCookie } from '../../utils/sessions.js';
 
 const router = express.Router();
 router.use(extractAuth);
-
-const randomToken = () => {
-  return crypto.randomBytes(32).toString('hex');
-};
 
 router.get("/me", async (req, res) => {
   try {
@@ -20,9 +17,7 @@ router.get("/me", async (req, res) => {
       return res.status(401).json({ success: false });
     }
 
-    const user = await pg('users')
-      .where('authorization', authorization)
-      .first();
+    const user = await getUser(authorization);
 
     if (!user) {
       return res.status(401).json({ success: false });
@@ -156,24 +151,16 @@ router.post('/signup', authLimiter, async (req, res) => {
       });
     }
 
-    const authToken = randomToken();
-
     const [newUser] = await pg('users')
       .insert({
         email,
         username,
-        authorization: authToken,
         max_spaces: 3,
         is_admin: false
       })
-      .returning(['id', 'email', 'username', 'authorization', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
+      .returning(['id', 'email', 'username', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
 
-    res.cookie('auth_token', newUser.authorization, {
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'strict',
-      secure: process.env.NODE_ENV === 'production'
-    });
+    setSessionCookie(res, await createSession(newUser.id));
 
     res.status(201).json({
       success: true,
@@ -247,30 +234,18 @@ router.post('/login', authLimiter, async (req, res) => {
       });
     }
 
-    const newAuthToken = randomToken();
-
-    const [updatedUser] = await pg('users')
-      .where('email', email)
-      .update({ authorization: newAuthToken })
-      .returning(['email', 'username', 'authorization', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
-
-    res.cookie('auth_token', updatedUser.authorization, {
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'strict',
-      secure: process.env.NODE_ENV === 'production'
-    });
+    setSessionCookie(res, await createSession(user.id));
 
     res.status(200).json({
       success: true,
       message: 'Login successful',
       data: {
-        email: updatedUser.email,
-        username: updatedUser.username,
-        is_admin: updatedUser.is_admin,
-        hackatime_api_key: updatedUser.hackatime_api_key,
-        hackclub_id: updatedUser.hackclub_id,
-        hackclub_verification_status: updatedUser.hackclub_verification_status
+        email: user.email,
+        username: user.username,
+        is_admin: user.is_admin,
+        hackatime_api_key: user.hackatime_api_key,
+        hackclub_id: user.hackclub_id,
+        hackclub_verification_status: user.hackclub_verification_status
       }
     });
 
@@ -297,16 +272,7 @@ router.post('/signout', async (req, res) => {
       });
     }
 
-    const user = await pg('users')
-      .where('authorization', authorization)
-      .first();
-
-    if (user) {
-      const newAuthToken = randomToken();
-      await pg('users')
-        .where('authorization', authorization)
-        .update({ authorization: newAuthToken });
-    }
+    await deleteSession(authorization);
 
     res.clearCookie('auth_token');
 
@@ -338,9 +304,7 @@ router.put('/update', async (req, res) => {
       });
     }
 
-    const user = await pg('users')
-      .where('authorization', authorization)
-      .first();
+    const user = await getUser(authorization);
 
     if (!user) {
       return res.status(404).json({

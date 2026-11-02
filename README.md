@@ -92,7 +92,7 @@ The API is served at `/api/v1`.
 
 ### Authentication
 
-Logging in sets an `auth_token` cookie, which the website sends automatically. Other clients can send the same token in the `Authorization` header instead. Each user has one token at a time: logging in again or signing out replaces it.
+Logging in sets an `auth_token` cookie, which the website sends automatically. Other clients can send the same token in the `Authorization` header instead. Each login gets its own token, so a user can be logged in on several devices at once. Tokens last 7 days, and signing out ends only that device's login. The database keeps only a SHA-256 hash of each token, in the `sessions` table, and the auto-stop job deletes expired ones.
 
 ### Users API (`/api/v1/users`)
 

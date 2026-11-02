@@ -1,4 +1,5 @@
 import pg from "./src/utils/db.js"
+import { hashToken, SESSION_MAX_AGE } from "./src/utils/sessions.js"
 import readline from "readline"
 
 const rl = new readline.createInterface({
@@ -21,12 +22,17 @@ async function main() {
         .insert({
             email,
             username: "supercool",
-            authorization: "w",
             max_spaces: 3,
             is_admin: true,
             hackclub_verification_status: "verified_eligible"
         })
-        .returning(['id', 'email', 'username', 'authorization', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
+        .returning(['id', 'email', 'username', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
+
+    await pg('sessions').insert({
+        user_id: newUser.id,
+        token_hash: hashToken("w"),
+        expires_at: new Date(Date.now() + SESSION_MAX_AGE)
+    })
 
     console.log("user created!")
     console.dir(newUser)

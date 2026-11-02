@@ -1,17 +1,15 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import crypto from 'crypto';
 import pg from '../../utils/db.js';
 import { checkMemberStatus, checkLeaderStatus, getOrCreateClubByName, linkUserToClub } from '../../utils/clubs.js';
 import { checkEmail } from '../../utils/airtable.js';
 import { authLimiter } from '../../middlewares/rate-limit.middleware.js';
 import { validateEmail, validateUsername, validatePassword, normalizeEmail } from '../../utils/validation.js';
+import { createSession, setSessionCookie } from '../../utils/sessions.js';
 
 const router = express.Router();
 
 const SALT_ROUNDS = 12;
-
-const randomToken = () => crypto.randomBytes(32).toString('hex');
 
 router.post('/club-member/signup', authLimiter, async (req, res) => {
   try {
@@ -90,18 +88,16 @@ router.post('/club-member/signup', authLimiter, async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-    const authToken = randomToken();
 
     const [newUser] = await pg('users')
       .insert({
         email,
         username,
         password_hash: passwordHash,
-        authorization: authToken,
         max_spaces: 3,
         is_admin: false
       })
-      .returning(['id', 'email', 'username', 'authorization', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
+      .returning(['id', 'email', 'username', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
 
     if (clubName) {
       try {
@@ -114,12 +110,7 @@ router.post('/club-member/signup', authLimiter, async (req, res) => {
       }
     }
 
-    res.cookie('auth_token', newUser.authorization, {
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'strict',
-      secure: process.env.NODE_ENV === 'production'
-    });
+    setSessionCookie(res, await createSession(newUser.id));
 
     res.status(201).json({
       success: true,
@@ -198,30 +189,18 @@ router.post('/club-member/login', authLimiter, async (req, res) => {
       return res.status(401).json(genericAuthError);
     }
 
-    const newAuthToken = randomToken();
-
-    const [updatedUser] = await pg('users')
-      .where('email', email)
-      .update({ authorization: newAuthToken })
-      .returning(['email', 'username', 'authorization', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
-
-    res.cookie('auth_token', updatedUser.authorization, {
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      sameSite: 'strict',
-      secure: process.env.NODE_ENV === 'production'
-    });
+    setSessionCookie(res, await createSession(user.id));
 
     res.status(200).json({
       success: true,
       message: 'Login successful',
       data: {
-        email: updatedUser.email,
-        username: updatedUser.username,
-        is_admin: updatedUser.is_admin,
-        hackatime_api_key: updatedUser.hackatime_api_key,
-        hackclub_id: updatedUser.hackclub_id,
-        hackclub_verification_status: updatedUser.hackclub_verification_status
+        email: user.email,
+        username: user.username,
+        is_admin: user.is_admin,
+        hackatime_api_key: user.hackatime_api_key,
+        hackclub_id: user.hackclub_id,
+        hackclub_verification_status: user.hackclub_verification_status
       }
     });
 
