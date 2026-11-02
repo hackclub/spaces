@@ -27,6 +27,16 @@
     onMount(async () => {
         applyTheme(get(currentTheme));
 
+        const originalFetch = window.fetch;
+        window.fetch = async (...args) => {
+            const response = await originalFetch(...args);
+            if (response.status === 401 && isAuthenticated) {
+                isAuthenticated = false;
+                spaces = [];
+            }
+            return response;
+        };
+
         isAuthenticated = await userData.refresh();
     });
 

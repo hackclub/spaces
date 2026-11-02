@@ -23,6 +23,11 @@ app.use(cors({
 	optionsSuccessStatus: 200
 }));
 
+app.use((req, res, next) => {
+	res.set('Cache-Control', 'no-store');
+	next();
+});
+
 app.get('/', (req, res) => {
 	res.status(200).json({
 		message: 'API is located at /api/v1',
