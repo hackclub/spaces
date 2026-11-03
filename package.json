@@ -21,12 +21,12 @@
     "airtable": "^0.12.2",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "dotenv": "^18.0.9",
     "express": "^4.22.3",
     "express-rate-limit": "^8.7.3",
-    "knex": "^3.1.0",
-    "pg": "^8.16.3"
+    "knex": "^3.3.0",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "concurrently": "^10.0.6",
