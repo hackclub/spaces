@@ -17,6 +17,7 @@ export async function up(knex) {
     `);
   }
 
+  await knex.raw('alter table users alter column "authorization" drop not null');
   await knex('users').whereNotNull('authorization').update({ authorization: null });
 }
 
