@@ -79,7 +79,7 @@ document.cookie = "auth_token=w; path=/"
 
 ## Deploying
 
-Vercel deploys the production branch automatically on every push. The build runs `npm run migrate` first, so new migrations apply before the new code goes live. Production environment variables are set in the Vercel project's settings.
+Vercel deploys the production branch automatically on every push. Production builds run `npm run migrate` first, so new migrations apply before the new code goes live. Preview builds skip it: they have no database, and unmerged migrations must never touch production. Production environment variables are set in the Vercel project's settings.
 
 ## Scripts
 
