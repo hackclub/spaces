@@ -1,0 +1,10 @@
+[
+  {"id": "hello", "name": "Hello", "description": "The classic: a circling heart, mouse clicks and text.", "files": ["main.lua"]},
+  {"id": "platformer", "name": "Platformer", "description": "Run, jump and collect coins. Keyboard input, tile collisions and a scrolling camera.", "files": ["main.lua", "player.lua", "conf.lua"]},
+  {"id": "particles", "name": "Particles", "description": "Fire, magic and snow from a ParticleSystem with a texture generated at runtime.", "files": ["main.lua", "conf.lua"]},
+  {"id": "shader", "name": "Shaders", "description": "A plasma pixel shader and a ripple + pixelate post-processing effect.", "files": ["main.lua", "conf.lua"]},
+  {"id": "physics", "name": "Physics", "description": "Box2D world with falling boxes, a spinning paddle and mouse dragging.", "files": ["main.lua", "conf.lua"]},
+  {"id": "textinput", "name": "Text input", "description": "love.textinput, key repeat and UTF-8 aware cursor editing.", "files": ["main.lua", "conf.lua"]},
+  {"id": "canvas", "name": "Canvas & blend modes", "description": "Every blend mode side by side, plus glowing trails on a canvas that is never cleared.", "files": ["main.lua", "conf.lua"]},
+  {"id": "synth", "name": "Synth", "description": "A playable keyboard: waveforms generated sample by sample into SoundData.", "files": ["main.lua", "conf.lua"]}
+]

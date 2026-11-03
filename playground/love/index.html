@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cupid</title>
+<meta name="description" content="Write, run and share LÖVE 12 games in your browser.">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%23e74a99' d='M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z'/></svg>">
+<script>
+  // Apply the saved theme before first paint (see settings.js).
+  (function () {
+    var t = 'system';
+    try {
+      var s = JSON.parse(localStorage.getItem('cupid.settings') || localStorage.getItem('smitten.settings') || '{}');
+      if (s && s.theme) t = s.theme;
+      else if (localStorage.getItem('lws.theme')) t = JSON.parse(localStorage.getItem('lws.theme'));
+    } catch (e) {}
+    if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
+<!-- CodeMirror 6, pinned. Every package resolves its dependencies through
+     this map ("*" = external deps on esm.sh), so there is exactly one copy of
+     each module. If the CDN is unreachable the editor falls back to a textarea. -->
+<script type="importmap">
+{
+  "imports": {
+    "@codemirror/state": "https://esm.sh/*@codemirror/state@6.5.2",
+    "@codemirror/view": "https://esm.sh/*@codemirror/view@6.38.1",
+    "@codemirror/language": "https://esm.sh/*@codemirror/language@6.11.2",
+    "@codemirror/commands": "https://esm.sh/*@codemirror/commands@6.8.1",
+    "@codemirror/search": "https://esm.sh/*@codemirror/search@6.5.11",
+    "@codemirror/autocomplete": "https://esm.sh/*@codemirror/autocomplete@6.18.6",
+    "@codemirror/legacy-modes/mode/lua": "https://esm.sh/*@codemirror/legacy-modes@6.5.1/mode/lua",
+    "@codemirror/legacy-modes/mode/clike": "https://esm.sh/*@codemirror/legacy-modes@6.5.1/mode/clike",
+    "@codemirror/legacy-modes/mode/javascript": "https://esm.sh/*@codemirror/legacy-modes@6.5.1/mode/javascript",
+    "@lezer/common": "https://esm.sh/*@lezer/common@1.2.3",
+    "@lezer/highlight": "https://esm.sh/*@lezer/highlight@1.2.1",
+    "@marijn/find-cluster-break": "https://esm.sh/*@marijn/find-cluster-break@1.0.2",
+    "crelt": "https://esm.sh/*crelt@1.0.6",
+    "style-mod": "https://esm.sh/*style-mod@4.1.2",
+    "w3c-keyname": "https://esm.sh/*w3c-keyname@2.2.8"
+  }
+}
+</script>
+<link rel="stylesheet" href="editor.css">
+</head>
+<body>
+<div id="app" class="booting">
+  <header class="topbar">
+    <button id="btn-sidebar" class="icon-btn" type="button" data-icon="sidebar" title="Toggle file panel (Ctrl+B)" aria-label="Toggle file panel" aria-pressed="true"></button>
+    <a class="brand" href="./" title="Cupid">
+      <span class="brand-mark" data-icon="heart" data-icon-size="16"></span>
+      <span class="brand-name">Cupid</span>
+    </a>
+    <span class="topbar-sep" aria-hidden="true"></span>
+    <button id="btn-project" class="project-btn" type="button" aria-haspopup="dialog" title="Projects (Ctrl+O)">
+      <span id="project-name" class="project-name">Loading…</span>
+      <span class="chev" data-icon="chevronDown" data-icon-size="14"></span>
+    </button>
+    <span class="topbar-sep" aria-hidden="true"></span>
+
+    <div class="toolbar run-controls" role="toolbar" aria-label="Run controls">
+      <button id="btn-run" class="btn primary run-btn" type="button" data-icon="play" data-icon-size="14" title="Save and run (F5)"><span class="label">Run</span></button>
+      <button id="btn-stop" class="icon-btn" type="button" data-icon="stop" title="Stop (Shift+F5)" aria-label="Stop" disabled></button>
+      <button id="btn-restart" class="icon-btn" type="button" data-icon="restart" title="Restart (F5)" aria-label="Restart" disabled></button>
+      <button id="btn-pause" class="icon-btn" type="button" data-icon="pause" title="Pause (F8)" aria-label="Pause" aria-pressed="false" disabled></button>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="toolbar" role="toolbar" aria-label="Project actions">
+      <button id="btn-share" class="btn ghost" type="button" data-icon="link" title="Copy a link that contains this project"><span class="label">Share</span></button>
+      <button id="btn-export" class="btn ghost" type="button" data-icon="download" aria-haspopup="menu" title="Export or download the project"><span class="label">Export</span></button>
+      <span class="topbar-sep" aria-hidden="true"></span>
+      <button id="btn-help" class="icon-btn" type="button" data-icon="help" aria-haspopup="menu" title="Help" aria-label="Help"></button>
+      <button id="btn-settings" class="icon-btn" type="button" data-icon="settings" title="Settings (Ctrl+,)" aria-label="Settings"></button>
+    </div>
+  </header>
+
+  <main id="workspace">
+    <aside id="sidebar" aria-label="Project files">
+      <div class="panel-header">
+        <span class="panel-title">Files</span>
+        <div class="panel-actions">
+          <button id="btn-new-file" class="icon-btn small" type="button" data-icon="filePlus" title="New file (Alt+N)" aria-label="New file"></button>
+          <button id="btn-new-folder" class="icon-btn small" type="button" data-icon="folderPlus" title="New folder" aria-label="New folder"></button>
+          <button id="btn-import" class="icon-btn small" type="button" data-icon="upload" title="Import files, folders or a .love/.zip" aria-label="Import" aria-haspopup="menu"></button>
+        </div>
+      </div>
+      <div id="file-tree" role="tree" aria-label="Files"></div>
+      <div class="sidebar-footer" id="sidebar-footer"></div>
+      <input type="file" id="input-files" multiple hidden>
+      <input type="file" id="input-folder" webkitdirectory multiple hidden>
+      <input type="file" id="input-archive" accept=".love,.zip,application/zip" hidden>
+      <input type="file" id="input-open-project" accept=".love,.zip,application/zip" hidden>
+    </aside>
+
+    <div class="splitter v" data-split="sidebar" role="separator" aria-orientation="vertical" aria-label="Resize file panel" tabindex="0"></div>
+
+    <section id="editor-pane" aria-label="Editor">
+      <div id="tabs" role="tablist" aria-label="Open files"></div>
+      <div id="editor-area">
+        <div id="editor-host"></div>
+        <div id="preview" hidden></div>
+        <div id="editor-empty" class="empty-state" hidden>
+          <span class="empty-icon" data-icon="code" data-icon-size="32"></span>
+          <h2>No file open</h2>
+          <p>Pick a file in the sidebar, or find one by name.</p>
+          <ul class="shortcut-list">
+            <li><span>Go to file</span><span><kbd class="mod">Ctrl</kbd><kbd>P</kbd></span></li>
+            <li><span>Command palette</span><span><kbd class="mod">Ctrl</kbd><kbd>Shift</kbd><kbd>P</kbd></span></li>
+            <li><span>Run the game</span><span><kbd>F5</kbd></span></li>
+            <li><span>Settings</span><span><kbd class="mod">Ctrl</kbd><kbd>,</kbd></span></li>
+          </ul>
+        </div>
+        <div id="editor-loading" class="loading-state"><span class="spinner" aria-hidden="true"></span>Loading editor…</div>
+      </div>
+      <div id="statusbar">
+        <button id="status-problems" class="status-item" type="button" title="Web compatibility issues found by the last check" hidden></button>
+        <span id="status-left"></span>
+        <span class="spacer"></span>
+        <button id="status-cursor" class="status-item" type="button" title="Go to line (Ctrl+G)"></button>
+        <button id="status-indent" class="status-item" type="button" title="Indentation (change in Settings)"></button>
+        <span id="status-lang" class="status-item static"></span>
+        <span id="status-engine" class="status-item static" title="Engine version"></span>
+      </div>
+    </section>
+
+    <div class="splitter v" data-split="right" role="separator" aria-orientation="vertical" aria-label="Resize game panel" tabindex="0"></div>
+
+    <section id="right-pane" aria-label="Game and console">
+      <div id="game-panel">
+        <div class="panel-header">
+          <span id="game-status" class="status-dot idle" aria-hidden="true"></span>
+          <span id="game-title" class="panel-title">Game</span>
+          <span id="game-state-label" class="panel-subtitle"></span>
+          <div class="panel-actions">
+            <button id="btn-game-fullscreen" class="icon-btn small" type="button" data-icon="maximize" title="Fullscreen game" aria-label="Fullscreen game"></button>
+            <button id="btn-popout" class="icon-btn small" type="button" data-icon="popout" title="Open the game in a new window" aria-label="Open game in a new window"></button>
+          </div>
+        </div>
+        <div id="game-stage">
+          <div id="game-empty" class="empty-state compact">
+            <button id="btn-run-big" class="play-big" type="button" title="Run (F5)" aria-label="Run the game" data-icon="play" data-icon-size="20"></button>
+            <p id="game-empty-text">Press <kbd>F5</kbd> to run your game</p>
+          </div>
+          <div id="game-loading" class="loading-state" hidden><span class="spinner" aria-hidden="true"></span>Starting LÖVE…</div>
+          <div id="game-paused" class="paused-badge" hidden>
+            <span data-icon="pause" data-icon-size="20"></span>Paused
+          </div>
+        </div>
+      </div>
+      <div class="splitter h" data-split="game" role="separator" aria-orientation="horizontal" aria-label="Resize console" tabindex="0"></div>
+      <div id="console-panel">
+        <div class="panel-header">
+          <span class="panel-title">Console</span>
+          <span id="console-badge" class="badge danger" hidden></span>
+          <div class="panel-actions">
+            <input id="console-filter" class="input small" type="search" placeholder="Filter" aria-label="Filter console output" spellcheck="false">
+            <select id="console-level" class="select small" aria-label="Show">
+              <option value="all">All</option>
+              <option value="out">Output</option>
+              <option value="err">Errors</option>
+            </select>
+            <button id="console-autoscroll" class="icon-btn small toggle" type="button" data-icon="scrollDown" title="Auto-scroll" aria-label="Auto-scroll" aria-pressed="true"></button>
+            <button id="console-copy" class="icon-btn small" type="button" data-icon="copy" title="Copy console output" aria-label="Copy console output"></button>
+            <button id="console-clear" class="icon-btn small" type="button" data-icon="clear" title="Clear console" aria-label="Clear console"></button>
+          </div>
+        </div>
+        <div id="console-output" role="log" aria-live="polite" tabindex="0"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="drop-overlay" hidden>
+  <div class="drop-card">
+    <span data-icon="upload" data-icon-size="28"></span>
+    <strong>Drop to import</strong>
+    <span>Files, folders, or a .love / .zip</span>
+  </div>
+</div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+  // If the app's modules fail to load, say so instead of spinning forever.
+  function bootFailed() {
+    var el = document.getElementById('editor-loading');
+    if (el && !window.studio) el.textContent = 'Cupid could not load. Check your connection and reload the page.';
+  }
+  setTimeout(bootFailed, 20000);
+</script>
+<script type="module" src="app.js" onerror="bootFailed()"></script>
+</body>
+</html>

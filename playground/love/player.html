@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Cupid Player</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>❤</text></svg>">
+<link rel="stylesheet" href="player.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
+</div>
+
+<div id="overlay" hidden>
+  <div class="card">
+    <div class="logo" aria-hidden="true">❤</div>
+    <div id="overlay-title">LÖVE</div>
+    <div id="overlay-status">Loading engine…</div>
+    <div class="bar"><div id="overlay-progress"></div></div>
+    <button id="play-button" hidden>▶ Play</button>
+    <label id="file-picker" hidden>
+      Drop a <code>.love</code> file here, or <u>choose one</u>
+      <input type="file" accept=".love,.zip" hidden>
+    </label>
+  </div>
+</div>
+
+<div id="dialog-bar" role="dialog" aria-labelledby="dialog-title" hidden>
+  <span id="dialog-title"></span>
+  <button id="dialog-ok"></button>
+  <button id="dialog-cancel"></button>
+</div>
+
+<div id="toolbar" hidden>
+  <button id="btn-fullscreen" title="Fullscreen (F11)">⛶</button>
+</div>
+
+<script type="module" src="player.js"></script>
+</body>
+</html>
