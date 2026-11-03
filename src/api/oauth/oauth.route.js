@@ -16,7 +16,7 @@ const STATE_COOKIE = 'oauth_state';
 const STATE_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'lax',
-  secure: process.env.NODE_ENV === 'production',
+  secure: true,
   path: '/api/v1/oauth'
 };
 

@@ -44,6 +44,6 @@ export const setSessionCookie = (res, token, { sameSite = 'strict' } = {}) => {
     httpOnly: true,
     maxAge: SESSION_MAX_AGE,
     sameSite,
-    secure: process.env.NODE_ENV === 'production'
+    secure: true
   });
 };
