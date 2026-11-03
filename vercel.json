@@ -12,7 +12,8 @@
       "framework": "vite",
       "rewrites": [
         { "source": "/godot/", "destination": "/godot/index.html" },
-        { "source": "/((?!godot/).*)", "destination": "/index.html" }
+        { "source": "/love/", "destination": "/love/index.html" },
+        { "source": "/((?!godot/|love/).*)", "destination": "/index.html" }
       ]
     }
   },
@@ -20,7 +21,8 @@
     { "path": "/api/v1/cron/auto-stop", "schedule": "*/5 * * * *" }
   ],
   "redirects": [
-    { "source": "/godot", "destination": "/godot/", "permanent": false }
+    { "source": "/godot", "destination": "/godot/", "permanent": false },
+    { "source": "/love", "destination": "/love/", "permanent": false }
   ],
   "headers": [
     {

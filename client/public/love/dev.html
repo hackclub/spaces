@@ -1,0 +1,20 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>LÖVE dev harness</title>
+<style>body{background:#222;color:#ddd;font:12px monospace;margin:0}canvas{display:block}</style></head>
+<body><canvas id="canvas" tabindex="1"></canvas><pre id="log"></pre>
+<script type="module">
+// Development harness: runs the Lua source in the URL hash (base64url) as main.lua.
+import createLove from './love.mjs';
+window.addEventListener('hashchange', () => location.reload());
+const log = (...a) => { document.getElementById('log').textContent += a.join(' ') + '\n'; console.log(...a); };
+const b64 = location.hash.slice(1).replace(/-/g, '+').replace(/_/g, '/');
+const main = new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+const Module = await createLove({ canvas: document.getElementById('canvas'), print: log, printErr: log,
+  onLoveQuit: (code) => log('quit', code) });
+Module.FS.mkdir('/game');
+Module.FS.writeFile('/game/main.lua', main);
+window.frameTimes = [];
+let last = performance.now();
+(function tick() { const n = performance.now(); frameTimes.push(n - last); last = n; requestAnimationFrame(tick); })();
+Module.callMain(['/game']);
+</script></body></html>

@@ -1,0 +1,66 @@
+{
+  "_comment": "Things a LÖVE game can do on desktop but not in the browser. Used by the editor (compat.js) and package.py. 'scope' is the text a pattern runs on: 'source' (comments removed) or 'code' (comments and string contents removed). A match is skipped if its line matches 'unless', or the file matches 'unlessFile'. 'once' reports only the first match in a project. {1} in a message is the pattern's first group.",
+  "rules": [
+    {
+      "id": "luajit-module",
+      "severity": "error",
+      "scope": "source",
+      "pattern": "\\brequire\\s*\\(?\\s*[\"'](ffi|jit|jit\\.\\w+|string\\.buffer)[\"']",
+      "unless": "pcall\\s*\\(\\s*require",
+      "message": "require('{1}') fails on the web: it's part of LuaJIT, and the browser runs standard Lua 5.1. Wrap it in pcall and fall back to plain Lua."
+    },
+    {
+      "id": "sockets",
+      "severity": "error",
+      "scope": "source",
+      "pattern": "\\brequire\\s*\\(?\\s*[\"'](socket|socket\\.\\w+|enet|ltn12|mime)[\"']",
+      "unless": "pcall\\s*\\(\\s*require",
+      "message": "require('{1}') fails on the web: browsers don't allow raw network sockets. Use require('https') for HTTP requests."
+    },
+    {
+      "id": "int64-literal",
+      "severity": "error",
+      "scope": "code",
+      "pattern": "\\b(?:0[xX][0-9a-fA-F]+|[0-9]+)[uU]?[lL][lL]\\b",
+      "message": "64-bit integer literals need LuaJIT's FFI, so this file won't load on the web."
+    },
+    {
+      "id": "compute-shaders",
+      "severity": "error",
+      "scope": "code",
+      "pattern": "\\blove\\.graphics\\.(newComputeShader|dispatchThreadgroups|dispatchIndirect)\\b",
+      "message": "love.graphics.{1} isn't available on the web: compute shaders need desktop graphics APIs, and browsers only offer WebGL 2 here."
+    },
+    {
+      "id": "processes",
+      "severity": "warning",
+      "scope": "code",
+      "pattern": "\\b(io\\.popen|os\\.execute)\\b",
+      "message": "{1} can't run programs in the browser."
+    },
+    {
+      "id": "jit-global",
+      "severity": "warning",
+      "scope": "code",
+      "pattern": "\\bjit\\.(on|off|flush|status|opt|version|arch|os)\\b",
+      "unlessFile": "\\bif\\s+(not\\s+)?jit\\b|\\bjit\\s+(and|then)\\b|type\\s*\\(\\s*jit\\s*\\)|rawget\\s*\\(\\s*_G\\s*,\\s*[\"']jit[\"']",
+      "message": "The jit global is nil on the web, so jit.{1} raises an error. Guard it with 'if jit then'."
+    },
+    {
+      "id": "get-os",
+      "severity": "info",
+      "scope": "source",
+      "pattern": "\\blove\\.system\\.getOS\\s*\\(\\s*\\)",
+      "once": true,
+      "message": "love.system.getOS() returns \"Web\" in the browser."
+    },
+    {
+      "id": "threads",
+      "severity": "info",
+      "scope": "code",
+      "pattern": "\\blove\\.thread\\.newThread\\b",
+      "once": true,
+      "message": "Threads work on the web, but they take turns with the game on one CPU core rather than running in parallel."
+    }
+  ]
+}

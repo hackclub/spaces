@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LÖVE API introspection</title>
+<style>
+  body { background: #141318; color: #e8e6ef; font: 14px/1.5 system-ui, sans-serif; margin: 24px; }
+  textarea { width: 100%; height: 60vh; background: #0d0d10; color: #cfcbe0; border: 1px solid #2f2d38; font: 12px ui-monospace, Menlo, monospace; }
+  iframe { width: 200px; height: 100px; border: 1px solid #2f2d38; }
+  button { background: #e74a99; color: #fff; border: 0; border-radius: 6px; padding: 6px 14px; font: inherit; cursor: pointer; }
+</style>
+</head>
+<body>
+<h1>LÖVE API introspection</h1>
+<p>Runs <code>introspect.lua</code> in the real engine and produces <code>love-api.json</code> for the editor's autocompletion.
+Save the result as <code>web/editor/love-api.json</code>.</p>
+<p id="status">Loading engine…</p>
+<iframe id="player" src="../player.html?embed=1" title="LÖVE player"></iframe>
+<p><button id="download" disabled>Download love-api.json</button></p>
+<textarea id="out" readonly></textarea>
+<script type="module">
+const status = document.getElementById('status');
+const out = document.getElementById('out');
+const frame = document.getElementById('player');
+const chunks = [];
+const lua = await (await fetch('introspect.lua')).text();
+const conf = 'function love.conf(t) t.window.width = 200; t.window.height = 100 end';
+
+window.addEventListener('message', (e) => {
+  const msg = e.data;
+  if (!msg || msg.source !== 'love-player') return;
+  if (msg.type === 'ready') {
+    status.textContent = 'Running…';
+    frame.contentWindow.postMessage({ type: 'run', files: { 'main.lua': lua, 'conf.lua': conf } }, '*');
+  } else if (msg.type === 'log') {
+    if (msg.text.startsWith('@@API ')) chunks.push(msg.text.slice(6));
+    else if (msg.text === '@@END') finish();
+  } else if (msg.type === 'error') {
+    status.textContent = 'Error: ' + msg.text;
+  }
+});
+
+function finish() {
+  const api = JSON.parse(chunks.join(''));
+  const json = JSON.stringify(api, null, 1);
+  out.value = json;
+  window.loveApi = api;
+  status.textContent = `Done: ${Object.keys(api.modules).length} modules, ${Object.keys(api.types).length} types (LÖVE ${api.version}).`;
+  const btn = document.getElementById('download');
+  btn.disabled = false;
+  btn.onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    a.download = 'love-api.json';
+    a.click();
+  };
+}
+</script>
+</body>
+</html>

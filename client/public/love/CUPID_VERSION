@@ -1,0 +1,5 @@
+Cupid (https://github.com/mostlime12195/cupid), the dist/ build output.
+Source commit: 95aa4597984c8dd3b0f25277b9ef2f451c00d27d
+Taken from the GitHub Pages artifact of workflow run 41556485515.
+To update: download the newest Pages artifact from that repo's "Deploy to
+GitHub Pages" workflow, untar it over this folder, and update this file.
