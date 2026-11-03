@@ -22,7 +22,19 @@
   ],
   "redirects": [
     { "source": "/godot", "destination": "/godot/", "permanent": false },
-    { "source": "/love", "destination": "/love/", "permanent": false }
+    {
+      "source": "/love/:path*",
+      "missing": [{ "type": "host", "value": "spaces-playground.hackclub.dev" }],
+      "destination": "https://spaces-playground.hackclub.dev/love/:path*",
+      "permanent": false
+    },
+    { "source": "/love", "destination": "https://spaces-playground.hackclub.dev/love/", "permanent": false },
+    {
+      "source": "/((?!love/).*)",
+      "has": [{ "type": "host", "value": "spaces-playground.hackclub.dev" }],
+      "destination": "https://spaces.hackclub.com/",
+      "permanent": false
+    }
   ],
   "headers": [
     {
