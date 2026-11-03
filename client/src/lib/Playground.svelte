@@ -22,7 +22,8 @@
       name: 'LÖVE 2D', 
       description: 'Framework for making 2D games in Lua',
       icon: 'https://love2d.org/apple-touch-icon.png',
-      status: 'coming-soon'
+      status: 'available',
+      url: 'https://spaces-playground.hackclub.dev/love/'
     }
   ];
 
