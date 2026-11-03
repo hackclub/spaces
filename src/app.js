@@ -28,6 +28,26 @@ app.use((req, res, next) => {
 	next();
 });
 
+const frontendOrigin = new URL(process.env.FRONTEND_URL || 'http://localhost:5173').origin;
+const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
+
+app.use((req, res, next) => {
+	const origin = req.get('origin');
+	if (SAFE_METHODS.includes(req.method) || !origin) return next();
+
+	let originHost = null;
+	try {
+		originHost = new URL(origin).host;
+	} catch (_) {}
+
+	if (origin === frontendOrigin || originHost === req.get('host')) return next();
+
+	res.status(403).json({
+		success: false,
+		message: 'Requests from other websites are not allowed'
+	});
+});
+
 app.get('/', (req, res) => {
 	res.status(200).json({
 		message: 'API is located at /api/v1',
