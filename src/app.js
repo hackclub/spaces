@@ -16,6 +16,10 @@ app.set('trust proxy', 1);
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use((req, res, next) => {
+	req.body ??= {};
+	next();
+});
 app.use(cookieParser());
 app.use(cors({
 	origin: process.env.FRONTEND_URL || 'http://localhost:5173',
