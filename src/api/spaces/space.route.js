@@ -165,6 +165,24 @@ router.post("/:spaceId/favorite", async (req, res) => {
   }
 });
 
+router.post("/:spaceId/open", async (req, res) => {
+  const { spaceId } = req.params;
+  const authorization = req.authToken;
+  try {
+    const user = await getUser(authorization);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+    const updated = await pg('spaces')
+      .where({ id: spaceId, user_id: user.id })
+      .update({ last_opened_at: new Date() });
+    if (!updated) return res.status(404).json({ error: "Space not found" });
+
+    res.json({ success: true });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
 router.post("/:spaceId/share/club", spaceShareLimiter, async (req, res) => {
   const { spaceId } = req.params;
   const { share } = req.body;

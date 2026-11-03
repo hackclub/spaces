@@ -162,7 +162,18 @@
     }
   }
 
+  function recordOpen(space) {
+    space.last_opened_at = new Date().toISOString();
+    spaces = spaces;
+    fetch(`${API_BASE}/spaces/${space.id}/open`, {
+      method: "POST",
+      credentials: "include",
+    }).catch((err) => console.error("Failed to record opening the space:", err));
+  }
+
   function openSpace(event, space) {
+    recordOpen(space);
+
     if (space.type !== "code-server" || !space.password || !space.access_url) {
       return;
     }

@@ -163,6 +163,7 @@ Creating a space needs a verified Hack Club account or a club membership. Only o
 | POST | `/password/:spaceId` | Change a space's password. Body: `{ "password" }` (8 to 128 characters). A running space restarts its app. |
 | DELETE | `/delete/:spaceId` | Delete a space and its sandbox |
 | POST | `/:spaceId/favorite` | Toggle favourite |
+| POST | `/:spaceId/open` | Record that the owner opened the space, for its "last opened" time |
 | POST | `/:spaceId/share/club` | Share with or unshare from the user's club leaders. Body: `{ "share": true }` |
 | GET | `/:spaceId/share/status` | Whether the space is shared |
 | GET | `/shared-with-me` | For club leaders: spaces their members shared. Links are returned without passwords. |
