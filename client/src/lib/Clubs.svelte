@@ -360,6 +360,11 @@
                     {space.running ? "Running" : "Stopped"}
                   </span>
                 </div>
+                {#if space.name}
+                  <div class="space-owner">
+                    Name: <strong>{space.name}</strong>
+                  </div>
+                {/if}
                 <div class="space-owner">
                   Shared by: <strong>{space.owner.username}</strong>
                 </div>

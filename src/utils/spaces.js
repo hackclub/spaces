@@ -63,16 +63,19 @@ export const spaceConfigs = {
   "blender": {
     kind: "gui",
     image: "linuxserver/blender",
+    label: "Blender",
     description: "Blender 3D"
   },
   "kicad": {
     kind: "gui",
     image: "linuxserver/kicad",
+    label: "KiCad",
     description: "KiCad PCB Design"
   },
   "freecad": {
     kind: "gui",
     image: "linuxserver/freecad",
+    label: "FreeCAD",
     description: "FreeCAD is a general-purpose parametric 3D computer-aided design (CAD) modeler and a building information modeling (BIM) software application with finite element method (FEM) support."
   }
 };
@@ -231,6 +234,7 @@ export const createContainer = async (password, type, authorization, name) => {
         user_id: user.id,
         container_id: sandboxName,
         type: typeLower,
+        name: isGui ? config.label : spaceName,
         description: config.description,
         image: isGui ? config.image : SANDBOX_IMAGE,
         port: isGui ? GUI_PORT : CODE_SERVER_PORT,
@@ -478,12 +482,12 @@ export const getUserSpaces = async (authorization) => {
   try {
     const spaces = await pg('spaces')
       .where('user_id', user.id)
-      .select(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'created_at', 'running', 'is_favorite', 'last_opened_at', 'workspace_dir']);
+      .select(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'created_at', 'running', 'is_favorite', 'last_opened_at', 'name', 'workspace_dir']);
 
     const spacesWithStatus = spaces.map(({ workspace_dir, ...space }) => {
       return {
         ...space,
-        name: spaceNameFor(workspace_dir),
+        folder: space.type === "code-server" ? spaceNameFor(workspace_dir) : null,
         status: space.running ? 'running' : 'stopped'
       };
     });

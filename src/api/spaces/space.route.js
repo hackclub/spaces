@@ -183,6 +183,30 @@ router.post("/:spaceId/open", async (req, res) => {
   }
 });
 
+router.post("/:spaceId/rename", async (req, res) => {
+  const { spaceId } = req.params;
+  const authorization = req.authToken;
+  try {
+    const user = await getUser(authorization);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+    const name = typeof req.body.name === "string" ? req.body.name.trim().replace(/\s+/g, " ") : "";
+    if (!name || name.length > 64) {
+      return res.status(400).json({ error: "Give your space a name of up to 64 characters." });
+    }
+
+    const [updated] = await pg('spaces')
+      .where({ id: spaceId, user_id: user.id })
+      .update({ name })
+      .returning(['id', 'name']);
+    if (!updated) return res.status(404).json({ error: "Space not found" });
+
+    res.json({ success: true, name: updated.name });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
 router.post("/:spaceId/share/club", spaceShareLimiter, async (req, res) => {
   const { spaceId } = req.params;
   const { share } = req.body;
@@ -358,6 +382,7 @@ router.get("/shared-with-me", async (req, res) => {
         spaces: sharedSpaces.map(space => ({
           id: space.space_id,
           type: space.type,
+          name: space.name,
           description: space.description,
           accessUrl: withoutCredentials(space.access_url),
           running: space.running,

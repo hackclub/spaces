@@ -1,7 +1,7 @@
 import express from 'express';
 import pg from '../../utils/db.js';
 import { requireAdmin } from '../../middlewares/admin.middleware.js';
-import { deleteSpace, spaceNameFor } from '../../utils/spaces.js';
+import { deleteSpace } from '../../utils/spaces.js';
 import { getSandboxStats } from '../../utils/sandboxes.js';
 import { getUsage } from '../../utils/space-runs.js';
 
@@ -116,16 +116,13 @@ router.post('/users', requireAdmin, async (req, res) => {
 router.post('/spaces', requireAdmin, async (req, res) => {
   try {
     const spaces = await pg('spaces')
-      .select('spaces.id', 'spaces.type', 'spaces.container_id', 'spaces.running', 'spaces.started_at', 'spaces.last_opened_at', 'spaces.created_at', 'spaces.workspace_dir', 'spaces.is_favorite', 'spaces.user_id', 'users.username', 'users.email')
+      .select('spaces.id', 'spaces.type', 'spaces.container_id', 'spaces.running', 'spaces.started_at', 'spaces.last_opened_at', 'spaces.created_at', 'spaces.name', 'spaces.is_favorite', 'spaces.user_id', 'users.username', 'users.email')
       .join('users', 'spaces.user_id', 'users.id')
       .orderBy('spaces.id', 'desc');
 
     res.status(200).json({
       success: true,
-      data: spaces.map(({ workspace_dir, ...space }) => ({
-        ...space,
-        name: space.type === 'code-server' && workspace_dir ? spaceNameFor(workspace_dir) : null
-      }))
+      data: spaces
     });
   } catch (error) {
     console.error('Error fetching spaces:', error);

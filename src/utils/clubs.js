@@ -491,6 +491,7 @@ export async function getSpacesSharedWithLeader(userId) {
     .select(
       'spaces.id as space_id',
       'spaces.type',
+      'spaces.name',
       'spaces.description',
       'spaces.access_url',
       'spaces.running',

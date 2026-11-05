@@ -162,6 +162,55 @@
     }
   }
 
+  let nameEditor = { spaceId: null, value: "", error: "", saving: false };
+
+  function openNameEditor(space) {
+    nameEditor = { spaceId: space.id, value: space.name || "", error: "", saving: false };
+  }
+
+  function closeNameEditor() {
+    nameEditor = { spaceId: null, value: "", error: "", saving: false };
+  }
+
+  async function submitRename(spaceId) {
+    const name = nameEditor.value.trim();
+    if (!name) {
+      nameEditor = { ...nameEditor, error: "Give your space a name." };
+      return;
+    }
+
+    nameEditor = { ...nameEditor, saving: true, error: "" };
+
+    try {
+      const response = await fetch(`${API_BASE}/spaces/${spaceId}/rename`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name }),
+      });
+      const data = await response.json();
+
+      if (response.ok) {
+        spaces = spaces.map((s) =>
+          s.id === spaceId ? { ...s, name: data.name } : s,
+        );
+        closeNameEditor();
+      } else {
+        nameEditor = {
+          ...nameEditor,
+          saving: false,
+          error: data.error || "Failed to rename the space.",
+        };
+      }
+    } catch (err) {
+      nameEditor = {
+        ...nameEditor,
+        saving: false,
+        error: ERROR_MESSAGES.NETWORK_ERROR,
+      };
+    }
+  }
+
   function recordOpen(space) {
     space.last_opened_at = new Date().toISOString();
     spaces = spaces;
@@ -817,8 +866,57 @@
                   <strong>Last opened:</strong>
                   {formatLastOpened(space.last_opened_at)}
                 </p>
-                {#if space.type === "code-server" && space.name}
-                  <p><strong>Name:</strong> {space.name}</p>
+                <p>
+                  <strong>Name:</strong>
+                  {space.name || "—"}
+                  <button
+                    type="button"
+                    class="link-button"
+                    on:click={() => openNameEditor(space)}
+                  >
+                    Rename
+                  </button>
+                </p>
+                {#if nameEditor.spaceId === space.id}
+                  <div class="password-editor">
+                    <input
+                      class="form-input"
+                      type="text"
+                      maxlength="64"
+                      placeholder="New name"
+                      bind:value={nameEditor.value}
+                      on:keydown={(e) => e.key === "Enter" && submitRename(space.id)}
+                      disabled={nameEditor.saving}
+                    />
+                    <button
+                      type="button"
+                      class="btn-primary"
+                      on:click={() => submitRename(space.id)}
+                      disabled={nameEditor.saving}
+                    >
+                      {nameEditor.saving ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      class="link-button"
+                      on:click={closeNameEditor}
+                      disabled={nameEditor.saving}
+                    >
+                      Cancel
+                    </button>
+                    {#if nameEditor.error}
+                      <p class="password-editor-error">
+                        {nameEditor.error}
+                      </p>
+                    {/if}
+                    {#if space.folder}
+                      <p class="password-editor-note">
+                        This only changes the name on your dashboard. The folder
+                        in VS Code stays "{space.folder}", and Hackatime keeps
+                        tracking this project under that name.
+                      </p>
+                    {/if}
+                  </div>
                 {/if}
                 {#if space.type === "code-server" && space.password}
                   <p class="space-password">

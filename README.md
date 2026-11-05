@@ -135,7 +135,7 @@ Creating a space needs a verified Hack Club account or a club membership. Only o
     "name": "my-project"
   }
   ```
-  `name` is required for VS Code spaces and ignored for the others. It names the project folder, which Hackatime uses as the project name. Spaces become `-`, and anything other than letters, numbers, `-`, `_` and `.` is removed. A name with nothing left after that is refused.
+  `name` is required for VS Code spaces and ignored for the others. It names the project folder, which Hackatime uses as the project name. Spaces become `-`, and anything other than letters, numbers, `-`, `_` and `.` is removed. A name with nothing left after that is refused. Blender, KiCad and FreeCAD spaces are named after the app. Any space can be renamed later; that only changes the name on the dashboard, not the folder.
 - **Response**:
   ```json
   {
@@ -159,10 +159,11 @@ Creating a space needs a verified Hack Club account or a club membership. Only o
 | POST | `/start/:spaceId` | Start a space. Returns `{ "message", "spaceId", "containerId" }`. |
 | POST | `/stop/:spaceId` | Stop a space. Vercel saves its snapshot. |
 | GET | `/status/:spaceId` | `{ "spaceId", "containerId", "type", "description", "accessUrl", "status", "running", "startedAt" }` |
-| GET | `/list` | The user's spaces, each with `id`, `type`, `name`, `access_url`, `password`, `running`, `is_favorite`, `last_opened_at` and `status` |
+| GET | `/list` | The user's spaces, each with `id`, `type`, `name`, `folder` (VS Code spaces only), `access_url`, `password`, `running`, `is_favorite`, `last_opened_at` and `status` |
 | POST | `/password/:spaceId` | Change a space's password. Body: `{ "password" }` (8 to 128 characters). A running space restarts its app. |
 | DELETE | `/delete/:spaceId` | Delete a space and its sandbox |
 | POST | `/:spaceId/favorite` | Toggle favourite |
+| POST | `/:spaceId/rename` | Rename a space on the dashboard. Body: `{ "name" }` (1 to 64 characters). The folder inside the space keeps its name. |
 | POST | `/:spaceId/open` | Record that the owner opened the space, for its "last opened" time |
 | POST | `/:spaceId/share/club` | Share with or unshare from the user's club leaders. Body: `{ "share": true }` |
 | GET | `/:spaceId/share/status` | Whether the space is shared |
