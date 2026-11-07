@@ -176,6 +176,7 @@ export const startCodeServer = async (sandbox, { password, workspacePath }) => {
 
 export const GUI_PORT = 3000;
 export const GUI_VCPUS = 2;
+export const GUI_USERNAME = "abc";
 const GUI_CONFIG_PATH = `${SANDBOX_ROOT}/config`;
 const GUI_CONTAINER = "space-app";
 
@@ -189,7 +190,7 @@ const START_DOCKER = [
 
 const guiAccessUrl = (domain, password) => {
   const url = new URL(domain);
-  url.username = "abc";
+  url.username = GUI_USERNAME;
   url.password = password;
   return url.toString();
 };
@@ -223,7 +224,7 @@ export const startGuiApp = async (sandbox, { image, password }) => {
       [
         `for i in $(seq 1 120); do code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${GUI_PORT}/); [ "$code" != 000 ] && break; sleep 0.5; done`,
         `[ "$code" = 401 ] || { echo "desktop answered $code without a password"; exit 2; }`,
-        `[ "$(curl -s -o /dev/null -w '%{http_code}' -u "abc:$SPACE_PASSWORD" http://127.0.0.1:${GUI_PORT}/)" = 200 ] || { echo "desktop rejected the space password"; exit 3; }`
+        `[ "$(curl -s -o /dev/null -w '%{http_code}' -u "${GUI_USERNAME}:$SPACE_PASSWORD" http://127.0.0.1:${GUI_PORT}/)" = 200 ] || { echo "desktop rejected the space password"; exit 3; }`
       ].join("; "),
       { env: { SPACE_PASSWORD: password }, timeoutMs: 2 * MINUTE }
     );

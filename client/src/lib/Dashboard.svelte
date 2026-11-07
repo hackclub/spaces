@@ -918,7 +918,20 @@
                     {/if}
                   </div>
                 {/if}
-                {#if space.type === "code-server" && space.password}
+                {#if space.password}
+                  {#if space.login_username}
+                    <p class="space-password">
+                      <strong>Username:</strong>
+                      <code>{space.login_username}</code>
+                      <button
+                        type="button"
+                        class="link-button"
+                        on:click={() => copyPassword(space.login_username)}
+                      >
+                        Copy
+                      </button>
+                    </p>
+                  {/if}
                   <p class="space-password">
                     <strong>Password:</strong>
                     <code
@@ -984,6 +997,12 @@
                           : "Takes effect next time you start this space."}
                       </p>
                     </div>
+                  {/if}
+                  {#if space.login_username}
+                    <p class="password-editor-note">
+                      If your browser asks you to log in when you open this
+                      space, use this username and password.
+                    </p>
                   {/if}
                 {/if}
               </div>
