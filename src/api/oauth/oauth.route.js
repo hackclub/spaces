@@ -17,11 +17,12 @@ const STATE_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'lax',
   secure: true,
-  path: '/api/v1/oauth'
+  path: '/api/v1/oauth',
+  maxAge: 10 * 60 * 1000
 };
 
 const setStateCookie = (res, state) => {
-  res.cookie(STATE_COOKIE, state, { ...STATE_COOKIE_OPTIONS, maxAge: 10 * 60 * 1000 });
+  res.cookie(STATE_COOKIE, state, STATE_COOKIE_OPTIONS);
 };
 
 const stateMatchesCookie = (req, state) => {
