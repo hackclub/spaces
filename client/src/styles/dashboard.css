@@ -505,6 +505,16 @@
   background: var(--muted);
 }
 
+.status-locked {
+  background: var(--orange);
+}
+
+.locked-note {
+  margin: 0;
+  font-size: 14px;
+  color: var(--orange);
+}
+
 .space-info {
   margin-bottom: 16px;
   font-size: 14px;

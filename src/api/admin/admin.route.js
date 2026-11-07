@@ -154,7 +154,7 @@ router.post('/users', requireAdmin, async (req, res) => {
 router.post('/spaces', requireAdmin, async (req, res) => {
   try {
     const spaces = await pg('spaces')
-      .select('spaces.id', 'spaces.type', 'spaces.container_id', 'spaces.running', 'spaces.started_at', 'spaces.last_opened_at', 'spaces.created_at', 'spaces.name', 'spaces.is_favorite', 'spaces.user_id', 'users.username', 'users.email')
+      .select('spaces.id', 'spaces.type', 'spaces.container_id', 'spaces.running', 'spaces.started_at', 'spaces.last_opened_at', 'spaces.created_at', 'spaces.name', 'spaces.is_favorite', 'spaces.locked_at', 'spaces.locked_reason', 'spaces.user_id', 'users.username', 'users.email')
       .join('users', 'spaces.user_id', 'users.id')
       .orderBy('spaces.id', 'desc');
 
@@ -395,6 +395,9 @@ router.post('/spaces/:spaceId/delete', requireAdmin, async (req, res) => {
     const owner = await pg('users').where('id', space.user_id).first();
     if (owner && !canManage(req.user, owner)) {
       return res.status(403).json({ success: false, message: "Only superadmins can delete admins' spaces" });
+    }
+    if (space.locked_at && !req.user.is_superadmin) {
+      return res.status(403).json({ success: false, message: 'Only superadmins can delete locked spaces' });
     }
 
     await logAdminAction(req.user, 'space.delete', {

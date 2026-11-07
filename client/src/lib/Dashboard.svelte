@@ -538,6 +538,8 @@
         return "status-stopped";
       case "created":
         return "status-created";
+      case "locked":
+        return "status-locked";
       default:
         return "status-unknown";
     }
@@ -1032,7 +1034,12 @@
               {/if}
 
               <div class="space-actions">
-                {#if actionLoading[space.id]}
+                {#if space.locked}
+                  <p class="locked-note">
+                    Paused by Hack Club moderators{space.locked_reason ? `: ${space.locked_reason}` : '.'}
+                    Contact Hack Club if you think this is a mistake.
+                  </p>
+                {:else if actionLoading[space.id]}
                   <button disabled class="action-btn">
                     {actionLoading[space.id]}...
                   </button>

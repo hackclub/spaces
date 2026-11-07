@@ -209,6 +209,15 @@ Admin only (admins and superadmins). Every route is a POST, and every change is 
 | `/spaces/:spaceId/delete` | Delete a space |
 | `/logs` | Superadmins only: the audit log of every admin action, newest first. Body: `{ "action", "search", "before", "limit" }` |
 
+### Moderation API (`/api/v1/admin/moderation`)
+
+Superadmins only. Every route is a POST and is written to the audit log. Owners are not told when their space is inspected or opened.
+
+| Path | Description |
+|---|---|
+| `/spaces/:spaceId/lock` | Stop the space, change its password and block the owner from starting, deleting or changing it. Body: `{ "reason" }` (required, shown to the owner) |
+| `/spaces/:spaceId/unlock` | Give the space back to its owner. Body: `{ "reason" }` (optional, for the log) |
+
 ### Other
 
 | Method | Path | Description |

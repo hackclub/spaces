@@ -83,6 +83,12 @@ export const spaceConfigs = {
 
 const configFor = (type) => spaceConfigs[(type || "").toLowerCase()];
 
+export const lockedError = (space, action = "used") => {
+  const error = new Error(`This space was paused by Hack Club moderators and can't be ${action}${space.locked_reason ? `. Reason: ${space.locked_reason}` : "."}`);
+  error.statusCode = 403;
+  return error;
+};
+
 const startSpaceApp = (sandbox, space, password) => {
   const config = configFor(space.type);
   if (config?.kind === "gui") {
@@ -132,6 +138,10 @@ export const changeSpacePassword = async (spaceId, newPassword, authorization) =
     const error = new Error("Space not found or not owned by user");
     error.statusCode = 404;
     throw error;
+  }
+
+  if (space.locked_at) {
+    throw lockedError(space, "changed");
   }
 
   const wasRunning = Boolean(space.running);
@@ -305,6 +315,10 @@ export const startContainer = async (spaceId, authorization) => {
       throw error;
     }
 
+    if (space.locked_at) {
+      throw lockedError(space, "started");
+    }
+
     const maxRunning = user.max_running ?? 1;
     const { n: runningCount } = await pg('spaces')
       .where('user_id', user.id)
@@ -358,7 +372,7 @@ export const startContainer = async (spaceId, authorization) => {
   } catch (err) {
     console.error("Sandbox error:", err);
 
-    if (err.statusCode === 404 || err.statusCode === 400) {
+    if (err.statusCode) {
       throw err;
     }
 
@@ -492,9 +506,22 @@ export const getUserSpaces = async (authorization) => {
   try {
     const spaces = await pg('spaces')
       .where('user_id', user.id)
-      .select(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'created_at', 'running', 'is_favorite', 'last_opened_at', 'name', 'workspace_dir']);
+      .select(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'created_at', 'running', 'is_favorite', 'last_opened_at', 'name', 'workspace_dir', 'locked_at', 'locked_reason']);
 
-    const spacesWithStatus = spaces.map(({ workspace_dir, ...space }) => {
+    const spacesWithStatus = spaces.map(({ workspace_dir, locked_at, locked_reason, ...space }) => {
+      if (locked_at) {
+        return {
+          ...space,
+          access_url: null,
+          password: null,
+          running: false,
+          folder: space.type === "code-server" ? spaceNameFor(workspace_dir) : null,
+          login_username: null,
+          locked: true,
+          locked_reason,
+          status: 'locked'
+        };
+      }
       return {
         ...space,
         folder: space.type === "code-server" ? spaceNameFor(workspace_dir) : null,
@@ -559,6 +586,10 @@ export const deleteSpace = async (spaceId, authorization, { isAdmin = false } = 
       throw error;
     }
 
+    if (space.locked_at && !isAdmin) {
+      throw lockedError(space, "deleted");
+    }
+
     const sandbox = await findSandbox(space.container_id);
     if (sandbox) {
       await sandbox.delete();
@@ -577,7 +608,7 @@ export const deleteSpace = async (spaceId, authorization, { isAdmin = false } = 
   } catch (err) {
     console.error("Error deleting space:", err);
 
-    if (err.statusCode === 404) {
+    if (err.statusCode) {
       throw err;
     }
 

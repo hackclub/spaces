@@ -3,6 +3,7 @@
   import { API_BASE } from '../config.js';
   import StatChart from './StatChart.svelte';
   import UserManageModal from './UserManageModal.svelte';
+  import SpaceModerationModal from './SpaceModerationModal.svelte';
   import AdminLogs from './AdminLogs.svelte';
   import { userData } from '../stores/user.svelte';
 
@@ -27,6 +28,7 @@
   let statsDays = 30;
   let loadingStats = false;
   let managing = null;
+  let moderating = null;
   const me = userData.user;
   export let url = '/admin';
   export let navigate = () => {};
@@ -232,6 +234,7 @@
     all: () => true,
     running: (space) => space.running,
     stopped: (space) => !space.running,
+    locked: (space) => Boolean(space.locked_at),
     favorite: (space) => space.is_favorite,
     inactive: isInactive,
     never: (space) => !lastOpened(space)
@@ -683,6 +686,7 @@
         <option value="all">Any status</option>
         <option value="running">Running</option>
         <option value="stopped">Stopped</option>
+        <option value="locked">Locked</option>
         <option value="favorite">Favourited</option>
         <option value="inactive">Inactive &gt; {analytics.inactiveDays ?? 90} days</option>
         <option value="never">Never opened</option>
@@ -732,11 +736,14 @@
                 <td>{space.type}</td>
                 <td>{space.username}</td>
                 <td>{space.email}</td>
-                <td>{space.running ? 'Running' : 'Stopped'}</td>
+                <td>{space.locked_at ? 'Locked' : space.running ? 'Running' : 'Stopped'}</td>
                 <td>{lastOpened(space) ? new Date(lastOpened(space)).toLocaleString() : 'Never'}</td>
                 <td>{formatDate(space.created_at)}</td>
                 <td class="sandbox-name">{space.container_id ?? '—'}</td>
-                <td>
+                <td class="row-actions">
+                  {#if me?.is_superadmin}
+                    <button class="manage-btn" on:click={() => (moderating = space)}>Moderate</button>
+                  {/if}
                   <button on:click={() => deleteSpace(space.id)} class="delete-btn">Delete</button>
                 </td>
               </tr>
@@ -814,6 +821,14 @@
     <AdminLogs />
   {/if}
 </div>
+
+{#if moderating}
+  <SpaceModerationModal
+    space={moderating}
+    on:close={() => (moderating = null)}
+    on:changed={loadSpaces}
+  />
+{/if}
 
 {#if managing}
   <UserManageModal
@@ -1040,6 +1055,14 @@
 
   .delete-selected-btn:hover {
     background-color: #c82333;
+  }
+
+  .row-actions {
+    white-space: nowrap;
+  }
+
+  .row-actions button + button {
+    margin-left: 6px;
   }
 
   .manage-btn {
