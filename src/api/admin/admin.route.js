@@ -4,6 +4,7 @@ import { requireAdmin } from '../../middlewares/admin.middleware.js';
 import { deleteSpace } from '../../utils/spaces.js';
 import { getSandboxStats } from '../../utils/sandboxes.js';
 import { getUsage } from '../../utils/space-runs.js';
+import { getStats } from '../../utils/stats.js';
 
 const router = express.Router();
 
@@ -59,6 +60,23 @@ router.post('/usage', requireAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch usage'
+    });
+  }
+});
+
+router.post('/stats', requireAdmin, async (req, res) => {
+  try {
+    const days = [7, 30, 90].includes(Number(req.body?.days)) ? Number(req.body.days) : 30;
+
+    res.status(200).json({
+      success: true,
+      data: await getStats(days)
+    });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch stats'
     });
   }
 });

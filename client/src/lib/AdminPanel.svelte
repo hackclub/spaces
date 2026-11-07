@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { API_BASE } from '../config.js';
+  import StatChart from './StatChart.svelte';
 
   let analytics = {
     totalUsers: 0,
@@ -19,12 +20,16 @@
   let loadingUsage = false;
   let usage = null;
   let usageDays = 7;
+  let stats = null;
+  let statsDays = 30;
+  let loadingStats = false;
   let deletingInactive = false;
   export let url = '/admin';
   export let navigate = () => {};
 
   const TABS = ['analytics', 'users', 'spaces', 'usage'];
   const USAGE_PERIODS = [1, 7, 30];
+  const STATS_PERIODS = [7, 30, 90];
   const HEAVY_HOURS_PER_DAY = 8;
   let activeTab = 'analytics';
   const PAGE_SIZE = 100;
@@ -153,6 +158,9 @@
       if (spaceStatus !== 'all') params.set('status', spaceStatus);
       if (spaceSort !== 'newest') params.set('sort', spaceSort);
     }
+    if (tab === 'analytics' && statsDays !== 30) {
+      params.set('days', statsDays);
+    }
     if (tab === 'usage' && usageDays !== 7) {
       params.set('days', usageDays);
     }
@@ -175,6 +183,10 @@
       spaceType = params.get('type') ?? 'all';
       spaceStatus = params.get('status') in spaceStatuses ? params.get('status') : 'all';
       spaceSort = params.get('sort') in spaceSorts ? params.get('sort') : 'newest';
+    }
+    if (activeTab === 'analytics') {
+      const days = Number(params.get('days'));
+      statsDays = STATS_PERIODS.includes(days) ? days : 30;
     }
     if (activeTab === 'usage') {
       const days = Number(params.get('days'));
@@ -231,8 +243,9 @@
   $: spaceTypes = [...new Set(spaces.map(space => space.type).filter(Boolean))].sort();
 
   $: applyUrl(url);
-  $: activeTab, userSearch, userFilter, userSort, spaceSearch, spaceType, spaceStatus, spaceSort, usageDays, syncUrl();
+  $: activeTab, userSearch, userFilter, userSort, spaceSearch, spaceType, spaceStatus, spaceSort, usageDays, statsDays, syncUrl();
   $: if (activeTab === 'usage') loadUsage(usageDays);
+  $: if (activeTab === 'analytics') loadStats(statsDays);
 
   function formatHours(hours = 0) {
     return hours < 1 ? `${Math.round(hours * 60)} min` : `${hours.toFixed(1)} h`;
@@ -301,6 +314,32 @@
       loadingSandboxStats = false;
     }
   }
+
+  async function loadStats(days) {
+    loadingStats = true;
+    try {
+      const response = await fetch(`${API_BASE}/admin/stats`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ days })
+      });
+      const data = await response.json();
+      if (response.ok && data.data.days === statsDays) {
+        stats = data.data;
+      }
+    } catch (err) {
+      console.error('Failed to load stats:', err);
+    } finally {
+      loadingStats = false;
+    }
+  }
+
+  function sumOf(rows, key) {
+    return rows.reduce((sum, row) => sum + (row[key] ?? 0), 0);
+  }
+
+  $: statRows = stats?.daily ?? [];
 
   async function loadUsage(days) {
     loadingUsage = true;
@@ -478,6 +517,94 @@
           <p class="stat">{analytics.inactiveSpaces ?? 0}</p>
         </div>
       </div>
+    {/if}
+
+    <h2 class="section-heading">Growth</h2>
+    <div class="spaces-controls">
+      <select bind:value={statsDays} class="sort-select">
+        <option value={7}>Last 7 days</option>
+        <option value={30}>Last 30 days</option>
+        <option value={90}>Last 90 days</option>
+      </select>
+    </div>
+    {#if loadingStats && !(stats && stats.days === statsDays)}
+      <p class="loading-note">Loading growth stats...</p>
+    {:else if stats}
+      <p class="stat-sub">
+        Sign-ups and logins are recorded from {formatDate(stats.recordedSince.users)}, and space use from {formatDate(stats.recordedSince.runs)}. Days before that are left empty.
+        Deleted users and spaces aren't counted. Days are in UTC.
+      </p>
+      <div class="analytics growth-cards">
+        <div class="stat-card">
+          <h3>Logged In, Last 7 Days</h3>
+          <p class="stat">{stats.totals.loggedInWeek ?? '—'}</p>
+          <p class="stat-sub">different people</p>
+        </div>
+        <div class="stat-card">
+          <h3>Used a Space, Last 7 Days</h3>
+          <p class="stat">{stats.totals.activeWeek ?? '—'}</p>
+          <p class="stat-sub">different people</p>
+        </div>
+        <div class="stat-card">
+          <h3>New Users</h3>
+          <p class="stat">{sumOf(statRows, 'newUsers')}</p>
+          <p class="stat-sub">in this period</p>
+        </div>
+        <div class="stat-card">
+          <h3>New Spaces</h3>
+          <p class="stat">{sumOf(statRows, 'newSpaces')}</p>
+          <p class="stat-sub">{stats.spaceTypes.map(t => `${t.count} ${t.type}`).join(', ') || 'in this period'}</p>
+        </div>
+      </div>
+      <div class="charts">
+        <StatChart title="New users per day" rows={statRows} key="newUsers" />
+        <StatChart title="Total users" rows={statRows} key="totalUsers" kind="line" />
+        <StatChart title="People who logged in per day" rows={statRows} key="loggedIn" detail={row => `${row.logins} login${row.logins === 1 ? '' : 's'}`} />
+        <StatChart title="People who used a space per day" rows={statRows} key="activePeople" />
+        <StatChart title="New spaces per day" rows={statRows} key="newSpaces" />
+        <StatChart title="Total spaces" rows={statRows} key="totalSpaces" kind="line" />
+        <StatChart title="Spaces started per day" rows={statRows} key="starts" />
+        <StatChart title="Hours of space use per day" rows={statRows} key="hours" format={formatHours} />
+      </div>
+      <details class="stats-table">
+        <summary>Show as a table</summary>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>New Users</th>
+                <th>Total Users</th>
+                <th>Logged In</th>
+                <th>Logins</th>
+                <th>Used a Space</th>
+                <th>New Spaces</th>
+                <th>Total Spaces</th>
+                <th>Starts</th>
+                <th>Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each [...statRows].reverse() as row (row.day)}
+                <tr>
+                  <td>{row.day}</td>
+                  <td>{row.newUsers ?? '—'}</td>
+                  <td>{row.totalUsers ?? '—'}</td>
+                  <td>{row.loggedIn ?? '—'}</td>
+                  <td>{row.logins ?? '—'}</td>
+                  <td>{row.activePeople ?? '—'}</td>
+                  <td>{row.newSpaces}</td>
+                  <td>{row.totalSpaces}</td>
+                  <td>{row.starts ?? '—'}</td>
+                  <td>{row.hours === null ? '—' : formatHours(row.hours)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    {:else}
+      <p class="stat-sub">Couldn't load growth stats.</p>
     {/if}
 
     <h2 class="section-heading">Sandboxes</h2>
@@ -813,6 +940,27 @@
     margin: 6px 0 0 0;
     font-size: 12px;
     color: #666;
+  }
+
+  .growth-cards {
+    margin-top: 12px;
+  }
+
+  .charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+  }
+
+  .stats-table {
+    margin-top: 20px;
+  }
+
+  .stats-table summary {
+    cursor: pointer;
+    font-size: 14px;
+    margin-bottom: 10px;
   }
 
   .section-heading {

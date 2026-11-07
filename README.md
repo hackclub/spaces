@@ -92,7 +92,7 @@ The API is served at `/api/v1`.
 
 ### Authentication
 
-Logging in sets an `auth_token` cookie, which the website sends automatically. Other clients can send the same token in the `Authorization` header instead. Each login gets its own token, so a user can be logged in on several devices at once. Tokens last 7 days, and signing out ends only that device's login. The database keeps only a SHA-256 hash of each token, in the `sessions` table, and the auto-stop job deletes expired ones.
+Logging in sets an `auth_token` cookie, which the website sends automatically. Other clients can send the same token in the `Authorization` header instead. Each login gets its own token, so a user can be logged in on several devices at once. Tokens last 7 days, and signing out ends only that device's login. The database keeps only a SHA-256 hash of each token, in the `sessions` table, and the auto-stop job deletes expired ones. Each login is also added to the `logins` table (user, time and method: `hackclub`, `email` or `password`), which is kept for the admin stats.
 
 ### Users API (`/api/v1/users`)
 
@@ -196,6 +196,8 @@ Admin only. Every route is a POST.
 | Path | Description |
 |---|---|
 | `/analytics` | User and space counts |
+| `/stats` | Daily growth for the last 7, 30 or 90 days (`{ "days": 30 }`): new users, logins, people using spaces, new spaces, starts and hours. Sign-up dates and the `logins` table start on 7 Nov 2026 and space use on 2 Nov 2026; earlier days come back as `null`, not 0. |
+| `/usage` | Running time per user for the last 1, 7 or 30 days (`{ "days": 7 }`) |
 | `/sandbox-stats` | Sandbox and snapshot storage stats from Vercel. Slow, since it lists every sandbox and snapshot. |
 | `/users` | All users with their space counts, last activity, Hack Club status and club role |
 | `/spaces` | All spaces with their name, owner, dates and sandbox name |

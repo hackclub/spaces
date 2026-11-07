@@ -160,7 +160,7 @@ router.post('/signup', authLimiter, async (req, res) => {
       })
       .returning(['id', 'email', 'username', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
 
-    setSessionCookie(res, await createSession(newUser.id));
+    setSessionCookie(res, await createSession(newUser.id, 'email'));
 
     res.status(201).json({
       success: true,
@@ -234,7 +234,7 @@ router.post('/login', authLimiter, async (req, res) => {
       });
     }
 
-    setSessionCookie(res, await createSession(user.id));
+    setSessionCookie(res, await createSession(user.id, 'email'));
 
     res.status(200).json({
       success: true,

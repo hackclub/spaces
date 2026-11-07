@@ -5,7 +5,15 @@ export const SESSION_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
 export const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
-export const createSession = async (userId) => {
+const recordLogin = async (userId, method) => {
+  try {
+    await pg('logins').insert({ user_id: userId, method });
+  } catch (err) {
+    console.error(`Failed to record login of user ${userId}:`, err);
+  }
+};
+
+export const createSession = async (userId, method) => {
   const token = crypto.randomBytes(32).toString('hex');
 
   await pg('sessions')
@@ -18,6 +26,8 @@ export const createSession = async (userId) => {
     token_hash: hashToken(token),
     expires_at: new Date(Date.now() + SESSION_MAX_AGE)
   });
+
+  await recordLogin(userId, method);
 
   return token;
 };
