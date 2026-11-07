@@ -8,6 +8,7 @@
   let loading = true;
   let linkLoading = false;
   let shipsLoading = false;
+  let shipsError = "";
   let sharedLoading = false;
   let error = "";
   let message = "";
@@ -49,6 +50,7 @@
 
   async function loadShips() {
     shipsLoading = true;
+    shipsError = "";
 
     try {
       const response = await fetch(`${API_BASE}/clubs/me/ships`, {
@@ -59,9 +61,12 @@
 
       if (response.ok && data.success) {
         ships = data.data.ships || [];
+      } else {
+        shipsError = data.message || "Couldn't load your club's ships.";
       }
     } catch (err) {
       console.error("Failed to load ships:", err);
+      shipsError = "Couldn't load your club's ships.";
     } finally {
       shipsLoading = false;
     }
@@ -305,35 +310,41 @@
       <div class="ships-section">
         {#if shipsLoading}
           <div class="loading">Loading ships...</div>
+        {:else if shipsError}
+          <div class="empty-state">
+            <p>{shipsError}</p>
+          </div>
         {:else if ships.length === 0}
           <div class="empty-state">
             <p>No ships found for your club yet.</p>
           </div>
         {:else}
           <div class="ships-grid">
-            {#each ships as ship}
+            {#each ships as ship (ship.id)}
               <div class="ship-card">
-                <div class="ship-name">{ship.workshop || "Unnamed Ship"}</div>
-                {#if ship.rating}
-                  <div class="ship-rating">⭐ {ship.rating}</div>
-                {/if}
-                {#if ship.codeUrl}
-                  <a
-                    href={ship.codeUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="ship-link"
-                  >
-                    View Code →
-                  </a>
-                {/if}
-                {#if ship.ysws && ship.ysws.length > 0}
-                  <div class="ship-ysws">
-                    {#each ship.ysws as ysws}
-                      <span class="ysws-badge">{ysws}</span>
-                    {/each}
-                  </div>
-                {/if}
+                <div class="ship-name">{ship.ysws || "Project"}</div>
+                <div class="ship-links">
+                  {#if ship.codeUrl}
+                    <a
+                      href={ship.codeUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="ship-link"
+                    >
+                      View Code →
+                    </a>
+                  {/if}
+                  {#if ship.playUrl}
+                    <a
+                      href={ship.playUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="ship-link"
+                    >
+                      Try It →
+                    </a>
+                  {/if}
+                </div>
               </div>
             {/each}
           </div>
@@ -652,10 +663,10 @@
     margin-bottom: 8px;
   }
 
-  .ship-rating {
-    color: var(--orange);
-    font-size: 14px;
-    margin-bottom: 8px;
+  .ship-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
   }
 
   .ship-link {
@@ -666,21 +677,6 @@
 
   .ship-link:hover {
     text-decoration: underline;
-  }
-
-  .ship-ysws {
-    margin-top: 12px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .ysws-badge {
-    background: rgba(90, 95, 255, 0.1);
-    color: var(--blue);
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
   }
 
   .shared-spaces-grid {

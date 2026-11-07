@@ -21,6 +21,17 @@ const router = express.Router();
 router.use(extractAuth);
 router.use(clubsLimiter);
 
+const toLink = (value) => {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const text = value.trim();
+  try {
+    const url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`);
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : null;
+  } catch {
+    return null;
+  }
+};
+
 router.get('/', (req, res) => {
   res.status(200).json({
     message: 'Clubs API Route'
@@ -302,16 +313,22 @@ router.get('/me/ships', async (req, res) => {
     }
 
     const ships = await getClubShips(membership.club_name);
+    if (!ships) {
+      return res.status(502).json({
+        success: false,
+        message: "Couldn't load your club's ships right now. Please try again later."
+      });
+    }
 
     res.status(200).json({
       success: true,
       data: {
         clubName: membership.club_name,
         ships: ships.map(ship => ({
-          workshop: ship.workshop,
-          rating: ship.Rating,
-          codeUrl: ship.code_url,
-          ysws: ship['YSWS–Name (from Unified YSWS Database)']
+          id: ship.id,
+          ysws: ship.fields?.YSWS || null,
+          codeUrl: toLink(ship.fields?.['Code URL']),
+          playUrl: toLink(ship.fields?.['Playable URL'])
         }))
       }
     });

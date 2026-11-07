@@ -282,17 +282,20 @@ export async function getClubShips(clubName) {
   }
 
   try {
-    const ships = await callClubsAPI('/ships', { club_name: clubName }, false);
-    
+    const ships = (await callClubsAPI('/ships', { club_name: clubName }, false)) ?? [];
+    if (!Array.isArray(ships)) {
+      throw new Error(`Clubs API sent ships that aren't a list: ${JSON.stringify(ships).slice(0, 200)}`);
+    }
+
     clubInfoCache.set(cacheKey, {
-      data: ships || [],
+      data: ships,
       timestamp: Date.now()
     });
 
-    return ships || [];
+    return ships;
   } catch (error) {
     console.error('Error fetching club ships:', error);
-    return cached?.data || [];
+    return cached?.data ?? null;
   }
 }
 
