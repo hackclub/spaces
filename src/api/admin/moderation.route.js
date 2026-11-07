@@ -11,6 +11,7 @@ import {
   listDirectory,
   readSpaceFile,
   looksLikeText,
+  openForModeration,
   MAX_PREVIEW_BYTES,
   MAX_DOWNLOAD_BYTES
 } from '../../utils/moderation.js';
@@ -155,6 +156,26 @@ router.post('/spaces/:spaceId/file', async (req, res) => {
     });
   } catch (error) {
     sendFileError(res, error, 'Failed to read the file');
+  }
+});
+
+router.post('/spaces/:spaceId/full-access', async (req, res) => {
+  try {
+    const found = await findSpace(req, res);
+    if (!found) return;
+    const reason = reasonFrom(req, res, { required: true });
+    if (reason === undefined) return;
+
+    await logAdminAction(req.user, 'space.full_access', {
+      targetUser: found.owner,
+      targetSpaceId: found.space.id,
+      details: { name: found.space.name, type: found.space.type, was_running: Boolean(found.space.running), locked: Boolean(found.space.locked_at) },
+      reason
+    });
+
+    res.status(200).json({ success: true, data: await openForModeration(found.space) });
+  } catch (error) {
+    sendFileError(res, error, 'Failed to open the space');
   }
 });
 

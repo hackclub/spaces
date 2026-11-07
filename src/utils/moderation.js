@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import path from 'path';
 import pg from './db.js';
-import { findSandbox, SANDBOX_ROOT } from './sandboxes.js';
+import { findSandbox, SANDBOX_ROOT, GUI_USERNAME } from './sandboxes.js';
+import { startSpaceApp, spaceConfigs } from './spaces.js';
 import { recordRunStop } from './space-runs.js';
 
 export const stopSandbox = async (space) => {
@@ -107,3 +108,27 @@ export const readSpaceFile = async (space, file, { maxBytes }) => {
 };
 
 export const looksLikeText = (buffer) => !buffer.subarray(0, 8000).includes(0);
+
+export const openForModeration = async (space) => {
+  const gui = spaceConfigs[(space.type || '').toLowerCase()]?.kind === 'gui';
+  const login = (accessUrl, password) => ({
+    type: space.type,
+    access_url: accessUrl,
+    password,
+    login_username: gui ? GUI_USERNAME : null
+  });
+
+  if (space.running && space.access_url && space.password) {
+    return { ...login(space.access_url, space.password), started: false };
+  }
+
+  const sandbox = await sandboxFor(space);
+  const password = space.password || crypto.randomBytes(16).toString('hex');
+  const accessUrl = await startSpaceApp(sandbox, space, password);
+
+  await pg('spaces')
+    .where('id', space.id)
+    .update({ access_url: space.locked_at ? null : accessUrl, password });
+
+  return { ...login(accessUrl, password), started: true };
+};

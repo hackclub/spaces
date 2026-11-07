@@ -18,6 +18,10 @@
   let filesLoading = false;
   let filesError = '';
   let preview = null;
+  let accessReason = '';
+  let access = null;
+  let opening = false;
+  let accessError = '';
   let lockReason = '';
   let unlockNote = '';
   let busy = '';
@@ -142,6 +146,60 @@
     }
   }
 
+  function openTab(tab, login) {
+    if (login.type !== 'code-server') {
+      tab.location.href = login.access_url;
+      return;
+    }
+    const loginUrl = new URL(login.access_url, window.location.origin);
+    loginUrl.pathname = `${loginUrl.pathname.replace(/\/$/, '')}/login`;
+    const doc = tab.document;
+    const form = doc.createElement('form');
+    form.method = 'POST';
+    form.action = loginUrl.toString();
+    for (const [name, value] of Object.entries({ password: login.password, base: '.' })) {
+      const input = doc.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    }
+    (doc.body || doc.documentElement).appendChild(form);
+    form.submit();
+  }
+
+  async function fullAccess() {
+    accessError = '';
+    if (!accessReason.trim()) {
+      accessError = 'Give a reason for the log.';
+      return;
+    }
+    const tab = window.open('', '_blank');
+    opening = true;
+    try {
+      const response = await post('full-access', { reason: accessReason.trim() });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        accessError = data.message || "Couldn't open the space.";
+        tab?.close();
+        return;
+      }
+      access = data.data;
+      explored = true;
+      if (tab) {
+        tab.opener = null;
+        openTab(tab, access);
+      } else {
+        accessError = 'Your browser blocked the new tab. Use the link below.';
+      }
+    } catch (err) {
+      accessError = 'Network error. Please try again.';
+      tab?.close();
+    } finally {
+      opening = false;
+    }
+  }
+
   function formatSize(bytes) {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -249,6 +307,24 @@
             <pre>{preview.text}</pre>
           {/if}
         </div>
+      {/if}
+    </section>
+
+    <section>
+      <h3>Full access</h3>
+      <p class="note">Opens the space as if you were its owner, in a new tab. You can change anything, so use this only when the file explorer isn't enough. If the space is stopped or locked, only its app starts, for you, and it's stopped again when you close this window.</p>
+      <div class="row">
+        <input type="text" placeholder="Reason (for the log)" bind:value={accessReason} maxlength="1000" />
+        <button class="btn" disabled={opening} on:click={fullAccess}>{opening ? 'Opening...' : 'Open space'}</button>
+      </div>
+      {#if opening}<p class="note">Starting the space if needed, this can take up to a minute...</p>{/if}
+      {#if accessError}<p class="result error">{accessError}</p>{/if}
+      {#if access}
+        <p class="note login">
+          <a href={access.access_url} target="_blank" rel="noopener noreferrer">Open again</a>
+          {#if access.login_username}· Username <code>{access.login_username}</code>{/if}
+          · Password <code>{access.password}</code>
+        </p>
       {/if}
     </section>
 
@@ -385,6 +461,13 @@
   .lock-btn:disabled {
     opacity: 0.6;
     cursor: default;
+  }
+
+  .login code {
+    background: #f3f3f3;
+    padding: 1px 4px;
+    border-radius: 3px;
+    word-break: break-all;
   }
 
   .path-row {

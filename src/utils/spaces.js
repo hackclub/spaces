@@ -89,7 +89,7 @@ export const lockedError = (space, action = "used") => {
   return error;
 };
 
-const startSpaceApp = (sandbox, space, password) => {
+export const startSpaceApp = (sandbox, space, password) => {
   const config = configFor(space.type);
   if (config?.kind === "gui") {
     return startGuiApp(sandbox, { image: config.image, password });
