@@ -56,8 +56,15 @@ router.post('/club-member/signup', authLimiter, async (req, res) => {
       });
     }
 
-    const { isMember, clubName } = await checkMemberStatus(email);
-    const { isLeader } = await checkLeaderStatus(email);
+    const { isMember, clubName, failed: memberCheckFailed } = await checkMemberStatus(email);
+    const { isLeader, failed: leaderCheckFailed } = await checkLeaderStatus(email);
+
+    if (memberCheckFailed || leaderCheckFailed) {
+      return res.status(503).json({
+        success: false,
+        message: "Couldn't check your club membership right now. Please try again in a few minutes."
+      });
+    }
 
     if (isLeader) {
       return res.status(403).json({
@@ -227,8 +234,15 @@ router.post('/club-member/check', async (req, res) => {
     }
     const email = emailValidation.normalized;
 
-    const { isMember } = await checkMemberStatus(email);
-    const { isLeader } = await checkLeaderStatus(email);
+    const { isMember, failed: memberCheckFailed } = await checkMemberStatus(email);
+    const { isLeader, failed: leaderCheckFailed } = await checkLeaderStatus(email);
+
+    if (memberCheckFailed || leaderCheckFailed) {
+      return res.status(503).json({
+        success: false,
+        message: "Couldn't check your club membership right now. Please try again in a few minutes."
+      });
+    }
 
     if (!isMember && !isLeader) {
       return res.status(404).json({

@@ -94,7 +94,10 @@ export async function checkLeaderStatus(email) {
 
   try {
     const result = await callClubsAPI('/leader', { email }, true);
-    
+    if (result?.error) {
+      throw new Error(`Clubs API: ${result.error}`);
+    }
+
     if (result?.club_name) {
       return { isLeader: true, clubName: result.club_name };
     }
@@ -106,7 +109,7 @@ export async function checkLeaderStatus(email) {
     return { isLeader: false, clubName: null };
   } catch (error) {
     console.error('Error checking leader status:', error);
-    return { isLeader: false, clubName: null };
+    return { isLeader: false, clubName: null, failed: true };
   }
 }
 
@@ -117,6 +120,9 @@ export async function checkMemberStatus(email) {
 
   try {
     const result = await callClubsAPI('/member/email', { email }, true);
+    if (result?.error) {
+      throw new Error(`Clubs API: ${result.error}`);
+    }
 
     if (!result || !result.club_name) {
       return { isMember: false, clubName: null };
@@ -125,7 +131,7 @@ export async function checkMemberStatus(email) {
     return { isMember: true, clubName: result.club_name };
   } catch (error) {
     console.error('Error checking member status:', error);
-    return { isMember: false, clubName: null };
+    return { isMember: false, clubName: null, failed: true };
   }
 }
 
@@ -134,17 +140,17 @@ export async function checkClubAffiliation(email) {
     return { affiliated: false, role: null, clubName: null };
   }
 
-  const { isLeader, clubName: leaderClubName } = await checkLeaderStatus(email);
-  if (isLeader && leaderClubName) {
-    return { affiliated: true, role: 'leader', clubName: leaderClubName };
+  const leader = await checkLeaderStatus(email);
+  if (leader.isLeader && leader.clubName) {
+    return { affiliated: true, role: 'leader', clubName: leader.clubName };
   }
 
-  const { isMember, clubName: memberClubName } = await checkMemberStatus(email);
-  if (isMember && memberClubName) {
-    return { affiliated: true, role: 'member', clubName: memberClubName };
+  const member = await checkMemberStatus(email);
+  if (member.isMember && member.clubName && !leader.failed) {
+    return { affiliated: true, role: 'member', clubName: member.clubName };
   }
 
-  return { affiliated: false, role: null, clubName: null };
+  return { affiliated: false, role: null, clubName: null, failed: Boolean(leader.failed || member.failed) };
 }
 
 /**
@@ -388,9 +394,13 @@ export async function refreshMembershipIfStale(userId, maxAgeHours = 24) {
     return membership;
   }
 
-  const { isLeader, clubName } = await checkLeaderStatus(user.email);
-  
-  if (!isLeader || !clubName) {
+  const { isLeader, clubName, failed } = await checkLeaderStatus(user.email);
+
+  if (failed) {
+    return membership;
+  }
+
+  if (!isLeader) {
     await pg('user_club_memberships')
       .where('id', membership.id)
       .update({
@@ -402,7 +412,7 @@ export async function refreshMembershipIfStale(userId, maxAgeHours = 24) {
     return getUserPrimaryMembership(userId);
   }
 
-  if (clubName !== membership.club_name) {
+  if (clubName && clubName !== membership.club_name) {
     const newClub = await getOrCreateClubByName(clubName);
     if (newClub) {
       await linkUserToClub(userId, newClub.id, 'leader', 'leader_email');
@@ -413,6 +423,7 @@ export async function refreshMembershipIfStale(userId, maxAgeHours = 24) {
   await pg('user_club_memberships')
     .where('id', membership.id)
     .update({
+      ...(clubName ? { role: 'leader', source: 'leader_email' } : {}),
       last_verified_at: new Date(),
       updated_at: new Date()
     });

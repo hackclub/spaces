@@ -65,7 +65,14 @@ router.post('/link', async (req, res) => {
       });
     }
 
-    const { affiliated, role, clubName } = await checkClubAffiliation(user.email);
+    const { affiliated, role, clubName, failed } = await checkClubAffiliation(user.email);
+
+    if (failed) {
+      return res.status(503).json({
+        success: false,
+        message: "Couldn't check your club right now. Please try again in a few minutes."
+      });
+    }
 
     if (!affiliated || !clubName) {
       return res.status(404).json({
