@@ -6,6 +6,18 @@
 
   const dispatch = createEventDispatcher();
 
+  const SHORTCUTS = [
+    { label: 'Workspace', path: '/vercel/sandbox' },
+    { label: 'Home folders', path: '/home' },
+    { label: 'Whole machine', path: '/' }
+  ];
+
+  let explorer = null;
+  let explored = false;
+  let pathInput = '/vercel/sandbox';
+  let filesLoading = false;
+  let filesError = '';
+  let preview = null;
   let lockReason = '';
   let unlockNote = '';
   let busy = '';
@@ -60,7 +72,86 @@
     }
   }
 
+  async function post(path, body) {
+    return fetch(`${API_BASE}/admin/moderation/spaces/${space.id}/${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body)
+    });
+  }
+
+  async function browse(dir) {
+    filesLoading = true;
+    filesError = '';
+    preview = null;
+    explored = true;
+    try {
+      const response = await post('files', { path: dir });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        filesError = data.message || "Couldn't list that folder.";
+        return;
+      }
+      explorer = data.data;
+      pathInput = explorer.path;
+    } catch (err) {
+      filesError = 'Network error. Please try again.';
+    } finally {
+      filesLoading = false;
+    }
+  }
+
+  const childPath = (name) => `${explorer.path === '/' ? '' : explorer.path}/${name}`;
+
+  async function openFile(file) {
+    filesLoading = true;
+    filesError = '';
+    try {
+      const response = await post('file', { path: file });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        filesError = data.message || "Couldn't open that file.";
+        return;
+      }
+      preview = data.data;
+    } catch (err) {
+      filesError = 'Network error. Please try again.';
+    } finally {
+      filesLoading = false;
+    }
+  }
+
+  async function download(file) {
+    filesError = '';
+    try {
+      const response = await post('file', { path: file, download: true });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        filesError = data.message || "Couldn't download that file.";
+        return;
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.split('/').pop() || 'file';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      filesError = 'Network error. Please try again.';
+    }
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+
   function close() {
+    if (explored && !space.running) {
+      post('release', {}).catch(() => {});
+    }
     dispatch('close');
   }
 </script>
@@ -100,6 +191,63 @@
         <div class="row">
           <input type="text" placeholder="Reason (the owner sees this)" bind:value={lockReason} maxlength="1000" />
           <button class="lock-btn" disabled={busy !== ''} on:click={lock}>{busy === 'lock' ? 'Locking...' : 'Lock space'}</button>
+        </div>
+      {/if}
+    </section>
+
+    <section>
+      <h3>Files</h3>
+      {#if !explorer}
+        <p class="note">Browse and download this space's files without opening it. A stopped space wakes up for this and is stopped again when you close this window.</p>
+      {/if}
+      <div class="row">
+        {#each SHORTCUTS as shortcut}
+          <button class="btn" disabled={filesLoading} on:click={() => browse(shortcut.path)}>{shortcut.label}</button>
+        {/each}
+      </div>
+      <form class="row path-row" on:submit|preventDefault={() => browse(pathInput)}>
+        <input type="text" bind:value={pathInput} aria-label="Folder path" />
+        <button class="btn" type="submit" disabled={filesLoading}>Go</button>
+      </form>
+      {#if filesLoading}
+        <p class="note">{explorer ? 'Loading...' : 'Waking the space up, this can take a few seconds...'}</p>
+      {/if}
+      {#if filesError}<p class="result error">{filesError}</p>{/if}
+      {#if explorer}
+        <div class="files">
+          {#if explorer.parent}
+            <button class="file-row" on:click={() => browse(explorer.parent)}><span>📁 ..</span><span></span></button>
+          {/if}
+          {#each explorer.entries as entry (entry.name)}
+            {#if entry.type === 'folder'}
+              <button class="file-row" on:click={() => browse(childPath(entry.name))}><span>📁 {entry.name}</span><span class="muted">{new Date(entry.modified).toLocaleDateString()}</span></button>
+            {:else}
+              <div class="file-row">
+                <button class="file-name" on:click={() => openFile(childPath(entry.name))}>{entry.type === 'link' ? '🔗' : '📄'} {entry.name}</button>
+                <span class="muted">{formatSize(entry.size)} · {new Date(entry.modified).toLocaleDateString()}
+                  <button class="link" on:click={() => download(childPath(entry.name))}>Download</button>
+                </span>
+              </div>
+            {/if}
+          {:else}
+            <p class="note">This folder is empty.</p>
+          {/each}
+        </div>
+      {/if}
+      {#if preview}
+        <div class="preview">
+          <div class="preview-head">
+            <strong>{preview.path}</strong>
+            <span>
+              <button class="link" on:click={() => download(preview.path)}>Download</button>
+              <button class="link" on:click={() => (preview = null)}>Close</button>
+            </span>
+          </div>
+          {#if preview.binary}
+            <p class="note">Not a text file ({formatSize(preview.size)}). Download it to look inside.</p>
+          {:else}
+            <pre>{preview.text}</pre>
+          {/if}
         </div>
       {/if}
     </section>
@@ -237,6 +385,95 @@
   .lock-btn:disabled {
     opacity: 0.6;
     cursor: default;
+  }
+
+  .path-row {
+    margin-top: 8px;
+  }
+
+  .files {
+    margin-top: 10px;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .file-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 6px 10px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid #f3f3f3;
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    color: inherit;
+  }
+
+  button.file-row {
+    cursor: pointer;
+  }
+
+  button.file-row:hover,
+  .file-name:hover {
+    background: #f7f9fc;
+  }
+
+  .file-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0;
+    background: none;
+    border: none;
+    font: inherit;
+    text-align: left;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .link {
+    margin-left: 8px;
+    padding: 0;
+    background: none;
+    border: none;
+    color: #007bff;
+    text-decoration: underline;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .preview {
+    margin-top: 12px;
+    border: 1px solid #eee;
+    border-radius: 6px;
+  }
+
+  .preview-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 10px;
+    border-bottom: 1px solid #eee;
+    font-size: 13px;
+    word-break: break-all;
+  }
+
+  pre {
+    margin: 0;
+    padding: 10px;
+    max-height: 360px;
+    overflow: auto;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
 
   .note {

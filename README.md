@@ -217,6 +217,9 @@ Superadmins only. Every route is a POST and is written to the audit log. Owners 
 |---|---|
 | `/spaces/:spaceId/lock` | Stop the space, change its password and block the owner from starting, deleting or changing it. Body: `{ "reason" }` (required, shown to the owner) |
 | `/spaces/:spaceId/unlock` | Give the space back to its owner. Body: `{ "reason" }` (optional, for the log) |
+| `/spaces/:spaceId/files` | List a folder in the space, as root. Body: `{ "path" }` (absolute, default `/vercel/sandbox`). A stopped space wakes up for this. |
+| `/spaces/:spaceId/file` | Read a file. Body: `{ "path", "download" }`. Without `download`, returns text files up to 1 MB as JSON; with `"download": true`, sends the file itself, up to 4 MB (Vercel's response limit). |
+| `/spaces/:spaceId/release` | Stop a space that was woken up for moderation, unless its owner is using it |
 
 ### Other
 

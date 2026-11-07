@@ -1,6 +1,7 @@
 import crypto from 'crypto';
+import path from 'path';
 import pg from './db.js';
-import { findSandbox } from './sandboxes.js';
+import { findSandbox, SANDBOX_ROOT } from './sandboxes.js';
 import { recordRunStop } from './space-runs.js';
 
 export const stopSandbox = async (space) => {
@@ -32,3 +33,77 @@ export const lockSpace = async (space, actor, reason) => {
 export const unlockSpace = (space) => pg('spaces')
   .where('id', space.id)
   .update({ locked_at: null, locked_reason: null, locked_by: null });
+
+export const MAX_PREVIEW_BYTES = 1024 * 1024;
+export const MAX_DOWNLOAD_BYTES = 4 * 1024 * 1024;
+export const DEFAULT_BROWSE_PATH = SANDBOX_ROOT;
+
+const fileError = (message, statusCode) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
+export const cleanPath = (value) => {
+  const raw = typeof value === 'string' && value.trim() ? value.trim() : DEFAULT_BROWSE_PATH;
+  if (!raw.startsWith('/') || raw.includes('\0')) {
+    throw fileError('Use an absolute path, like /vercel/sandbox', 400);
+  }
+  return path.posix.normalize(raw);
+};
+
+const sandboxFor = async (space) => {
+  const sandbox = await findSandbox(space.container_id);
+  if (!sandbox) {
+    throw fileError("This space's machine could not be found", 404);
+  }
+  return sandbox;
+};
+
+const runAsRoot = async (sandbox, script, env) => {
+  const result = await sandbox.runCommand({ cmd: 'bash', args: ['-c', script], env, sudo: true });
+  return { exitCode: result.exitCode, stdout: await result.stdout() };
+};
+
+export const listDirectory = async (space, dir) => {
+  const sandbox = await sandboxFor(space);
+  const { exitCode, stdout } = await runAsRoot(
+    sandbox,
+    'test -d "$DIR" || exit 3; find "$DIR" -mindepth 1 -maxdepth 1 -printf "%y\t%s\t%T@\t%f\n" 2>/dev/null | head -n 2000',
+    { DIR: dir }
+  );
+  if (exitCode === 3) {
+    throw fileError('That folder does not exist', 404);
+  }
+
+  const kinds = { d: 'folder', f: 'file', l: 'link' };
+  return stdout
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const [kind, size, modified, ...name] = line.split('\t');
+      return { name: name.join('\t'), type: kinds[kind] ?? 'other', size: Number(size), modified: new Date(Number(modified) * 1000).toISOString() };
+    })
+    .sort((x, y) => (x.type === 'folder') === (y.type === 'folder') ? x.name.localeCompare(y.name) : x.type === 'folder' ? -1 : 1);
+};
+
+export const readSpaceFile = async (space, file, { maxBytes }) => {
+  const sandbox = await sandboxFor(space);
+  const { exitCode, stdout } = await runAsRoot(
+    sandbox,
+    'test -f "$FILE" || exit 3; size=$(stat -c %s "$FILE"); [ "$size" -le "$MAX" ] || { echo "$size"; exit 4; }; base64 -w0 "$FILE"',
+    { FILE: file, MAX: String(maxBytes) }
+  );
+  if (exitCode === 3) {
+    throw fileError('That file does not exist', 404);
+  }
+  if (exitCode === 4) {
+    throw fileError(`That file is ${Math.ceil(Number(stdout.trim()) / 1024 / 1024)} MB, over the ${Math.round(maxBytes / 1024 / 1024)} MB limit here. Use full access to get it.`, 413);
+  }
+  if (exitCode !== 0) {
+    throw new Error(`Reading ${file} failed with exit code ${exitCode}`);
+  }
+  return Buffer.from(stdout.trim(), 'base64');
+};
+
+export const looksLikeText = (buffer) => !buffer.subarray(0, 8000).includes(0);
