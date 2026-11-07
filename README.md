@@ -124,7 +124,7 @@ Codes allow five wrong guesses, expire after 5 minutes and work once.
 
 ### Spaces API (`/api/v1/spaces`)
 
-Creating a space needs a verified Hack Club account or a club membership. Only one space can run at a time.
+Creating a space needs a verified Hack Club account or a club membership. Each user can run one space at a time unless an admin raises their limit (`users.max_running`).
 
 #### Create a space
 - **POST** `/api/v1/spaces/create`
@@ -191,7 +191,7 @@ Creating a space needs a verified Hack Club account or a club membership. Only o
 
 ### Admin API (`/api/v1/admin`)
 
-Admin only. Every route is a POST.
+Admin only (admins and superadmins). Every route is a POST, and every change is written to the `admin_actions` audit log. Admins can only manage regular users; superadmins can manage everyone and are the only ones who can make admins or superadmins.
 
 | Path | Description |
 |---|---|
@@ -201,10 +201,13 @@ Admin only. Every route is a POST.
 | `/sandbox-stats` | Sandbox and snapshot storage stats from Vercel. Slow, since it lists every sandbox and snapshot. |
 | `/users` | All users with their space counts, last activity, Hack Club status and club role |
 | `/spaces` | All spaces with their name, owner, dates and sandbox name |
-| `/users/:userId/update` | Change `max_spaces` or `is_admin` |
-| `/users/:userId/delete` | Delete a user and their spaces |
+| `/users/:userId/update` | Change `max_spaces` (0–100) or `max_running` (spaces running at once, 0–10). Admins can only change regular users. |
+| `/users/:userId/roles` | Superadmins only: set `is_admin` / `is_superadmin`. Superadmins are always admins too, and nobody can change their own roles. |
+| `/users/:userId/sign-out` | End all of a user's logins |
+| `/users/:userId/stop-spaces` | Stop all of a user's running spaces |
+| `/users/:userId/delete` | Delete a user and their spaces. Superadmins can't be deleted until their role is removed. |
 | `/spaces/:spaceId/delete` | Delete a space |
-| `/spaces/delete-inactive` | Delete spaces stopped for 90 days or more |
+| `/logs` | Superadmins only: the audit log of every admin action, newest first. Body: `{ "action", "search", "before", "limit" }` |
 
 ### Other
 

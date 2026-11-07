@@ -2,6 +2,9 @@
   import { onMount } from 'svelte';
   import { API_BASE } from '../config.js';
   import StatChart from './StatChart.svelte';
+  import UserManageModal from './UserManageModal.svelte';
+  import AdminLogs from './AdminLogs.svelte';
+  import { userData } from '../stores/user.svelte';
 
   let analytics = {
     totalUsers: 0,
@@ -23,11 +26,12 @@
   let stats = null;
   let statsDays = 30;
   let loadingStats = false;
-  let deletingInactive = false;
+  let managing = null;
+  const me = userData.user;
   export let url = '/admin';
   export let navigate = () => {};
 
-  const TABS = ['analytics', 'users', 'spaces', 'usage'];
+  const TABS = me?.is_superadmin ? ['analytics', 'users', 'spaces', 'usage', 'logs'] : ['analytics', 'users', 'spaces', 'usage'];
   const USAGE_PERIODS = [1, 7, 30];
   const STATS_PERIODS = [7, 30, 90];
   const HEAVY_HOURS_PER_DAY = 8;
@@ -203,7 +207,8 @@
 
   const userFilters = {
     all: () => true,
-    admins: (user) => user.is_admin,
+    admins: (user) => user.is_admin || user.is_superadmin,
+    superadmins: (user) => user.is_superadmin,
     leaders: (user) => user.club_leader,
     members: (user) => user.in_club && !user.club_leader,
     verified: (user) => VERIFIED_STATUSES.includes(user.hackclub_verification_status),
@@ -397,40 +402,6 @@
     }
   }
 
-  async function updateUser(userId, updates) {
-    try {
-      const response = await fetch(`${API_BASE}/admin/users/${userId}/update`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(updates)
-      });
-      if (response.ok) {
-        await loadUsers();
-        await loadAnalytics();
-      }
-    } catch (err) {
-      console.error('Failed to update user:', err);
-    }
-  }
-
-  async function deleteUser(userId) {
-    if (!confirm('Are you sure you want to delete this user and all their spaces?')) return;
-    
-    try {
-      const response = await fetch(`${API_BASE}/admin/users/${userId}/delete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-      });
-      if (response.ok) {
-        loadData();
-      }
-    } catch (err) {
-      console.error('Failed to delete user:', err);
-    }
-  }
-
   async function deleteSpace(spaceId) {
     if (!confirm('Are you sure you want to delete this space?')) return;
     
@@ -448,40 +419,13 @@
     }
   }
 
-  async function deleteInactiveSpaces() {
-    if (!confirm('Are you sure you want to delete all spaces that have been stopped for 90 days or more? This action is irreversible.')) return;
-
-    try {
-      deletingInactive = true;
-      const response = await fetch(`${API_BASE}/admin/spaces/delete-inactive`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-      });
-      const data = await response.json();
-      if (response.ok) {
-        alert(data.message || 'Inactive spaces deleted successfully');
-        loadData();
-      } else {
-        alert(data.message || 'Failed to delete inactive spaces');
-      }
-    } catch (err) {
-      console.error('Failed to delete inactive spaces:', err);
-      alert('Error deleting inactive spaces');
-    } finally {
-      deletingInactive = false;
-    }
+  function userChanged() {
+    loadUsers();
+    loadAnalytics();
   }
 
-  function handleMaxSpacesChange(userId, newValue) {
-    const value = parseInt(newValue);
-    if (!isNaN(value) && value >= 0) {
-      updateUser(userId, { max_spaces: value });
-    }
-  }
-
-  function toggleAdmin(userId, currentValue) {
-    updateUser(userId, { is_admin: !currentValue });
+  function roleLabel(user) {
+    return user.is_superadmin ? 'Superadmin' : user.is_admin ? 'Admin' : '—';
   }
 </script>
 
@@ -493,6 +437,9 @@
     <button class:active={activeTab === 'users'} on:click={() => navigate(tabPath('users'))}>Users</button>
     <button class:active={activeTab === 'spaces'} on:click={() => navigate(tabPath('spaces'))}>Spaces</button>
     <button class:active={activeTab === 'usage'} on:click={() => navigate(tabPath('usage'))}>Usage</button>
+    {#if me?.is_superadmin}
+      <button class:active={activeTab === 'logs'} on:click={() => navigate(tabPath('logs'))}>Logs</button>
+    {/if}
   </div>
 
   {#if activeTab === 'analytics'}
@@ -644,6 +591,7 @@
       <select bind:value={userFilter} class="sort-select">
         <option value="all">All users</option>
         <option value="admins">Admins</option>
+        <option value="superadmins">Superadmins</option>
         <option value="leaders">Club leaders</option>
         <option value="members">Club members</option>
         <option value="verified">Hack Club verified</option>
@@ -678,8 +626,8 @@
               <th>Spaces</th>
               <th>Last Active</th>
               <th>Max Spaces</th>
-              <th>Admin</th>
-              <th>Actions</th>
+              <th>Role</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -699,23 +647,10 @@
                   {/if}
                 </td>
                 <td>{formatDate(user.last_active)}</td>
+                <td>{user.max_spaces}</td>
+                <td>{roleLabel(user)}</td>
                 <td>
-                  <input
-                    type="number"
-                    value={user.max_spaces}
-                    on:change={(e) => handleMaxSpacesChange(user.id, e.target.value)}
-                    min="0"
-                  />
-                </td>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={user.is_admin}
-                    on:change={() => toggleAdmin(user.id, user.is_admin)}
-                  />
-                </td>
-                <td>
-                  <button on:click={() => deleteUser(user.id)} class="delete-btn">Delete</button>
+                  <button class="manage-btn" on:click={() => (managing = user)}>Manage</button>
                 </td>
               </tr>
             {/each}
@@ -767,9 +702,6 @@
           Delete Selected ({selectedSpaces.size})
         </button>
       {/if}
-      <button on:click={deleteInactiveSpaces} class="delete-inactive-btn" disabled={deletingInactive}>
-        {deletingInactive ? 'Deleting...' : `Delete Spaces Inactive > ${analytics.inactiveDays ?? 90} Days`}
-      </button>
     </div>
     {#if loadingSpaces}
       <p class="loading-note">Loading spaces...</p>
@@ -877,7 +809,21 @@
       <p class="stat-sub">Couldn't load usage.</p>
     {/if}
   {/if}
+
+  {#if activeTab === 'logs' && me?.is_superadmin}
+    <AdminLogs />
+  {/if}
 </div>
+
+{#if managing}
+  <UserManageModal
+    user={managing}
+    {me}
+    on:close={() => (managing = null)}
+    on:changed={userChanged}
+    on:showspaces={(e) => { managing = null; showSpacesOf(e.detail); }}
+  />
+{/if}
 
 <style>
   .admin-panel {
@@ -1065,11 +1011,6 @@
     border-color: #007bff;
   }
 
-  .delete-inactive-btn:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-
   .search-input {
     flex: 1;
     min-width: 220px;
@@ -1101,23 +1042,15 @@
     background-color: #c82333;
   }
 
-  .delete-inactive-btn {
-    padding: 8px 16px;
-    background-color: #e67e22;
-    color: white;
-    border: none;
+  .manage-btn {
+    padding: 5px 12px;
+    background: #fff;
+    border: 1px solid #ccc;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: background-color 0.2s, transform 0.1s;
   }
 
-  .delete-inactive-btn:hover {
-    background-color: #d35400;
-  }
-
-  .delete-inactive-btn:active {
-    transform: scale(0.98);
+  .manage-btn:hover {
+    border-color: #007bff;
   }
 </style>

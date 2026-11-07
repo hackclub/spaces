@@ -28,7 +28,8 @@ router.get("/me", async (req, res) => {
       data: {
         username: user.username,
         email: user.email,
-        is_admin: user.is_admin,
+        is_admin: user.is_admin || user.is_superadmin,
+        is_superadmin: Boolean(user.is_superadmin),
         hackatime_api_key: user.hackatime_api_key,
         hackclub_id: user.hackclub_id,
         hackclub_verification_status: user.hackclub_verification_status,

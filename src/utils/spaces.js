@@ -305,14 +305,20 @@ export const startContainer = async (spaceId, authorization) => {
       throw error;
     }
 
-    const runningSpace = await pg('spaces')
+    const maxRunning = user.max_running ?? 1;
+    const { n: runningCount } = await pg('spaces')
       .where('user_id', user.id)
       .where('running', true)
       .whereNot('id', spaceId)
+      .count('id as n')
       .first();
 
-    if (runningSpace) {
-      const error = new Error("You can only have one space running at a time. Please stop your other space first.");
+    if (Number(runningCount) >= maxRunning) {
+      const error = new Error(maxRunning === 1
+        ? "You can only have one space running at a time. Please stop your other space first."
+        : maxRunning === 0
+          ? "You can't start spaces right now."
+          : `You can only have ${maxRunning} spaces running at a time. Please stop one first.`);
       error.statusCode = 400;
       throw error;
     }
@@ -360,25 +366,28 @@ export const startContainer = async (spaceId, authorization) => {
   }
 };
 
-export const stopContainer = async (spaceId, authorization) => {
+export const stopContainer = async (spaceId, authorization, { isAdmin = false, reason = 'user' } = {}) => {
   if (!spaceId) {
     throw new Error("Space ID is required");
   }
 
-  if (!authorization) {
-    throw new Error("Missing authorization token");
-  }
+  let spaceQuery = pg('spaces').where('id', spaceId);
 
-  const user = await getUser(authorization);
-  if (!user) {
-    throw new Error("Invalid authorization token");
+  if (!isAdmin) {
+    if (!authorization) {
+      throw new Error("Missing authorization token");
+    }
+
+    const user = await getUser(authorization);
+    if (!user) {
+      throw new Error("Invalid authorization token");
+    }
+
+    spaceQuery = spaceQuery.where('user_id', user.id);
   }
 
   try {
-    const space = await pg('spaces')
-      .where('id', spaceId)
-      .where('user_id', user.id)
-      .first();
+    const space = await spaceQuery.first();
 
     if (!space) {
       const error = new Error("Space not found or not owned by user");
@@ -397,7 +406,7 @@ export const stopContainer = async (spaceId, authorization) => {
         running: false
       });
 
-    await recordRunStop(space.id, 'user');
+    await recordRunStop(space.id, reason);
 
     return {
       message: "Space stopped successfully",
