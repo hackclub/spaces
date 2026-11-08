@@ -195,7 +195,7 @@ const guiAccessUrl = (domain, password) => {
   return url.toString();
 };
 
-export const setupGuiApp = async (sandbox, { image, setup }) => {
+export const setupGuiApp = async (sandbox, { image, build }) => {
   await run(
     sandbox,
     "command -v dockerd >/dev/null 2>&1 || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker.io)",
@@ -204,21 +204,27 @@ export const setupGuiApp = async (sandbox, { image, setup }) => {
   await run(sandbox, START_DOCKER, { sudo: true, timeoutMs: 2 * MINUTE });
   await run(sandbox, 'docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull -q "$IMAGE"', { sudo: true, env: { IMAGE: image }, timeoutMs: 10 * MINUTE });
   await run(sandbox, 'mkdir -p "$CONFIG" && chown 1000:1000 "$CONFIG"', { sudo: true, env: { CONFIG: GUI_CONFIG_PATH } });
-  if (setup) {
-    await run(sandbox, setup, { sudo: true, env: { CONFIG: GUI_CONFIG_PATH }, timeoutMs: 10 * MINUTE });
+  if (build) {
+    await run(
+      sandbox,
+      'docker image inspect "$TAG" >/dev/null 2>&1 || { dir=$(mktemp -d) && printf "%s" "$DOCKERFILE" > "$dir/Dockerfile" && docker build -q -t "$TAG" "$dir" >/dev/null && rm -rf "$dir"; }',
+      { sudo: true, env: { TAG: build.tag, DOCKERFILE: build.dockerfile }, timeoutMs: 10 * MINUTE }
+    );
   }
+  return build?.tag ?? image;
 };
 
-export const startGuiApp = async (sandbox, { image, password, setup }) => {
-  await setupGuiApp(sandbox, { image, setup });
+export const startGuiApp = async (sandbox, { image, password, build, env = {} }) => {
+  const runImage = await setupGuiApp(sandbox, { image, build });
+  const extraEnv = Object.keys(env).map((name) => `-e ${name}="$${name}"`).join(" ");
 
   await run(
     sandbox,
     [
       `docker rm -f ${GUI_CONTAINER} >/dev/null 2>&1 || true`,
-      `docker run -d --name ${GUI_CONTAINER} -p ${GUI_PORT}:3000 -e PUID=1000 -e PGID=1000 -e PASSWORD="$SPACE_PASSWORD" -e SELKIES_FILE_TRANSFERS=upload,download -e SELKIES_UI_SIDEBAR_SHOW_FILES=True --shm-size=1g -v "$CONFIG":/config "$IMAGE" >/dev/null`
+      `docker run -d --name ${GUI_CONTAINER} -p ${GUI_PORT}:3000 -e PUID=1000 -e PGID=1000 -e PASSWORD="$SPACE_PASSWORD" -e SELKIES_FILE_TRANSFERS=upload,download -e SELKIES_UI_SIDEBAR_SHOW_FILES=True --shm-size=1g ${extraEnv} -v "$CONFIG":/config "$IMAGE" >/dev/null`
     ].join("; "),
-    { sudo: true, env: { SPACE_PASSWORD: password, CONFIG: GUI_CONFIG_PATH, IMAGE: image }, timeoutMs: 2 * MINUTE }
+    { sudo: true, env: { ...env, SPACE_PASSWORD: password, CONFIG: GUI_CONFIG_PATH, IMAGE: runImage }, timeoutMs: 2 * MINUTE }
   );
 
   try {

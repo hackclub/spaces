@@ -81,33 +81,28 @@ export const spaceConfigs = {
   },
   "godot": {
     kind: "gui",
-    image: "linuxserver/webtop:debian-xfce",
+    image: "ghcr.io/linuxserver/baseimage-selkies:debianbookworm",
     label: "Godot",
     title: "Godot",
     summary: "Game engine, the full desktop editor",
     description: "Godot Engine",
     beta: true,
     vcpus: 4,
-    setup: [
-      "set -e",
-      "GODOT_VERSION=4.7.2-stable",
-      'DIR="$CONFIG/godot"',
-      'if [ "$(cat "$DIR/VERSION" 2>/dev/null)" != "$GODOT_VERSION" ] || [ ! -x "$DIR/godot" ]; then',
-      '  tmp=$(mktemp -d)',
-      '  curl -fsSL -o "$tmp/godot.zip" "https://github.com/godotengine/godot/releases/download/$GODOT_VERSION/Godot_v${GODOT_VERSION}_linux.x86_64.zip"',
-      '  python3 -m zipfile -e "$tmp/godot.zip" "$tmp/out"',
-      '  mkdir -p "$DIR"',
-      '  mv "$tmp"/out/Godot_v*_linux.x86_64 "$DIR/godot"',
-      '  chmod +x "$DIR/godot"',
-      '  echo "$GODOT_VERSION" > "$DIR/VERSION"',
-      '  rm -rf "$tmp"',
-      "fi",
-      'mkdir -p "$CONFIG/.config/autostart" "$CONFIG/Desktop" "$CONFIG/projects"',
-      'printf "%s\\n" "[Desktop Entry]" "Type=Application" "Name=Godot" "Exec=/config/godot/godot --rendering-driver opengl3 --project-manager" "Terminal=false" > "$CONFIG/.config/autostart/godot.desktop"',
-      'cp "$CONFIG/.config/autostart/godot.desktop" "$CONFIG/Desktop/godot.desktop"',
-      'chmod +x "$CONFIG/Desktop/godot.desktop"',
-      'chown -R 1000:1000 "$DIR" "$CONFIG/.config" "$CONFIG/Desktop" "$CONFIG/projects"'
-    ].join("\n")
+    build: {
+      tag: "spaces-godot:4.7.2-1",
+      dockerfile: [
+        "FROM ghcr.io/linuxserver/baseimage-selkies:debianbookworm",
+        "ARG GODOT_VERSION=4.7.2-stable",
+        "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl unzip libxcursor1 libxinerama1 libxrandr2 libxi6 libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri libfontconfig1 libasound2 libpulse0 && curl -fsSL -o /tmp/godot.zip \"https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip\" && unzip -q /tmp/godot.zip -d /opt/godot && mv /opt/godot/Godot_v*_linux.x86_64 /opt/godot/godot && chmod 755 /opt/godot/godot && rm -rf /tmp/godot.zip /var/lib/apt/lists/*",
+        "RUN printf '%s\\n' '/opt/godot/godot --rendering-driver opengl3 --project-manager' > /defaults/autostart && printf '%s\\n' '<?xml version=\"1.0\" encoding=\"utf-8\"?>' '<openbox_menu xmlns=\"http://openbox.org/3.4/menu\">' '<menu id=\"root-menu\" label=\"MENU\">' '<item label=\"Godot\"><action name=\"Execute\"><command>/opt/godot/godot --rendering-driver opengl3 --project-manager</command></action></item>' '</menu>' '</openbox_menu>' > /defaults/menu.xml"
+      ].join("\n")
+    },
+    env: {
+      DISABLE_TERMINALS: "true",
+      DISABLE_OPEN_TOOLS: "true",
+      DISABLE_SUDO: "true",
+      RESTART_APP: "true"
+    }
   },
   "freecad": {
     kind: "gui",
@@ -142,7 +137,7 @@ export const lockedError = (space, action = "used") => {
 export const startSpaceApp = (sandbox, space, password) => {
   const config = configFor(space.type);
   if (config?.kind === "gui") {
-    return startGuiApp(sandbox, { image: config.image, password, setup: config.setup });
+    return startGuiApp(sandbox, { image: config.image, password, build: config.build, env: config.env });
   }
   return startCodeServer(sandbox, { password, workspacePath: toSandboxPath(space.workspace_dir) });
 };
@@ -279,7 +274,7 @@ export const createContainer = async (password, type, authorization, name) => {
     sandbox = await createSandbox(sandboxName, isGui ? { port: GUI_PORT, vcpus: config.vcpus ?? GUI_VCPUS } : {});
 
     if (isGui) {
-      await setupGuiApp(sandbox, { image: config.image, setup: config.setup });
+      await setupGuiApp(sandbox, { image: config.image, build: config.build });
     } else {
       await setupCodeServer(sandbox, {
         workspacePath: toSandboxPath(workspaceDir),
