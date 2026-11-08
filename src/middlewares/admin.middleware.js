@@ -1,4 +1,5 @@
 import { getUser } from '../utils/user.js';
+import { getPermissions } from '../utils/permissions.js';
 
 const requireRole = (allowed, message) => async (req, res, next) => {
   try {
@@ -20,7 +21,9 @@ const requireRole = (allowed, message) => async (req, res, next) => {
       });
     }
 
-    if (!allowed(user)) {
+    const permissions = await getPermissions(user);
+
+    if (!allowed(user, permissions)) {
       return res.status(403).json({
         success: false,
         message
@@ -28,6 +31,7 @@ const requireRole = (allowed, message) => async (req, res, next) => {
     }
 
     req.user = user;
+    req.permissions = permissions;
     next();
   } catch (error) {
     console.error('Error in admin middleware:', error);
@@ -38,6 +42,8 @@ const requireRole = (allowed, message) => async (req, res, next) => {
   }
 };
 
-export const requireAdmin = requireRole((user) => user.is_admin || user.is_superadmin, 'Admin access required');
+export const requirePermission = (permission) => requireRole((user, permissions) => permissions.has(permission), "You don't have permission to do that");
+
+export const requireAnyPermission = (...list) => requireRole((user, permissions) => list.some((permission) => permissions.has(permission)), "You don't have permission to do that");
 
 export const requireSuperadmin = requireRole((user) => user.is_superadmin, 'Superadmin access required');

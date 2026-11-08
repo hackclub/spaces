@@ -1,6 +1,7 @@
 import express from 'express';
 import pg from '../../utils/db.js';
-import { requireAdmin, requireSuperadmin } from '../../middlewares/admin.middleware.js';
+import { requirePermission, requireSuperadmin } from '../../middlewares/admin.middleware.js';
+import { isStaff, getUserRoles } from '../../utils/permissions.js';
 import { deleteSpace, stopContainer, spaceConfigs } from '../../utils/spaces.js';
 import { listTemplates, rebuildTemplates } from '../../utils/templates.js';
 import { getSandboxStats } from '../../utils/sandboxes.js';
@@ -12,9 +13,7 @@ const router = express.Router();
 
 const INACTIVE_DAYS = 90;
 
-const isStaff = (user) => Boolean(user.is_admin || user.is_superadmin);
-
-const canManage = (actor, target) => Boolean(actor.is_superadmin) || !isStaff(target);
+const canManage = async (actor, target) => Boolean(actor.is_superadmin) || !(await isStaff(target));
 
 const findTarget = async (req, res) => {
   const target = await pg('users').where('id', req.params.userId).first();
@@ -22,14 +21,14 @@ const findTarget = async (req, res) => {
     res.status(404).json({ success: false, message: 'User not found' });
     return null;
   }
-  if (!canManage(req.user, target)) {
-    res.status(403).json({ success: false, message: 'Only superadmins can manage admins and superadmins' });
+  if (!(await canManage(req.user, target))) {
+    res.status(403).json({ success: false, message: 'Only superadmins can manage people with roles' });
     return null;
   }
   return target;
 };
 
-router.post('/analytics', requireAdmin, async (req, res) => {
+router.post('/analytics', requirePermission('stats.view'), async (req, res) => {
   try {
     const [userCount] = await pg('users').count('id as count');
     const [spaceCount] = await pg('spaces').count('id as count');
@@ -62,7 +61,7 @@ router.post('/analytics', requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/usage', requireAdmin, async (req, res) => {
+router.post('/usage', requirePermission('usage.view'), async (req, res) => {
   try {
     const days = [1, 7, 30].includes(Number(req.body?.days)) ? Number(req.body.days) : 7;
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -83,7 +82,7 @@ router.post('/usage', requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/stats', requireAdmin, async (req, res) => {
+router.post('/stats', requirePermission('stats.view'), async (req, res) => {
   try {
     const days = [7, 30, 90].includes(Number(req.body?.days)) ? Number(req.body.days) : 30;
 
@@ -100,7 +99,7 @@ router.post('/stats', requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/sandbox-stats', requireAdmin, async (req, res) => {
+router.post('/sandbox-stats', requirePermission('sandbox.view'), async (req, res) => {
   try {
     res.status(200).json({
       success: true,
@@ -115,7 +114,7 @@ router.post('/sandbox-stats', requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/users', requireAdmin, async (req, res) => {
+router.post('/users', requirePermission('users.view'), async (req, res) => {
   try {
     const users = await pg('users')
       .leftJoin('spaces', 'spaces.user_id', 'users.id')
@@ -126,8 +125,8 @@ router.post('/users', requireAdmin, async (req, res) => {
         'users.max_spaces',
         'users.max_running',
         'users.beta_access',
-        'users.is_admin',
         'users.is_superadmin',
+        pg.raw(`coalesce((select json_agg(json_build_object('id', r.id, 'name', r.name) order by r.name) from user_roles ur join roles r on r.id = ur.role_id where ur.user_id = users.id), '[]'::json) as roles`),
         'users.hackclub_verification_status',
         pg.raw('users.hackclub_id is not null as hackclub_linked'),
         pg.raw('users.password_hash is not null as has_password'),
@@ -153,7 +152,7 @@ router.post('/users', requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/spaces', requireAdmin, async (req, res) => {
+router.post('/spaces', requirePermission('spaces.view'), async (req, res) => {
   try {
     const spaces = await pg('spaces')
       .select('spaces.id', 'spaces.type', 'spaces.container_id', 'spaces.running', 'spaces.started_at', 'spaces.last_opened_at', 'spaces.created_at', 'spaces.name', 'spaces.is_favorite', 'spaces.locked_at', 'spaces.locked_reason', 'spaces.user_id', 'users.username', 'users.email')
@@ -173,7 +172,7 @@ router.post('/spaces', requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/users/:userId/update', requireAdmin, async (req, res) => {
+router.post('/users/:userId/update', requirePermission('users.limits'), async (req, res) => {
   try {
     const target = await findTarget(req, res);
     if (!target) return;
@@ -198,7 +197,7 @@ router.post('/users/:userId/update', requireAdmin, async (req, res) => {
     const [updatedUser] = await pg('users')
       .where('id', target.id)
       .update(updates)
-      .returning(['id', 'email', 'username', 'max_spaces', 'max_running', 'is_admin', 'is_superadmin']);
+      .returning(['id', 'email', 'username', 'max_spaces', 'max_running', 'is_superadmin']);
 
     await logAdminAction(req.user, 'user.limits', {
       targetUser: target,
@@ -223,51 +222,82 @@ router.post('/users/:userId/roles', requireSuperadmin, async (req, res) => {
     const target = await findTarget(req, res);
     if (!target) return;
 
-    if (target.id === req.user.id) {
-      return res.status(400).json({ success: false, message: "You can't change your own roles" });
+    const roleIds = req.body?.roleIds;
+    if (!Array.isArray(roleIds) || !roleIds.every(Number.isInteger)) {
+      return res.status(400).json({ success: false, message: 'Pick roles from the list' });
     }
 
-    const { is_admin, is_superadmin } = req.body;
-    if ((is_admin !== undefined && typeof is_admin !== 'boolean') || (is_superadmin !== undefined && typeof is_superadmin !== 'boolean')) {
-      return res.status(400).json({ success: false, message: 'Roles must be true or false' });
+    const wanted = await pg('roles').whereIn('id', roleIds).select('id', 'name');
+    if (wanted.length !== new Set(roleIds).size) {
+      return res.status(400).json({ success: false, message: 'One of those roles no longer exists' });
     }
 
-    const next = {
-      is_admin: is_admin ?? target.is_admin,
-      is_superadmin: is_superadmin ?? target.is_superadmin
-    };
-    if (next.is_superadmin && is_admin === false) {
-      return res.status(400).json({ success: false, message: 'Remove superadmin first' });
+    const current = await getUserRoles(target.id);
+    const added = wanted.filter((role) => !current.some((existing) => existing.id === role.id));
+    const removed = current.filter((role) => !roleIds.includes(role.id));
+    if (!added.length && !removed.length) {
+      return res.status(400).json({ success: false, message: 'Nothing to change' });
     }
-    if (next.is_superadmin) next.is_admin = true;
 
-    const [updatedUser] = await pg('users')
-      .where('id', target.id)
-      .update(next)
-      .returning(['id', 'email', 'username', 'max_spaces', 'max_running', 'is_admin', 'is_superadmin']);
+    await pg.transaction(async (trx) => {
+      if (removed.length) {
+        await trx('user_roles').where('user_id', target.id).whereIn('role_id', removed.map((role) => role.id)).delete();
+      }
+      if (added.length) {
+        await trx('user_roles').insert(added.map((role) => ({ user_id: target.id, role_id: role.id })));
+      }
+    });
 
     await logAdminAction(req.user, 'user.roles', {
       targetUser: target,
-      details: {
-        from: { is_admin: target.is_admin, is_superadmin: target.is_superadmin },
-        to: next
-      }
+      details: { added: added.map((role) => role.name), removed: removed.map((role) => role.name) }
+    });
+
+    const roles = (await getUserRoles(target.id)).map(({ id, name }) => ({ id, name }));
+    res.status(200).json({ success: true, message: 'Roles saved', data: { roles } });
+  } catch (error) {
+    console.error('Error updating roles:', error);
+    res.status(500).json({ success: false, message: 'Failed to update roles' });
+  }
+});
+
+router.post('/users/:userId/superadmin', requireSuperadmin, async (req, res) => {
+  try {
+    const target = await findTarget(req, res);
+    if (!target) return;
+
+    if (target.id === req.user.id) {
+      return res.status(400).json({ success: false, message: "You can't change your own superadmin" });
+    }
+    if (typeof req.body?.is_superadmin !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'Superadmin must be true or false' });
+    }
+    if (Boolean(target.is_superadmin) === req.body.is_superadmin) {
+      return res.status(400).json({ success: false, message: 'Nothing to change' });
+    }
+
+    const [updatedUser] = await pg('users')
+      .where('id', target.id)
+      .update({ is_superadmin: req.body.is_superadmin })
+      .returning(['id', 'is_superadmin']);
+
+    await logAdminAction(req.user, 'user.superadmin', {
+      targetUser: target,
+      details: { from: Boolean(target.is_superadmin), to: req.body.is_superadmin }
     });
 
     res.status(200).json({
       success: true,
+      message: req.body.is_superadmin ? 'They are now a superadmin' : 'Superadmin removed',
       data: updatedUser
     });
   } catch (error) {
-    console.error('Error updating roles:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update roles'
-    });
+    console.error('Error updating superadmin:', error);
+    res.status(500).json({ success: false, message: 'Failed to update superadmin' });
   }
 });
 
-router.post('/users/:userId/beta', requireSuperadmin, async (req, res) => {
+router.post('/users/:userId/beta', requirePermission('beta.manage'), async (req, res) => {
   try {
     const target = await findTarget(req, res);
     if (!target) return;
@@ -300,7 +330,7 @@ router.post('/users/:userId/beta', requireSuperadmin, async (req, res) => {
   }
 });
 
-router.post('/users/:userId/sign-out', requireAdmin, async (req, res) => {
+router.post('/users/:userId/sign-out', requirePermission('users.sign_out'), async (req, res) => {
   try {
     const target = await findTarget(req, res);
     if (!target) return;
@@ -322,7 +352,7 @@ router.post('/users/:userId/sign-out', requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/users/:userId/stop-spaces', requireAdmin, async (req, res) => {
+router.post('/users/:userId/stop-spaces', requirePermission('users.stop_spaces'), async (req, res) => {
   try {
     const target = await findTarget(req, res);
     if (!target) return;
@@ -353,7 +383,7 @@ router.post('/users/:userId/stop-spaces', requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/users/:userId/delete', requireSuperadmin, async (req, res) => {
+router.post('/users/:userId/delete', requirePermission('users.delete'), async (req, res) => {
   try {
     const target = await findTarget(req, res);
     if (!target) return;
@@ -395,7 +425,7 @@ router.post('/users/:userId/delete', requireSuperadmin, async (req, res) => {
   }
 });
 
-router.post('/templates', requireSuperadmin, async (req, res) => {
+router.post('/templates', requirePermission('templates.manage'), async (req, res) => {
   try {
     res.status(200).json({ success: true, data: await listTemplates(spaceConfigs) });
   } catch (error) {
@@ -404,7 +434,7 @@ router.post('/templates', requireSuperadmin, async (req, res) => {
   }
 });
 
-router.post('/templates/rebuild', requireSuperadmin, async (req, res) => {
+router.post('/templates/rebuild', requirePermission('templates.manage'), async (req, res) => {
   try {
     const results = await rebuildTemplates(spaceConfigs, { force: true });
     await logAdminAction(req.user, 'rebuild_templates', {
@@ -420,7 +450,7 @@ router.post('/templates/rebuild', requireSuperadmin, async (req, res) => {
   }
 });
 
-router.post('/logs', requireSuperadmin, async (req, res) => {
+router.post('/logs', requirePermission('logs.view'), async (req, res) => {
   try {
     const limit = Math.min(Math.max(Number(req.body?.limit) || 100, 1), 500);
     const before = Number.isInteger(req.body?.before) ? req.body.before : null;
@@ -445,7 +475,7 @@ router.post('/logs', requireSuperadmin, async (req, res) => {
   }
 });
 
-router.post('/spaces/:spaceId/delete', requireSuperadmin, async (req, res) => {
+router.post('/spaces/:spaceId/delete', requirePermission('spaces.delete'), async (req, res) => {
   try {
     const space = await pg('spaces').where('id', req.params.spaceId).first();
     if (!space) {

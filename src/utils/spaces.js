@@ -3,6 +3,7 @@ import { getUser, checkUserSpaceLimit, ensureHackclubVerified } from "./user.js"
 import { getUserPrimaryMembership } from "./clubs.js";
 import { recordRunStart, recordRunStop } from "./space-runs.js";
 import { findTemplate } from "./templates.js";
+import { hasPermission } from "./permissions.js";
 import path from "path";
 import crypto from "crypto";
 import {
@@ -311,7 +312,7 @@ export const createContainer = async (password, type, authorization, name) => {
     throw new Error("Invalid authorization token");
   }
 
-  if (!user.is_admin) {
+  if (!(await hasPermission(user, 'spaces.skip_verification'))) {
     const membership = await getUserPrimaryMembership(user.id);
     if (!membership) {
       const verificationStatus = await ensureHackclubVerified(user);

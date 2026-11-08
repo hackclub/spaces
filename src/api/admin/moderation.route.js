@@ -1,6 +1,6 @@
 import express from 'express';
 import pg from '../../utils/db.js';
-import { requireSuperadmin } from '../../middlewares/admin.middleware.js';
+import { requirePermission } from '../../middlewares/admin.middleware.js';
 import { logAdminAction } from '../../utils/admin-log.js';
 import path from 'path';
 import {
@@ -17,8 +17,6 @@ import {
 } from '../../utils/moderation.js';
 
 const router = express.Router();
-
-router.use(requireSuperadmin);
 
 const MAX_REASON_LENGTH = 1000;
 
@@ -45,7 +43,7 @@ const reasonFrom = (req, res, { required }) => {
   return reason || null;
 };
 
-router.post('/spaces/:spaceId/lock', async (req, res) => {
+router.post('/spaces/:spaceId/lock', requirePermission('moderation.lock'), async (req, res) => {
   try {
     const found = await findSpace(req, res);
     if (!found) return;
@@ -71,7 +69,7 @@ router.post('/spaces/:spaceId/lock', async (req, res) => {
   }
 });
 
-router.post('/spaces/:spaceId/unlock', async (req, res) => {
+router.post('/spaces/:spaceId/unlock', requirePermission('moderation.lock'), async (req, res) => {
   try {
     const found = await findSpace(req, res);
     if (!found) return;
@@ -105,7 +103,7 @@ const sendFileError = (res, error, fallback) => {
   res.status(500).json({ success: false, message: fallback });
 };
 
-router.post('/spaces/:spaceId/files', async (req, res) => {
+router.post('/spaces/:spaceId/files', requirePermission('moderation.files'), async (req, res) => {
   try {
     const found = await findSpace(req, res);
     if (!found) return;
@@ -127,7 +125,7 @@ router.post('/spaces/:spaceId/files', async (req, res) => {
   }
 });
 
-router.post('/spaces/:spaceId/file', async (req, res) => {
+router.post('/spaces/:spaceId/file', requirePermission('moderation.files'), async (req, res) => {
   try {
     const found = await findSpace(req, res);
     if (!found) return;
@@ -159,7 +157,7 @@ router.post('/spaces/:spaceId/file', async (req, res) => {
   }
 });
 
-router.post('/spaces/:spaceId/full-access', async (req, res) => {
+router.post('/spaces/:spaceId/full-access', requirePermission('moderation.full_access'), async (req, res) => {
   try {
     const found = await findSpace(req, res);
     if (!found) return;
@@ -179,7 +177,7 @@ router.post('/spaces/:spaceId/full-access', async (req, res) => {
   }
 });
 
-router.post('/spaces/:spaceId/release', async (req, res) => {
+router.post('/spaces/:spaceId/release', requirePermission('moderation.full_access'), async (req, res) => {
   try {
     const found = await findSpace(req, res);
     if (!found) return;
