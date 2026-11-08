@@ -561,11 +561,6 @@
   white-space: nowrap;
 }
 
-.type-tag.quick {
-  color: var(--white);
-  background: var(--green);
-}
-
 .type-empty {
   margin: 8px 0;
   color: var(--slate);

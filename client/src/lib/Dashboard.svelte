@@ -798,7 +798,6 @@
                     </span>
                     <span class="type-option-tags">
                       {#if spaceType.beta}<span class="beta-badge">Beta</span>{/if}
-                      {#if spaceType.kind === "gui" && spaceType.ready}<span class="type-tag quick">Quick start</span>{/if}
                       <span class="type-tag">{KIND_LABELS[spaceType.kind] ?? "Space"}</span>
                     </span>
                   </label>
