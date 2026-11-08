@@ -27,6 +27,7 @@
   let newSpaceRepo = "";
   let nameFromRepo = "";
   let githubSpace = null;
+  let connectGithubAfter = false;
   let githubRepos = [];
   let githubReposFor = "";
   let error = "";
@@ -478,6 +479,10 @@
         newSpaceRepo = "";
         nameFromRepo = "";
         await loadSpaces();
+        if (connectGithubAfter && !userData.user?.github_username) {
+          githubSpace = spaces.find((space) => space.id === data.spaceId) ?? null;
+        }
+        connectGithubAfter = false;
       } else {
         if (
           response.status === 403 &&
@@ -976,6 +981,15 @@
                     : "Public repos only. It's copied into your space so you can keep working on it."}
                 </p>
               </div>
+              {#if !userData.user.github_username}
+                <label class="connect-after">
+                  <input type="checkbox" bind:checked={connectGithubAfter} disabled={loading} />
+                  <span>
+                    <strong>Connect GitHub after creating</strong>
+                    <span class="form-hint">So you can push your work, and start future spaces from your repos.</span>
+                  </span>
+                </label>
+              {/if}
             {/if}
 
             {#if error}
