@@ -161,7 +161,7 @@
         </div>
       </section>
 
-      {#if !isSelf && !user.is_superadmin}
+      {#if me?.is_superadmin && !isSelf && !user.is_superadmin}
         <section class="danger">
           <h3>Delete</h3>
           <p class="note">Deletes the account and all {user.spaceCount} of their spaces, including their files. This can't be undone.</p>

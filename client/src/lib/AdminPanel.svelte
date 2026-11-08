@@ -799,7 +799,7 @@
       <span class="result-count">{filteredSpaces.length} of {spaces.length}</span>
     </div>
     <div class="spaces-controls">
-      {#if selectedSpaces.size > 0}
+      {#if me?.is_superadmin && selectedSpaces.size > 0}
         <button on:click={() => confirmer.ask('delete-selected', deleteSelectedSpaces)} class="delete-selected-btn">
           {$armed === 'delete-selected' ? `Really delete ${selectedSpaces.size}?` : `Delete Selected (${selectedSpaces.size})`}
         </button>
@@ -812,7 +812,7 @@
         <table>
           <thead>
             <tr>
-              <th><input type="checkbox" checked={allSelected} on:change={toggleSelectAll} /></th>
+              {#if me?.is_superadmin}<th><input type="checkbox" checked={allSelected} on:change={toggleSelectAll} /></th>{/if}
               <th>ID</th>
               <th>Name</th>
               <th>Type</th>
@@ -822,13 +822,13 @@
               <th>Last Opened</th>
               <th>Created</th>
               <th>Sandbox</th>
-              <th>Actions</th>
+              {#if me?.is_superadmin}<th>Actions</th>{/if}
             </tr>
           </thead>
           <tbody>
             {#each shownSpaces as space (space.id)}
               <tr>
-                <td><input type="checkbox" checked={selectedSpaces.has(space.id)} on:change={() => toggleSpaceSelection(space.id)} /></td>
+                {#if me?.is_superadmin}<td><input type="checkbox" checked={selectedSpaces.has(space.id)} on:change={() => toggleSpaceSelection(space.id)} /></td>{/if}
                 <td>{space.id}</td>
                 <td>{space.name ?? '—'}</td>
                 <td>{space.type}</td>
@@ -838,12 +838,12 @@
                 <td>{lastOpened(space) ? new Date(lastOpened(space)).toLocaleString() : 'Never'}</td>
                 <td>{formatDate(space.created_at)}</td>
                 <td class="sandbox-name">{space.container_id ?? '—'}</td>
-                <td class="row-actions">
-                  {#if me?.is_superadmin}
+                {#if me?.is_superadmin}
+                  <td class="row-actions">
                     <button class="manage-btn" on:click={() => (moderating = space)}>Moderate</button>
-                  {/if}
-                  <button on:click={() => confirmer.ask(`delete-${space.id}`, () => deleteSpace(space.id))} class="delete-btn">{$armed === `delete-${space.id}` ? 'Really delete?' : 'Delete'}</button>
-                </td>
+                    <button on:click={() => confirmer.ask(`delete-${space.id}`, () => deleteSpace(space.id))} class="delete-btn">{$armed === `delete-${space.id}` ? 'Really delete?' : 'Delete'}</button>
+                  </td>
+                {/if}
               </tr>
             {/each}
           </tbody>

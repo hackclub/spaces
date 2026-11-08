@@ -353,7 +353,7 @@ router.post('/users/:userId/stop-spaces', requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/users/:userId/delete', requireAdmin, async (req, res) => {
+router.post('/users/:userId/delete', requireSuperadmin, async (req, res) => {
   try {
     const target = await findTarget(req, res);
     if (!target) return;
@@ -445,7 +445,7 @@ router.post('/logs', requireSuperadmin, async (req, res) => {
   }
 });
 
-router.post('/spaces/:spaceId/delete', requireAdmin, async (req, res) => {
+router.post('/spaces/:spaceId/delete', requireSuperadmin, async (req, res) => {
   try {
     const space = await pg('spaces').where('id', req.params.spaceId).first();
     if (!space) {
@@ -453,12 +453,6 @@ router.post('/spaces/:spaceId/delete', requireAdmin, async (req, res) => {
     }
 
     const owner = await pg('users').where('id', space.user_id).first();
-    if (owner && !canManage(req.user, owner)) {
-      return res.status(403).json({ success: false, message: "Only superadmins can delete admins' spaces" });
-    }
-    if (space.locked_at && !req.user.is_superadmin) {
-      return res.status(403).json({ success: false, message: 'Only superadmins can delete locked spaces' });
-    }
 
     await logAdminAction(req.user, 'space.delete', {
       targetUser: owner,
