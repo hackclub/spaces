@@ -1,5 +1,5 @@
 import pg from "./db.js";
-import { getUser, checkUserSpaceLimit, ensureHackclubVerified } from "./user.js";
+import { getUser, ensureHackclubVerified } from "./user.js";
 import { getUserPrimaryMembership } from "./clubs.js";
 import { recordRunStart, recordRunStop } from "./space-runs.js";
 import { findTemplate } from "./templates.js";
@@ -344,6 +344,74 @@ const createGuiSandbox = async (sandboxName, type, config) => {
   return createSandbox(sandboxName, options);
 };
 
+const SPACE_LIMIT_LOCK = 7301;
+const RESERVATION_MS = 15 * 60 * 1000;
+
+const limitError = (message, statusCode) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
+const runningLimitError = (maxRunning) => limitError(maxRunning === 1
+  ? "You can only have one space running at a time. Please stop your other space first."
+  : maxRunning === 0
+    ? "You can't start spaces right now."
+    : `You can only have ${maxRunning} spaces running at a time. Please stop one first.`, 400);
+
+const removeStalePlaceholders = async (user) => {
+  const stale = await pg('spaces')
+    .where({ user_id: user.id, creating: true })
+    .where((query) => query.whereNull('reserved_at').orWhere('reserved_at', '<', new Date(Date.now() - RESERVATION_MS)))
+    .del()
+    .returning(['container_id']);
+
+  for (const { container_id: name } of stale) {
+    if (!name) continue;
+    const leftover = await findSandbox(name).catch(() => null);
+    await leftover?.delete().catch((err) => {
+      console.error(`Failed to clean up stale sandbox ${name}:`, err.message);
+    });
+  }
+};
+
+const reserveSpaceSlot = (user, { spaceId = null, placeholder = null }) => pg.transaction(async (trx) => {
+  await trx.raw('select pg_advisory_xact_lock(?, ?)', [SPACE_LIMIT_LOCK, user.id]);
+
+  const freshSince = new Date(Date.now() - RESERVATION_MS);
+  const spaces = await trx('spaces').where('user_id', user.id).select('id', 'running', 'reserved_at');
+  const active = spaces.filter((space) => space.id !== spaceId
+    && (space.running || (space.reserved_at && new Date(space.reserved_at) > freshSince)));
+
+  if (placeholder) {
+    const maxSpaces = user.max_spaces ?? 3;
+    if (spaces.length >= maxSpaces) {
+      throw limitError(`Maximum space limit reached (${maxSpaces} spaces)`, 403);
+    }
+  }
+
+  const maxRunning = user.max_running ?? 1;
+  if (active.length >= maxRunning) {
+    throw runningLimitError(maxRunning);
+  }
+
+  let reservedId = spaceId;
+  if (placeholder) {
+    const [row] = await trx('spaces')
+      .insert({ ...placeholder, user_id: user.id, running: false, creating: true, reserved_at: new Date() })
+      .returning(['id']);
+    reservedId = row.id;
+  } else {
+    const current = spaces.find((space) => space.id === spaceId);
+    if (current?.reserved_at && new Date(current.reserved_at) > freshSince) {
+      throw limitError("This space is already starting. Give it a moment.", 409);
+    }
+    await trx('spaces').where('id', spaceId).update({ reserved_at: new Date() });
+  }
+
+  return reservedId;
+});
+
 export const createContainer = async (password, type, authorization, name) => {
   if (process.env.SPACES_CREATION_PAUSED === 'true') {
     const error = new Error("Space creation is temporarily paused for maintenance. Your existing spaces are unaffected.");
@@ -376,8 +444,6 @@ export const createContainer = async (password, type, authorization, name) => {
     }
   }
 
-  await checkUserSpaceLimit(user.id);
-
   const typeLower = type.toLowerCase();
 
   const config = spaceConfigs[typeLower];
@@ -397,6 +463,20 @@ export const createContainer = async (password, type, authorization, name) => {
   }
   const workspaceDir = isGui ? DEFAULT_WORKSPACE_DIR : `/config/${spaceName}`;
   const sandboxName = sandboxNameFor(crypto.randomUUID());
+
+  await removeStalePlaceholders(user);
+  const reservedId = await reserveSpaceSlot(user, {
+    placeholder: {
+      container_id: sandboxName,
+      type: typeLower,
+      name: isGui ? config.label : spaceName,
+      description: config.description,
+      image: isGui ? config.image : SANDBOX_IMAGE,
+      port: isGui ? GUI_PORT : CODE_SERVER_PORT,
+      workspace_dir: workspaceDir,
+      password
+    }
+  });
 
   let sandbox = null;
 
@@ -421,20 +501,15 @@ export const createContainer = async (password, type, authorization, name) => {
     const access_url = await startSpaceApp(sandbox, { type: typeLower, workspace_dir: workspaceDir }, password);
 
     const [newSpace] = await pg('spaces')
-      .insert({
-        user_id: user.id,
-        container_id: sandboxName,
-        type: typeLower,
-        name: isGui ? config.label : spaceName,
-        description: config.description,
-        image: isGui ? config.image : SANDBOX_IMAGE,
-        port: isGui ? GUI_PORT : CODE_SERVER_PORT,
+      .where('id', reservedId)
+      .update({
         access_url,
         running: true,
+        creating: false,
+        reserved_at: null,
+        created_at: new Date(),
         started_at: new Date(),
-        last_opened_at: new Date(),
-        workspace_dir: workspaceDir,
-        password
+        last_opened_at: new Date()
       })
       .returning(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'running']);
 
@@ -465,6 +540,10 @@ export const createContainer = async (password, type, authorization, name) => {
       });
     }
 
+    await pg('spaces').where({ id: reservedId, creating: true }).del().catch((deleteErr) => {
+      console.error(`Failed to remove the placeholder for ${sandboxName}:`, deleteErr.message);
+    });
+
     throw new Error("Failed to create space");
   }
 };
@@ -483,6 +562,8 @@ export const startContainer = async (spaceId, authorization) => {
     throw new Error("Invalid authorization token");
   }
 
+  let reserved = false;
+
   try {
     const space = await pg('spaces')
       .where('id', spaceId)
@@ -499,23 +580,12 @@ export const startContainer = async (spaceId, authorization) => {
       throw lockedError(space, "started");
     }
 
-    const maxRunning = user.max_running ?? 1;
-    const { n: runningCount } = await pg('spaces')
-      .where('user_id', user.id)
-      .where('running', true)
-      .whereNot('id', spaceId)
-      .count('id as n')
-      .first();
-
-    if (Number(runningCount) >= maxRunning) {
-      const error = new Error(maxRunning === 1
-        ? "You can only have one space running at a time. Please stop your other space first."
-        : maxRunning === 0
-          ? "You can't start spaces right now."
-          : `You can only have ${maxRunning} spaces running at a time. Please stop one first.`);
-      error.statusCode = 400;
-      throw error;
+    if (space.creating) {
+      throw limitError("This space is still being created.", 409);
     }
+
+    await reserveSpaceSlot(user, { spaceId: space.id });
+    reserved = true;
 
     const sandbox = await findSandbox(space.container_id);
     if (!sandbox) {
@@ -540,11 +610,13 @@ export const startContainer = async (spaceId, authorization) => {
       .where('id', spaceId)
       .update({
         running: true,
+        reserved_at: null,
         started_at: new Date(),
         last_opened_at: new Date(),
         access_url,
         password
       });
+    reserved = false;
 
     await recordRunStart(space);
 
@@ -555,6 +627,10 @@ export const startContainer = async (spaceId, authorization) => {
     };
   } catch (err) {
     console.error("Sandbox error:", err);
+
+    if (reserved) {
+      await pg('spaces').where('id', spaceId).update({ reserved_at: null }).catch(() => {});
+    }
 
     if (err.statusCode) {
       throw err;
@@ -690,6 +766,7 @@ export const getUserSpaces = async (authorization) => {
   try {
     const spaces = await pg('spaces')
       .where('user_id', user.id)
+      .where('creating', false)
       .select(['id', 'container_id', 'type', 'description', 'image', 'port', 'access_url', 'password', 'created_at', 'running', 'is_favorite', 'last_opened_at', 'name', 'workspace_dir', 'locked_at', 'locked_reason']);
 
     const spacesWithStatus = spaces.map(({ workspace_dir, locked_at, locked_reason, ...space }) => {
