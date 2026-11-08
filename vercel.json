@@ -22,7 +22,13 @@
     { "path": "/api/v1/cron/templates", "schedule": "0 4 * * *" }
   ],
   "redirects": [
-    { "source": "/godot", "destination": "/godot/", "permanent": false },
+    { "source": "/godot", "destination": "https://spaces-playground.hackclub.dev/godot/", "permanent": false },
+    {
+      "source": "/godot/:path((?!service\\.worker\\.js$).*)",
+      "missing": [{ "type": "host", "value": "spaces-playground.hackclub.dev" }],
+      "destination": "https://spaces-playground.hackclub.dev/godot/:path",
+      "permanent": false
+    },
     {
       "source": "/love/:path*",
       "missing": [{ "type": "host", "value": "spaces-playground.hackclub.dev" }],
@@ -31,7 +37,7 @@
     },
     { "source": "/love", "destination": "https://spaces-playground.hackclub.dev/love/", "permanent": false },
     {
-      "source": "/((?!love/|_vercel/).*)",
+      "source": "/((?!love/|godot/|_vercel/).*)",
       "has": [{ "type": "host", "value": "spaces-playground.hackclub.dev" }],
       "destination": "https://spaces.hackclub.com/",
       "permanent": false

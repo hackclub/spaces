@@ -4,6 +4,7 @@
   import { currentTheme } from '../stores/theme.js';
   import { themes } from '../themes.js';
   import FlagIcon from '../assets/flag.svg?raw';
+  import { findLegacyGodotProjects, downloadLegacyGodotProjects } from './godot-legacy.js';
 
   export let username = '';
 
@@ -16,7 +17,7 @@
       description: 'Open-source 2D and 3D game engine',
       icon: 'https://godotengine.org/assets/favicon.png',
       status: 'available',
-      url: '/godot'
+      url: 'https://spaces-playground.hackclub.dev/godot/'
     },
     { 
       id: 'love2d', 
@@ -38,7 +39,27 @@
     }).catch(() => {});
   }
 
-  onMount(() => recordVisit());
+  let legacyGodotProjects = [];
+  let legacyDownloading = false;
+  let legacyMessage = '';
+
+  onMount(async () => {
+    recordVisit();
+    legacyGodotProjects = await findLegacyGodotProjects();
+  });
+
+  async function downloadLegacyProjects() {
+    legacyDownloading = true;
+    legacyMessage = '';
+    try {
+      const count = await downloadLegacyGodotProjects();
+      legacyMessage = `Downloaded ${count} file${count === 1 ? '' : 's'}.`;
+    } catch (err) {
+      legacyMessage = err.message || "Couldn't download your projects.";
+    } finally {
+      legacyDownloading = false;
+    }
+  }
 
   function handleSignOut() {
     dispatch('signout');
@@ -104,6 +125,20 @@
         They will not sync across devices or be backed up to the cloud.
       </span>
     </div>
+
+    {#if legacyGodotProjects.length}
+      <div class="browser-notice legacy-notice">
+        <span class="notice-text">
+          <strong>Your old Godot projects:</strong> the Godot playground moved to a new address to keep your account safe,
+          so {legacyGodotProjects.length === 1 ? 'the project' : `the ${legacyGodotProjects.length} projects`} you saved in this browser
+          ({legacyGodotProjects.join(', ')}) didn't come along. Download them as a zip, then open Godot and import the zip there.
+        </span>
+        <button class="legacy-download" on:click={downloadLegacyProjects} disabled={legacyDownloading}>
+          {legacyDownloading ? 'Preparing...' : 'Download my Godot projects'}
+        </button>
+        {#if legacyMessage}<span class="notice-text">{legacyMessage}</span>{/if}
+      </div>
+    {/if}
 
     <div class="tools-section">
       <h3 class="section-title">Choose a Tool</h3>
@@ -188,6 +223,29 @@
     display: flex;
     gap: 16px;
     align-items: center;
+  }
+
+  .legacy-notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .legacy-download {
+    padding: 10px 20px;
+    background: var(--red);
+    border: none;
+    border-radius: 99999px;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  .legacy-download:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
 
   .signout-button {
