@@ -5,6 +5,7 @@ const CLUBS_API_BASE = 'https://clubapi.hackclub.com';
 
 const clubInfoCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const LEADER_RECHECK_MS = 10 * 60 * 1000;
 
 async function callClubsAPI(path, params = {}, requireAuth = true) {
   const url = new URL(`${CLUBS_API_BASE}${path}`);
@@ -361,74 +362,119 @@ export async function getClubStatus(clubName) {
   }
 }
 
-export async function getClubMembers(clubName) {
-  if (!clubName) {
-    return null;
+const isFresh = (membership, maxAgeMs) =>
+  Boolean(membership.last_verified_at) && Date.now() - new Date(membership.last_verified_at).getTime() < maxAgeMs;
+
+async function reverifyMemberships(userId) {
+  const memberships = await getUserMemberships(userId);
+  if (memberships.length === 0) {
+    return { failed: false };
   }
 
-  try {
-    const result = await callClubsAPI('/members', { club_name: clubName }, true);
-    return result?.members || null;
-  } catch (error) {
-    console.error('Error fetching club members:', error);
-    return null;
+  const current = memberships.find(m => m.is_primary) || memberships[0];
+
+  const user = await pg('users').where('id', userId).first();
+  if (!user) {
+    return { failed: true };
   }
+
+  const leader = await checkLeaderStatus(user.email);
+  if (leader.failed) {
+    return { failed: true };
+  }
+
+  let role = null;
+  let clubName = null;
+
+  if (leader.isLeader) {
+    role = 'leader';
+    clubName = leader.clubName || current.club_name;
+  } else {
+    const member = await checkMemberStatus(user.email);
+    if (member.failed) {
+      return { failed: true };
+    }
+    if (member.isMember && member.clubName) {
+      role = 'member';
+      clubName = member.clubName;
+    }
+  }
+
+  let club = null;
+  if (clubName === current.club_name) {
+    club = { id: current.club_id };
+  } else if (clubName) {
+    club = await getOrCreateClubByName(clubName);
+    if (!club) {
+      return { failed: true };
+    }
+  }
+
+  for (const membership of memberships) {
+    if (!club || membership.club_id !== club.id) {
+      await unlinkUserFromClub(userId, membership.club_id);
+    }
+  }
+
+  if (!club) {
+    return { failed: false };
+  }
+
+  const source = role === 'leader' ? 'leader_email' : 'member_lookup';
+  const kept = memberships.find(m => m.club_id === club.id);
+
+  if (kept) {
+    await pg('user_club_memberships')
+      .where('id', kept.id)
+      .update({
+        role,
+        source,
+        is_primary: true,
+        last_verified_at: new Date(),
+        updated_at: new Date()
+      });
+  } else {
+    await linkUserToClub(userId, club.id, role, source);
+  }
+
+  return { failed: false };
 }
 
 export async function refreshMembershipIfStale(userId, maxAgeHours = 24) {
   const membership = await getUserPrimaryMembership(userId);
-  
+
   if (!membership) {
     return null;
   }
 
-  const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
-  const lastVerified = new Date(membership.last_verified_at);
-  
-  if (Date.now() - lastVerified.getTime() < maxAgeMs) {
+  const maxAgeMs = membership.role === 'leader' ? LEADER_RECHECK_MS : maxAgeHours * 60 * 60 * 1000;
+
+  if (isFresh(membership, maxAgeMs)) {
     return membership;
   }
 
-  const user = await pg('users').where('id', userId).first();
-  if (!user) {
-    return membership;
-  }
-
-  const { isLeader, clubName, failed } = await checkLeaderStatus(user.email);
-
-  if (failed) {
-    return membership;
-  }
-
-  if (!isLeader) {
-    await pg('user_club_memberships')
-      .where('id', membership.id)
-      .update({
-        role: 'member',
-        last_verified_at: new Date(),
-        updated_at: new Date()
-      });
-    
-    return getUserPrimaryMembership(userId);
-  }
-
-  if (clubName && clubName !== membership.club_name) {
-    const newClub = await getOrCreateClubByName(clubName);
-    if (newClub) {
-      await linkUserToClub(userId, newClub.id, 'leader', 'leader_email');
-    }
-    return getUserPrimaryMembership(userId);
-  }
-
-  await pg('user_club_memberships')
-    .where('id', membership.id)
-    .update({
-      ...(clubName ? { role: 'leader', source: 'leader_email' } : {}),
-      last_verified_at: new Date(),
-      updated_at: new Date()
-    });
+  await reverifyMemberships(userId);
 
   return getUserPrimaryMembership(userId);
+}
+
+export async function getVerifiedLeaderMemberships(userId) {
+  const memberships = await getLeaderMemberships(userId);
+
+  if (memberships.length === 0) {
+    return { memberships: [], failed: false };
+  }
+
+  if (memberships.every(m => m.is_primary && isFresh(m, LEADER_RECHECK_MS))) {
+    return { memberships, failed: false };
+  }
+
+  const { failed } = await reverifyMemberships(userId);
+  if (failed) {
+    return { memberships: [], failed: true };
+  }
+
+  return { memberships: await getLeaderMemberships(userId), failed: false };
 }
 
 export async function shareSpaceWithClub(spaceId, clubId, userId) {
@@ -457,13 +503,13 @@ export async function shareSpaceWithClub(spaceId, clubId, userId) {
   return share;
 }
 
-export async function revokeSpaceClubShare(spaceId, clubId) {
-  if (!spaceId || !clubId) {
-    throw new Error('Space ID and club ID are required');
+export async function revokeSpaceClubShares(spaceId) {
+  if (!spaceId) {
+    throw new Error('Space ID is required');
   }
 
   await pg('space_club_shares')
-    .where({ space_id: spaceId, club_id: clubId })
+    .where({ space_id: spaceId })
     .whereNull('revoked_at')
     .update({ revoked_at: new Date() });
 }
@@ -483,14 +529,8 @@ export async function getSpaceShareStatus(spaceId) {
   return share;
 }
 
-export async function getSpacesSharedWithLeader(userId) {
-  if (!userId) {
-    return [];
-  }
-
-  const leaderMemberships = await getLeaderMemberships(userId);
-  
-  if (leaderMemberships.length === 0) {
+export async function getSpacesSharedWithLeader(leaderMemberships) {
+  if (!leaderMemberships || leaderMemberships.length === 0) {
     return [];
   }
 
@@ -526,7 +566,15 @@ export async function unlinkUserFromClub(userId, clubId) {
     throw new Error('User ID and club ID are required');
   }
 
-  await pg('user_club_memberships')
-    .where({ user_id: userId, club_id: clubId })
-    .delete();
+  await pg.transaction(async (trx) => {
+    await trx('space_club_shares')
+      .where('club_id', clubId)
+      .whereIn('space_id', trx('spaces').select('id').where('user_id', userId))
+      .whereNull('revoked_at')
+      .update({ revoked_at: new Date() });
+
+    await trx('user_club_memberships')
+      .where({ user_id: userId, club_id: clubId })
+      .delete();
+  });
 }

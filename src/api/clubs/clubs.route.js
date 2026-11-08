@@ -5,12 +5,12 @@ import {
   getOrCreateClubByName,
   linkUserToClub,
   getUserPrimaryMembership,
+  getUserMemberships,
   refreshMembershipIfStale,
   getClubShips,
   getClubInfo,
   getClubLevel,
   getClubStatus,
-  getClubMembers,
   unlinkUserFromClub
 } from '../../utils/clubs.js';
 import { extractAuth } from '../../middlewares/auth.middleware.js';
@@ -138,15 +138,17 @@ router.post('/unlink', async (req, res) => {
       });
     }
 
-    const membership = await getUserPrimaryMembership(user.id);
-    if (!membership) {
+    const memberships = await getUserMemberships(user.id);
+    if (memberships.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'You are not linked to any club'
       });
     }
 
-    await unlinkUserFromClub(user.id, membership.club_id);
+    for (const membership of memberships) {
+      await unlinkUserFromClub(user.id, membership.club_id);
+    }
 
     res.status(200).json({
       success: true,
@@ -344,59 +346,6 @@ router.get('/me/ships', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to get club ships',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-router.get('/me/members', async (req, res) => {
-  try {
-    const authorization = req.authToken;
-
-    if (!authorization) {
-      return res.status(401).json({
-        success: false,
-        message: 'Unauthorized'
-      });
-    }
-
-    const user = await getUser(authorization);
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid authorization token'
-      });
-    }
-
-    const membership = await getUserPrimaryMembership(user.id);
-    if (!membership) {
-      return res.status(404).json({
-        success: false,
-        message: 'No club linked to your account'
-      });
-    }
-
-    if (membership.role !== 'leader' || !user.hackclub_id) {
-      return res.status(403).json({
-        success: false,
-        message: 'Only club leaders can view member list'
-      });
-    }
-
-    const rawMembers = await getClubMembers(membership.club_name);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        clubName: membership.club_name,
-        members: rawMembers
-      }
-    });
-  } catch (error) {
-    console.error('Error in /me/members route:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get club members',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

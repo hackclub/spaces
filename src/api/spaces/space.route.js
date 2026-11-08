@@ -15,10 +15,10 @@ import { readyTemplateTypes } from "../../utils/templates.js";
 import { 
   getUserPrimaryMembership,
   shareSpaceWithClub,
-  revokeSpaceClubShare,
+  revokeSpaceClubShares,
   getSpaceShareStatus,
   getSpacesSharedWithLeader,
-  getLeaderMemberships
+  getVerifiedLeaderMemberships
 } from "../../utils/clubs.js";
 import pg from "../../utils/db.js";
 import { containerOpsLimiter, spaceShareLimiter } from "../../middlewares/rate-limit.middleware.js";
@@ -254,15 +254,15 @@ router.post("/:spaceId/share/club", spaceShareLimiter, async (req, res) => {
       });
     }
 
-    const membership = await getUserPrimaryMembership(user.id);
-    if (!membership) {
-      return res.status(400).json({
-        success: false,
-        message: 'You must be linked to a club to share spaces'
-      });
-    }
-
     if (share === true) {
+      const membership = await getUserPrimaryMembership(user.id);
+      if (!membership) {
+        return res.status(400).json({
+          success: false,
+          message: 'You must be linked to a club to share spaces'
+        });
+      }
+
       await shareSpaceWithClub(space.id, membership.club_id, user.id);
       res.status(200).json({
         success: true,
@@ -274,7 +274,7 @@ router.post("/:spaceId/share/club", spaceShareLimiter, async (req, res) => {
         }
       });
     } else if (share === false) {
-      await revokeSpaceClubShare(space.id, membership.club_id);
+      await revokeSpaceClubShares(space.id);
       res.status(200).json({
         success: true,
         message: 'Space sharing revoked',
@@ -371,7 +371,14 @@ router.get("/shared-with-me", async (req, res) => {
       });
     }
 
-    const leaderMemberships = await getLeaderMemberships(user.id);
+    const { memberships: leaderMemberships, failed } = await getVerifiedLeaderMemberships(user.id);
+    if (failed) {
+      return res.status(503).json({
+        success: false,
+        message: "Couldn't check your club right now. Please try again in a few minutes."
+      });
+    }
+
     if (leaderMemberships.length === 0) {
       return res.status(200).json({
         success: true,
@@ -383,7 +390,7 @@ router.get("/shared-with-me", async (req, res) => {
       });
     }
 
-    const sharedSpaces = await getSpacesSharedWithLeader(user.id);
+    const sharedSpaces = await getSpacesSharedWithLeader(leaderMemberships);
 
     res.status(200).json({
       success: true,

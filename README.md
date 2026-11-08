@@ -188,7 +188,6 @@ Creating a space needs a verified Hack Club account or a club membership. Each u
 | GET | `/me` | The user's club and role |
 | GET | `/me/details` | More details about the club |
 | GET | `/me/ships` | The club's shipped projects |
-| GET | `/me/members` | For leaders with a linked Hack Club account: the club's members |
 
 ### Admin API (`/api/v1/admin`)
 
