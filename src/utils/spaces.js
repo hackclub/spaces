@@ -178,7 +178,6 @@ export const spaceConfigs = {
     summary: "Game engine, the full desktop editor",
     about: "Godot is a free and open-source engine for making 2D and 3D games, with the full desktop editor and GDScript, its Python-like scripting language.",
     description: "Godot Engine",
-    beta: true,
     vcpus: 4,
     hackatime: true,
     build: {
