@@ -28,6 +28,10 @@ const credentials = () => {
 
 export const sandboxNameFor = (uuid) => `space-${uuid}`;
 
+export const hackatimeMachineFor = (spaceId) => `hackclub-spaces-${spaceId}`;
+
+const TAG_HACKATIME_HOSTNAME = '[ -z "$MACHINE" ] || { if grep -q "^hostname" "$FILE"; then sed -i "s/^hostname.*/hostname = $MACHINE/" "$FILE"; else sed -i "/^\\[settings\\]/a hostname = $MACHINE" "$FILE"; fi; }';
+
 export const createSandbox = (name, { port = CODE_SERVER_PORT, vcpus = VCPUS, snapshotId = null } = {}) => Sandbox.create({
   ...credentials(),
   name,
@@ -99,7 +103,7 @@ const installExtension = async (sandbox, extension) => {
   }
 };
 
-export const ensureHackatime = async (sandbox, apiKey) => {
+export const ensureHackatime = async (sandbox, apiKey, machine = "") => {
   const key = sanitizeHackatimeKey(apiKey);
   if (!key) {
     return;
@@ -111,6 +115,7 @@ export const ensureHackatime = async (sandbox, apiKey) => {
       'command -v terminal-wakatime >/dev/null 2>&1 || curl -fsSL https://hack.club/setup/install.sh | bash -s -- "$HACKATIME_API_KEY" --yes',
       { env: { HACKATIME_API_KEY: key } }
     );
+    await run(sandbox, `FILE="$HOME/.wakatime.cfg"; [ -f "$FILE" ] || exit 0; ${TAG_HACKATIME_HOSTNAME}`, { env: { MACHINE: machine } });
   } catch (err) {
     console.error("Failed to set up Hackatime:", err.message);
   }
@@ -131,13 +136,13 @@ export const writeWelcomeFile = async (sandbox, workspacePath, fileName) => {
   }
 };
 
-export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey, extensions }) => {
+export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey, extensions, hackatimeMachine = "" }) => {
   await run(sandbox, INSTALL_CODE_SERVER, { sudo: true });
   await run(sandbox, 'mkdir -p "$WORKSPACE"', { env: { WORKSPACE: workspacePath } });
   await writeWelcomeFile(sandbox, workspacePath, "README.md");
 
   if (sanitizeHackatimeKey(hackatimeApiKey)) {
-    await ensureHackatime(sandbox, hackatimeApiKey);
+    await ensureHackatime(sandbox, hackatimeApiKey, hackatimeMachine);
     await installExtension(sandbox, "wakatime.vscode-wakatime");
   }
 
@@ -216,14 +221,14 @@ export const setupGuiApp = async (sandbox, { image, build }) => {
 
 const HACKATIME_API_URL = "https://hackatime.hackclub.com/api/hackatime/v1";
 
-export const writeHackatimeConfig = async (sandbox, apiKey) => {
+export const writeHackatimeConfig = async (sandbox, apiKey, machine = "") => {
   const key = sanitizeHackatimeKey(apiKey);
-  const write = 'rm -f "$FILE" && printf "[settings]\\napi_url = %s\\n" "$URL" > "$FILE" && { [ -z "$KEY" ] || printf "api_key = %s\\n" "$KEY" >> "$FILE"; } && printf "heartbeat_rate_limit_seconds = 30\\n" >> "$FILE" && chown -h 1000:1000 "$FILE" && chmod 600 "$FILE"';
+  const write = 'rm -f "$FILE" && printf "[settings]\\napi_url = %s\\n" "$URL" > "$FILE" && { [ -z "$KEY" ] || printf "api_key = %s\\n" "$KEY" >> "$FILE"; } && printf "heartbeat_rate_limit_seconds = 30\\n" >> "$FILE"';
 
   try {
-    await run(sandbox, key ? write : `[ -e "$FILE" ] || { ${write}; }`, {
+    await run(sandbox, `{ [ ! -L "$FILE" ] || rm -f "$FILE"; } && ${key ? write : `{ [ -e "$FILE" ] || { ${write}; }; }`} && ${TAG_HACKATIME_HOSTNAME} && chown -h 1000:1000 "$FILE" && chmod 600 "$FILE"`, {
       sudo: true,
-      env: { FILE: `${GUI_CONFIG_PATH}/.wakatime.cfg`, URL: HACKATIME_API_URL, KEY: key }
+      env: { FILE: `${GUI_CONFIG_PATH}/.wakatime.cfg`, URL: HACKATIME_API_URL, KEY: key, MACHINE: machine }
     });
   } catch (err) {
     console.error("Failed to set up Hackatime:", err.message);

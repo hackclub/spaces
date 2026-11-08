@@ -21,7 +21,8 @@ import {
   setupGuiApp,
   startGuiApp,
   ensureHackatime,
-  writeHackatimeConfig
+  writeHackatimeConfig,
+  hackatimeMachineFor
 } from "./sandboxes.js";
 
 const DEFAULT_WORKSPACE_DIR = "/config/workspace";
@@ -492,13 +493,14 @@ export const createContainer = async (password, type, authorization, name) => {
     if (isGui) {
       await setupGuiApp(sandbox, { image: config.image, build: config.build });
       if (config.hackatime) {
-        await writeHackatimeConfig(sandbox, user.hackatime_api_key);
+        await writeHackatimeConfig(sandbox, user.hackatime_api_key, hackatimeMachineFor(reservedId));
       }
     } else {
       await setupCodeServer(sandbox, {
         workspacePath: toSandboxPath(workspaceDir),
         hackatimeApiKey: user.hackatime_api_key,
-        extensions: user.vscode_extensions
+        extensions: user.vscode_extensions,
+        hackatimeMachine: hackatimeMachineFor(reservedId)
       });
     }
 
@@ -601,13 +603,13 @@ export const startContainer = async (spaceId, authorization) => {
     const password = space.password || crypto.randomBytes(16).toString('hex');
 
     if (configFor(space.type)?.hackatime) {
-      await writeHackatimeConfig(sandbox, user.hackatime_api_key);
+      await writeHackatimeConfig(sandbox, user.hackatime_api_key, hackatimeMachineFor(space.id));
     }
 
     const access_url = await startSpaceApp(sandbox, space, password);
 
     if (configFor(space.type)?.kind !== "gui" && user.hackatime_api_key) {
-      await ensureHackatime(sandbox, user.hackatime_api_key);
+      await ensureHackatime(sandbox, user.hackatime_api_key, hackatimeMachineFor(space.id));
     }
 
     await pg('spaces')
