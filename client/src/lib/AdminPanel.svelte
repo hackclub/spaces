@@ -5,6 +5,7 @@
   import UserManageModal from './UserManageModal.svelte';
   import SpaceModerationModal from './SpaceModerationModal.svelte';
   import AdminLogs from './AdminLogs.svelte';
+  import AdminRoles from './AdminRoles.svelte';
   import { userData } from '../stores/user.svelte';
   import { createConfirm } from './confirm.js';
 
@@ -40,11 +41,21 @@
   export let url = '/admin';
   export let navigate = () => {};
 
-  const TABS = me?.is_superadmin ? ['analytics', 'users', 'spaces', 'usage', 'logs'] : ['analytics', 'users', 'spaces', 'usage'];
+  const can = (permission) => Boolean(me?.is_superadmin || me?.permissions?.includes(permission));
+  const canModerate = can('moderation.lock') || can('moderation.files') || can('moderation.full_access');
+  const TAB_LABELS = { analytics: 'Analytics', users: 'Users', spaces: 'Spaces', usage: 'Usage', logs: 'Logs', roles: 'Roles' };
+  const TABS = [
+    (can('stats.view') || can('sandbox.view') || can('templates.manage')) && 'analytics',
+    can('users.view') && 'users',
+    can('spaces.view') && 'spaces',
+    can('usage.view') && 'usage',
+    can('logs.view') && 'logs',
+    me?.is_superadmin && 'roles'
+  ].filter(Boolean);
   const USAGE_PERIODS = [1, 7, 30];
   const STATS_PERIODS = [7, 30, 90];
   const HEAVY_HOURS_PER_DAY = 8;
-  let activeTab = 'analytics';
+  let activeTab = TABS[0];
   const PAGE_SIZE = 100;
   const VERIFIED_STATUSES = ['verified', 'verified_eligible', 'verified_but_over_18'];
   let userSearch = '';
@@ -177,17 +188,17 @@
       params.set('days', usageDays);
     }
     const query = params.toString();
-    return `/admin${tab === 'analytics' ? '' : `/${tab}`}${query ? `?${query}` : ''}`;
+    return `/admin${tab === TABS[0] ? '' : `/${tab}`}${query ? `?${query}` : ''}`;
   }
 
   function applyUrl(value) {
     const parsed = new URL(value, window.location.origin);
     const tab = parsed.pathname.split('/')[2];
     const params = parsed.searchParams;
-    activeTab = TABS.includes(tab) ? tab : 'analytics';
+    activeTab = TABS.includes(tab) ? tab : TABS[0];
     if (activeTab === 'users') {
       userSearch = params.get('q') ?? '';
-      userFilter = params.get('filter') in userFilters ? params.get('filter') : 'all';
+      userFilter = params.get('filter') in userFilters || params.get('filter')?.startsWith('role:') ? params.get('filter') : 'all';
       userSort = params.get('sort') in userSorts ? params.get('sort') : 'newest';
     }
     if (activeTab === 'spaces') {
@@ -215,7 +226,7 @@
 
   const userFilters = {
     all: () => true,
-    admins: (user) => user.is_admin || user.is_superadmin,
+    staff: (user) => user.is_superadmin || user.roles?.length > 0,
     superadmins: (user) => user.is_superadmin,
     beta: (user) => user.beta_access || user.is_superadmin,
     leaders: (user) => user.club_leader,
@@ -260,7 +271,11 @@
   $: applyUrl(url);
   $: activeTab, userSearch, userFilter, userSort, spaceSearch, spaceType, spaceStatus, spaceSort, usageDays, statsDays, syncUrl();
   $: if (activeTab === 'usage') loadUsage(usageDays);
-  $: if (activeTab === 'analytics') loadStats(statsDays);
+  $: if (activeTab === 'analytics' && can('stats.view')) loadStats(statsDays);
+  $: roleOptions = [...new Map(users.flatMap((user) => user.roles ?? []).map((role) => [role.id, role])).values()].sort((a, b) => a.name.localeCompare(b.name));
+  $: userFilterFn = userFilter.startsWith('role:')
+    ? (user) => (user.roles ?? []).some((role) => String(role.id) === userFilter.slice(5))
+    : userFilters[userFilter] ?? userFilters.all;
 
   function formatHours(hours = 0) {
     return hours < 1 ? `${Math.round(hours * 60)} min` : `${hours.toFixed(1)} h`;
@@ -272,7 +287,7 @@
   $: spaceSearch, spaceType, spaceStatus, spaceSort, (spaceLimit = PAGE_SIZE);
 
   $: filteredUsers = users
-    .filter(userFilters[userFilter])
+    .filter(userFilterFn)
     .filter(user => matches(userSearch, [user.id, user.email, user.username]))
     .sort(userSorts[userSort]);
   $: shownUsers = filteredUsers.slice(0, userLimit);
@@ -289,11 +304,11 @@
   });
 
   function loadData() {
-    loadAnalytics();
-    loadSandboxStats();
-    if (me?.is_superadmin) loadTemplates();
-    loadUsers();
-    loadSpaces();
+    if (can('stats.view')) loadAnalytics();
+    if (can('sandbox.view')) loadSandboxStats();
+    if (can('templates.manage')) loadTemplates();
+    if (can('users.view')) loadUsers();
+    if (can('spaces.view')) loadSpaces();
   }
 
   async function loadAnalytics() {
@@ -471,11 +486,12 @@
 
   function userChanged() {
     loadUsers();
-    loadAnalytics();
+    if (can('stats.view')) loadAnalytics();
   }
 
   function roleLabel(user) {
-    return user.is_superadmin ? 'Superadmin' : user.is_admin ? 'Admin' : '—';
+    const names = [user.is_superadmin && 'Superadmin', ...(user.roles ?? []).map((role) => role.name)].filter(Boolean);
+    return names.length ? names.join(', ') : '—';
   }
 </script>
 
@@ -483,16 +499,17 @@
   <h1>Admin Panel</h1>
 
   <div class="tabs">
-    <button class:active={activeTab === 'analytics'} on:click={() => navigate(tabPath('analytics'))}>Analytics</button>
-    <button class:active={activeTab === 'users'} on:click={() => navigate(tabPath('users'))}>Users</button>
-    <button class:active={activeTab === 'spaces'} on:click={() => navigate(tabPath('spaces'))}>Spaces</button>
-    <button class:active={activeTab === 'usage'} on:click={() => navigate(tabPath('usage'))}>Usage</button>
-    {#if me?.is_superadmin}
-      <button class:active={activeTab === 'logs'} on:click={() => navigate(tabPath('logs'))}>Logs</button>
-    {/if}
+    {#each TABS as tab}
+      <button class:active={activeTab === tab} on:click={() => navigate(tabPath(tab))}>{TAB_LABELS[tab]}</button>
+    {/each}
   </div>
 
+  {#if TABS.length === 0}
+    <p class="stat-sub">Your roles don't include anything in the admin panel yet.</p>
+  {/if}
+
   {#if activeTab === 'analytics'}
+    {#if can('stats.view')}
     {#if loadingAnalytics}
       <p class="loading-note">Loading stats...</p>
     {:else}
@@ -614,6 +631,9 @@
       <p class="stat-sub">Couldn't load growth stats.</p>
     {/if}
 
+    {/if}
+
+    {#if can('sandbox.view')}
     <h2 class="section-heading">Sandboxes</h2>
     {#if loadingSandboxStats}
       <p class="loading-note">Loading sandbox stats from Vercel...</p>
@@ -638,8 +658,9 @@
     {:else}
       <p class="stat-sub">Couldn't load sandbox stats from Vercel.</p>
     {/if}
+    {/if}
 
-    {#if me?.is_superadmin}
+    {#if can('templates.manage')}
       <h2 class="section-heading">Templates</h2>
       <p class="stat-sub">
         New Blender, KiCad, FreeCAD and Godot spaces start from these, so they skip installing and downloading the app.
@@ -690,8 +711,11 @@
       />
       <select bind:value={userFilter} class="sort-select">
         <option value="all">All users</option>
-        <option value="admins">Admins</option>
+        <option value="staff">Anyone with a role</option>
         <option value="superadmins">Superadmins</option>
+        {#each roleOptions as role}
+          <option value={`role:${role.id}`}>Role: {role.name}</option>
+        {/each}
         <option value="beta">Beta testers</option>
         <option value="leaders">Club leaders</option>
         <option value="members">Club members</option>
@@ -727,7 +751,7 @@
               <th>Spaces</th>
               <th>Last Active</th>
               <th>Max Spaces</th>
-              <th>Role</th>
+              <th>Roles</th>
               <th></th>
             </tr>
           </thead>
@@ -799,7 +823,7 @@
       <span class="result-count">{filteredSpaces.length} of {spaces.length}</span>
     </div>
     <div class="spaces-controls">
-      {#if me?.is_superadmin && selectedSpaces.size > 0}
+      {#if can('spaces.delete') && selectedSpaces.size > 0}
         <button on:click={() => confirmer.ask('delete-selected', deleteSelectedSpaces)} class="delete-selected-btn">
           {$armed === 'delete-selected' ? `Really delete ${selectedSpaces.size}?` : `Delete Selected (${selectedSpaces.size})`}
         </button>
@@ -812,7 +836,7 @@
         <table>
           <thead>
             <tr>
-              {#if me?.is_superadmin}<th><input type="checkbox" checked={allSelected} on:change={toggleSelectAll} /></th>{/if}
+              {#if can('spaces.delete')}<th><input type="checkbox" checked={allSelected} on:change={toggleSelectAll} /></th>{/if}
               <th>ID</th>
               <th>Name</th>
               <th>Type</th>
@@ -822,13 +846,13 @@
               <th>Last Opened</th>
               <th>Created</th>
               <th>Sandbox</th>
-              {#if me?.is_superadmin}<th>Actions</th>{/if}
+              {#if canModerate || can('spaces.delete')}<th>Actions</th>{/if}
             </tr>
           </thead>
           <tbody>
             {#each shownSpaces as space (space.id)}
               <tr>
-                {#if me?.is_superadmin}<td><input type="checkbox" checked={selectedSpaces.has(space.id)} on:change={() => toggleSpaceSelection(space.id)} /></td>{/if}
+                {#if can('spaces.delete')}<td><input type="checkbox" checked={selectedSpaces.has(space.id)} on:change={() => toggleSpaceSelection(space.id)} /></td>{/if}
                 <td>{space.id}</td>
                 <td>{space.name ?? '—'}</td>
                 <td>{space.type}</td>
@@ -841,10 +865,14 @@
                 <td>{lastOpened(space) ? new Date(lastOpened(space)).toLocaleString() : 'Never'}</td>
                 <td>{formatDate(space.created_at)}</td>
                 <td class="sandbox-name">{space.container_id ?? '—'}</td>
-                {#if me?.is_superadmin}
+                {#if canModerate || can('spaces.delete')}
                   <td class="row-actions">
-                    <button class="manage-btn" on:click={() => (moderating = space)}>Moderate</button>
-                    <button on:click={() => confirmer.ask(`delete-${space.id}`, () => deleteSpace(space.id))} class="delete-btn">{$armed === `delete-${space.id}` ? 'Really delete?' : 'Delete'}</button>
+                    {#if canModerate}
+                      <button class="manage-btn" on:click={() => (moderating = space)}>Moderate</button>
+                    {/if}
+                    {#if can('spaces.delete')}
+                      <button on:click={() => confirmer.ask(`delete-${space.id}`, () => deleteSpace(space.id))} class="delete-btn">{$armed === `delete-${space.id}` ? 'Really delete?' : 'Delete'}</button>
+                    {/if}
                   </td>
                 {/if}
               </tr>
@@ -918,8 +946,12 @@
     {/if}
   {/if}
 
-  {#if activeTab === 'logs' && me?.is_superadmin}
+  {#if activeTab === 'logs' && can('logs.view')}
     <AdminLogs />
+  {/if}
+
+  {#if activeTab === 'roles' && me?.is_superadmin}
+    <AdminRoles {users} on:changed={loadUsers} />
   {/if}
 </div>
 

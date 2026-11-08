@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
   import { API_BASE } from '../config.js';
   import { createConfirm } from './confirm.js';
 
@@ -11,16 +11,43 @@
   export let me;
 
   const dispatch = createEventDispatcher();
+  const can = (permission) => Boolean(me?.is_superadmin || me?.permissions?.includes(permission));
 
   let maxSpaces = user.max_spaces;
   let maxRunning = user.max_running;
   let busy = '';
   let message = '';
   let error = '';
+  let allRoles = [];
+  let chosenRoles = new Set((user.roles ?? []).map((role) => role.id));
 
   $: isSelf = me?.email === user.email;
-  $: isStaff = user.is_admin || user.is_superadmin;
+  $: isStaff = user.is_superadmin || (user.roles ?? []).length > 0;
   $: canManage = me?.is_superadmin || !isStaff;
+  $: currentRoleIds = (user.roles ?? []).map((role) => role.id);
+  $: rolesChanged = chosenRoles.size !== currentRoleIds.length || currentRoleIds.some((id) => !chosenRoles.has(id));
+  $: hasActions = can('users.sign_out') || (can('users.stop_spaces') && user.runningCount > 0) || (can('spaces.view') && user.spaceCount > 0);
+
+  onMount(async () => {
+    if (!me?.is_superadmin) return;
+    try {
+      const response = await fetch(`${API_BASE}/admin/roles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      const data = await response.json();
+      if (response.ok) allRoles = data.data.roles;
+    } catch (err) {
+      console.error('Failed to load roles:', err);
+    }
+  });
+
+  function toggleRole(id) {
+    if (chosenRoles.has(id)) chosenRoles.delete(id);
+    else chosenRoles.add(id);
+    chosenRoles = chosenRoles;
+  }
 
   function act(name, path, body = {}, confirmText = null) {
     if (!confirmText) return run(name, path, body);
@@ -49,6 +76,7 @@
       }
       message = data.message || 'Saved.';
       if (data.data) user = { ...user, ...data.data };
+      if (path === 'roles') chosenRoles = new Set((user.roles ?? []).map((role) => role.id));
       dispatch('changed');
       if (path === 'delete') dispatch('close');
     } catch (err) {
@@ -76,7 +104,8 @@
     </div>
 
     <div class="badges">
-      {#if user.is_superadmin}<span class="badge strong">Superadmin</span>{:else if user.is_admin}<span class="badge strong">Admin</span>{/if}
+      {#if user.is_superadmin}<span class="badge strong">Superadmin</span>{/if}
+      {#each user.roles ?? [] as role}<span class="badge strong">{role.name}</span>{/each}
       {#if user.club_leader}<span class="badge">Club leader</span>{:else if user.in_club}<span class="badge">Club member</span>{/if}
       <span class="badge">{user.hackclub_linked ? `Hack Club: ${user.hackclub_verification_status || 'linked'}` : 'No Hack Club account'}</span>
       {#if user.has_password}<span class="badge">Club password login</span>{/if}
@@ -85,48 +114,64 @@
     </div>
 
     {#if !canManage}
-      <p class="note">Only superadmins can manage admins and superadmins.</p>
+      <p class="note">Only superadmins can manage people with roles.</p>
     {:else}
-      <section>
-        <h3>Limits</h3>
-        <div class="row bottom">
-          <label class="limit">
-            Spaces they can have
-            <input type="number" min="0" max="100" bind:value={maxSpaces} />
-          </label>
-          <label class="limit">
-            Running at once
-            <input type="number" min="0" max="10" bind:value={maxRunning} />
-          </label>
-          <button class="btn" disabled={busy !== '' || (maxSpaces === user.max_spaces && maxRunning === user.max_running)} on:click={() => act('limits', 'update', { max_spaces: Number(maxSpaces), max_running: Number(maxRunning) })}>
-            {busy === 'limits' ? 'Saving...' : 'Save'}
-          </button>
-        </div>
-      </section>
-
-      {#if me?.is_superadmin}
+      {#if can('users.limits')}
         <section>
-          <h3>Roles</h3>
-          {#if isSelf}
-            <p class="note">You can't change your own roles.</p>
-          {:else}
-            <div class="row">
-              {#if user.is_superadmin}
-                <button class="btn" disabled={busy !== ''} on:click={() => act('roles', 'roles', { is_superadmin: false }, `Remove superadmin from ${user.username}? They stay an admin.`)}>Remove superadmin</button>
-              {:else}
-                {#if user.is_admin}
-                  <button class="btn" disabled={busy !== ''} on:click={() => act('roles', 'roles', { is_admin: false }, `Remove admin from ${user.username}?`)}>Remove admin</button>
-                {:else}
-                  <button class="btn" disabled={busy !== ''} on:click={() => act('roles', 'roles', { is_admin: true }, `Make ${user.username} an admin?`)}>Make admin</button>
-                {/if}
-                <button class="btn" disabled={busy !== ''} on:click={() => act('roles', 'roles', { is_superadmin: true }, `Make ${user.username} a superadmin? They'll be able to open any space, read the admin log and make other superadmins.`)}>Make superadmin</button>
-              {/if}
-            </div>
-          {/if}
+          <h3>Limits</h3>
+          <div class="row bottom">
+            <label class="limit">
+              Spaces they can have
+              <input type="number" min="0" max="100" bind:value={maxSpaces} />
+            </label>
+            <label class="limit">
+              Running at once
+              <input type="number" min="0" max="10" bind:value={maxRunning} />
+            </label>
+            <button class="btn" disabled={busy !== '' || (maxSpaces === user.max_spaces && maxRunning === user.max_running)} on:click={() => act('limits', 'update', { max_spaces: Number(maxSpaces), max_running: Number(maxRunning) })}>
+              {busy === 'limits' ? 'Saving...' : 'Save'}
+            </button>
+          </div>
         </section>
       {/if}
 
       {#if me?.is_superadmin}
+        <section>
+          <h3>Roles</h3>
+          {#if allRoles.length}
+            <div class="role-list">
+              {#each allRoles as role}
+                <label class="role-option">
+                  <input type="checkbox" checked={chosenRoles.has(role.id)} on:change={() => toggleRole(role.id)} />
+                  <span>
+                    <strong>{role.name}</strong>
+                    {#if role.description}<span class="role-desc">{role.description}</span>{/if}
+                  </span>
+                </label>
+              {/each}
+            </div>
+            <button class="btn" disabled={busy !== '' || !rolesChanged} on:click={() => act('roles', 'roles', { roleIds: [...chosenRoles] })}>
+              {busy === 'roles' ? 'Saving...' : 'Save roles'}
+            </button>
+          {:else}
+            <p class="note">Loading roles...</p>
+          {/if}
+        </section>
+
+        <section>
+          <h3>Superadmin</h3>
+          {#if isSelf}
+            <p class="note">You can't change your own superadmin.</p>
+          {:else if user.is_superadmin}
+            <p class="note">Superadmins have every permission and manage roles. Their roles above still apply if superadmin is removed.</p>
+            <button class="btn" disabled={busy !== ''} on:click={() => act('superadmin', 'superadmin', { is_superadmin: false }, `Remove superadmin from ${user.username}? They keep their roles.`)}>Remove superadmin</button>
+          {:else}
+            <button class="btn" disabled={busy !== ''} on:click={() => act('superadmin', 'superadmin', { is_superadmin: true }, `Make ${user.username} a superadmin? They'll get every permission, including managing roles and other superadmins.`)}>Make superadmin</button>
+          {/if}
+        </section>
+      {/if}
+
+      {#if can('beta.manage')}
         <section>
           <h3>Beta</h3>
           <p class="note">
@@ -144,24 +189,28 @@
         </section>
       {/if}
 
-      <section>
-        <h3>Actions</h3>
-        <div class="row">
-          {#if user.spaceCount > 0}
-            <button class="btn" on:click={() => dispatch('showspaces', user)}>Show their spaces</button>
-          {/if}
-          <button class="btn" disabled={busy !== ''} on:click={() => act('signout', 'sign-out', {}, `Sign ${user.username} out on every device?`)}>
-            {busy === 'signout' ? 'Signing out...' : 'Sign out everywhere'}
-          </button>
-          {#if user.runningCount > 0}
-            <button class="btn" disabled={busy !== ''} on:click={() => act('stop', 'stop-spaces', {}, `Stop ${user.username}'s running spaces?`)}>
-              {busy === 'stop' ? 'Stopping...' : 'Stop running spaces'}
-            </button>
-          {/if}
-        </div>
-      </section>
+      {#if hasActions}
+        <section>
+          <h3>Actions</h3>
+          <div class="row">
+            {#if can('spaces.view') && user.spaceCount > 0}
+              <button class="btn" on:click={() => dispatch('showspaces', user)}>Show their spaces</button>
+            {/if}
+            {#if can('users.sign_out')}
+              <button class="btn" disabled={busy !== ''} on:click={() => act('signout', 'sign-out', {}, `Sign ${user.username} out on every device?`)}>
+                {busy === 'signout' ? 'Signing out...' : 'Sign out everywhere'}
+              </button>
+            {/if}
+            {#if can('users.stop_spaces') && user.runningCount > 0}
+              <button class="btn" disabled={busy !== ''} on:click={() => act('stop', 'stop-spaces', {}, `Stop ${user.username}'s running spaces?`)}>
+                {busy === 'stop' ? 'Stopping...' : 'Stop running spaces'}
+              </button>
+            {/if}
+          </div>
+        </section>
+      {/if}
 
-      {#if me?.is_superadmin && !isSelf && !user.is_superadmin}
+      {#if can('users.delete') && !isSelf && !user.is_superadmin}
         <section class="danger">
           <h3>Delete</h3>
           <p class="note">Deletes the account and all {user.spaceCount} of their spaces, including their files. This can't be undone.</p>
@@ -309,6 +358,26 @@
     border: none;
     border-radius: 4px;
     cursor: pointer;
+  }
+
+  .role-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .role-option {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .role-desc {
+    display: block;
+    color: #666;
   }
 
   .danger {

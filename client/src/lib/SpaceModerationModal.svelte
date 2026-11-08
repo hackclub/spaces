@@ -2,6 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import { API_BASE } from '../config.js';
   import { createConfirm } from './confirm.js';
+  import { userData } from '../stores/user.svelte';
 
   const confirmer = createConfirm(6000);
   const { armed } = confirmer;
@@ -11,6 +12,9 @@
   };
 
   export let space;
+
+  const me = userData.user;
+  const can = (permission) => Boolean(me?.is_superadmin || me?.permissions?.includes(permission));
 
   const dispatch = createEventDispatcher();
 
@@ -248,8 +252,9 @@
       {/if}
       <span class="badge">Sandbox {space.container_id ?? '—'}</span>
     </div>
-    <p class="note">Only superadmins can see this. Everything here is written to the admin log, and owners aren't told.</p>
+    <p class="note">Only people with moderation permissions can see this. Everything here is written to the admin log, and owners aren't told.</p>
 
+    {#if can('moderation.lock')}
     <section>
       <h3>Lock</h3>
       {#if space.locked_at}
@@ -266,7 +271,9 @@
         </div>
       {/if}
     </section>
+    {/if}
 
+    {#if can('moderation.files')}
     <section>
       <h3>Files</h3>
       {#if !explorer}
@@ -323,7 +330,9 @@
         </div>
       {/if}
     </section>
+    {/if}
 
+    {#if can('moderation.full_access')}
     <section>
       <h3>Full access</h3>
       <p class="note">Opens the space as if you were its owner, in a new tab. You can change anything, so use this only when the file explorer isn't enough. If the space is stopped or locked, only its app starts, for you, and it's stopped again when you close this window.</p>
@@ -341,6 +350,7 @@
         </p>
       {/if}
     </section>
+    {/if}
 
     {#if $armed && PROMPTS[$armed]}<p class="result prompt">{PROMPTS[$armed]} Click the same button again to confirm.</p>{/if}
     {#if message}<p class="result">{message}</p>{/if}

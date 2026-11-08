@@ -5,6 +5,10 @@
   const LABELS = {
     'user.limits': 'Changed limits',
     'user.roles': 'Changed roles',
+    'user.superadmin': 'Changed superadmin',
+    'role.create': 'Created role',
+    'role.update': 'Edited role',
+    'role.delete': 'Deleted role',
     'user.beta': 'Changed beta access',
     'user.sign_out': 'Signed out everywhere',
     'user.stop_spaces': 'Stopped running spaces',
@@ -36,7 +40,11 @@
     const d = entry.details || {};
     switch (entry.action) {
       case 'user.limits': return Object.entries(d).map(([field, change]) => `${field === 'max_running' ? 'running at once' : 'max spaces'} ${change.from} → ${change.to}`).join(', ');
-      case 'user.roles': return `${roleText(d.from)} → ${roleText(d.to)}`;
+      case 'user.roles': return d.from ? `${roleText(d.from)} → ${roleText(d.to)}` : [...(d.added ?? []).map((name) => `+${name}`), ...(d.removed ?? []).map((name) => `−${name}`)].join(', ');
+      case 'user.superadmin': return d.to ? 'made superadmin' : 'superadmin removed';
+      case 'role.create': return `${d.name}: ${(d.permissions ?? []).length} permission${d.permissions?.length === 1 ? '' : 's'}`;
+      case 'role.update': return [d.renamed_from ? `${d.renamed_from} → ${d.name}` : d.name, ...(d.added ?? []).map((key) => `+${key}`), ...(d.removed ?? []).map((key) => `−${key}`)].join(', ');
+      case 'role.delete': return d.name;
       case 'user.beta': return d.to ? 'given' : 'removed';
       case 'user.sign_out': return `${d.sessions} device${d.sessions === 1 ? '' : 's'}`;
       case 'user.stop_spaces': return d.spaces?.length ? d.spaces.map((id) => `#${id}`).join(', ') : 'none running';
