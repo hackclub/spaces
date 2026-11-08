@@ -1051,10 +1051,10 @@
 
               {#if actionLoading[space.id] === "starting"}
                 <ProgressNotice
-                  expectedSeconds={isGuiType(space.type) ? 90 : 30}
+                  expectedSeconds={isGuiType(space.type) ? 30 : 15}
                   steps={["Starting your machine...", isGuiType(space.type) ? "Starting the desktop..." : "Starting VS Code..."]}
                   done={Boolean(startDone[space.id])}
-                  note="The first start after Spaces moved can take up to a minute while it sets things up. After that, starting takes a few seconds."
+                  note="Your space picks up right where you left it. This usually takes a few seconds."
                 />
               {/if}
 
