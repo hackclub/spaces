@@ -20,7 +20,8 @@ import {
   startCodeServer,
   setupGuiApp,
   startGuiApp,
-  ensureHackatime
+  ensureHackatime,
+  writeHackatimeConfig
 } from "./sandboxes.js";
 
 const DEFAULT_WORKSPACE_DIR = "/config/workspace";
@@ -65,10 +66,49 @@ const GODOT_LAUNCHER = [
   "for lib in $LD_PRELOAD; do case \"$lib\" in *libudev*) ;; *) new=\"${new:+$new:}$lib\" ;; esac; done",
   "unset IFS",
   "export LD_PRELOAD=\"$new\"",
+  "mkdir -p \"$HOME/.wakatime\"",
+  "ln -sf /opt/wakatime/wakatime-cli-linux-amd64 \"$HOME/.wakatime/wakatime-cli-linux-amd64\"",
   "/opt/godot/move-uploads &",
+  "/opt/godot/add-hackatime &",
   "while true; do",
-  "  /opt/godot/godot --rendering-driver opengl3 --accessibility disabled --single-window --project-manager",
+  "  if [ -f /tmp/godot-reopen ]; then",
+  "    dir=$(cat /tmp/godot-reopen)",
+  "    rm -f /tmp/godot-reopen",
+  "    /opt/godot/godot --rendering-driver opengl3 --accessibility disabled --single-window --path \"$dir\" --editor",
+  "  else",
+  "    /opt/godot/godot --rendering-driver opengl3 --accessibility disabled --single-window --project-manager",
+  "  fi",
   "  while pgrep -f \"^/opt/godot/godot\" >/dev/null; do sleep 2; done",
+  "done"
+].join("\n");
+
+const GODOT_HACKATIME = [
+  "#!/bin/sh",
+  "ADDON=/opt/godot/addons/godot_super-wakatime",
+  "ENTRY=res://addons/godot_super-wakatime/plugin.cfg",
+  "enable() {",
+  "  if [ ! -f \"$1/addons/godot_super-wakatime/plugin.cfg\" ]; then",
+  "    mkdir -p \"$1/addons\" && cp -r \"$ADDON\" \"$1/addons/\" || return 1",
+  "  fi",
+  "  grep -qF \"$ENTRY\" \"$1/project.godot\" && return 1",
+  "  awk -v entry=\"\\\"$ENTRY\\\"\" '",
+  "    /^\\[/ { if (section && !done) { print \"enabled=PackedStringArray(\" entry \")\"; print \"\"; done = 1 } section = ($0 == \"[editor_plugins]\") }",
+  "    section && !done && /^enabled=PackedStringArray\\(/ { sub(/\\)[ \\t]*$/, \"\"); print $0 (/\\($/ ? \"\" : \", \") entry \")\"; done = 1; next }",
+  "    { print }",
+  "    END { if (!done) { if (!section) { print \"\"; print \"[editor_plugins]\"; print \"\" } print \"enabled=PackedStringArray(\" entry \")\" } }",
+  "  ' \"$1/project.godot\" > \"$1/.project.godot.hackatime\" && mv \"$1/.project.godot.hackatime\" \"$1/project.godot\"",
+  "}",
+  "while true; do",
+  "  for pid in $(pgrep -f \"^/opt/godot/godot.* --path \"); do",
+  "    dir=$(tr \"\\000\" \"\\n\" < /proc/$pid/cmdline | grep -A1 -x -- --path | tail -n 1)",
+  "    [ -f \"$dir/project.godot\" ] || continue",
+  "    if enable \"$dir\"; then",
+  "      age=$(ps -o etimes= -p \"$pid\" | tr -d \" \")",
+  "      if [ \"${age:-99}\" -lt 20 ]; then echo \"$dir\" > /tmp/godot-reopen; kill \"$pid\"; fi",
+  "    fi",
+  "  done",
+  "  find \"$HOME\" -maxdepth 4 -name \".*\" -prune -o -name project.godot -print 2>/dev/null | while read -r file; do enable \"$(dirname \"$file\")\"; done",
+  "  sleep 1",
   "done"
 ].join("\n");
 
@@ -132,13 +172,17 @@ export const spaceConfigs = {
     description: "Godot Engine",
     beta: true,
     vcpus: 4,
+    hackatime: true,
     build: {
-      tag: "spaces-godot:4.7.2-5",
+      tag: "spaces-godot:4.7.2-6",
       dockerfile: [
         "FROM ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
         "ARG GODOT_VERSION=4.7.2-stable",
+        "ARG WAKATIME_CLI_VERSION=v2.28.4",
+        "ARG GODOT_WAKATIME_COMMIT=87bfaba53afd6a3c05765a4d6ceb04e204e9be4d",
         "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl unzip libxcursor1 libxinerama1 libxrandr2 libxi6 libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri libfontconfig1 libasound2t64 libpulse0 && { curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/godot.zip \"https://downloads.godotengine.org/?version=${GODOT_VERSION%-*}&flavor=${GODOT_VERSION#*-}&slug=linux.x86_64.zip&platform=linux.64\" || curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/godot.zip \"https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip\"; } && unzip -q /tmp/godot.zip -d /opt/godot && mv /opt/godot/Godot_v*_linux.x86_64 /opt/godot/godot && chmod 755 /opt/godot/godot && rm -rf /tmp/godot.zip /var/lib/apt/lists/*",
-        `RUN echo ${base64(GODOT_LAUNCHER)} | base64 -d > /opt/godot/run && echo ${base64(GODOT_UPLOAD_MOVER)} | base64 -d > /opt/godot/move-uploads && chmod 755 /opt/godot/run /opt/godot/move-uploads && echo /opt/godot/run > /defaults/autostart && echo ${base64('<?xml version="1.0" encoding="utf-8"?>\n<openbox_menu xmlns="http://openbox.org/3.4/menu"><menu id="root-menu" label="MENU"></menu></openbox_menu>')} | base64 -d > /defaults/menu.xml`
+        "RUN mkdir -p /opt/wakatime /opt/godot/addons && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/wakatime.zip \"https://github.com/wakatime/wakatime-cli/releases/download/${WAKATIME_CLI_VERSION}/wakatime-cli-linux-amd64.zip\" && unzip -q /tmp/wakatime.zip -d /opt/wakatime && chmod 755 /opt/wakatime/wakatime-cli-linux-amd64 && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/godot-wakatime.tar.gz \"https://codeload.github.com/BudzioT/Godot_Super-Wakatime/tar.gz/${GODOT_WAKATIME_COMMIT}\" && tar -xzf /tmp/godot-wakatime.tar.gz -C /tmp && mv /tmp/Godot_Super-Wakatime-${GODOT_WAKATIME_COMMIT}/addons/godot_super-wakatime /opt/godot/addons/ && rm -rf /tmp/wakatime.zip /tmp/godot-wakatime.tar.gz /tmp/Godot_Super-Wakatime-*",
+        `RUN echo ${base64(GODOT_LAUNCHER)} | base64 -d > /opt/godot/run && echo ${base64(GODOT_UPLOAD_MOVER)} | base64 -d > /opt/godot/move-uploads && echo ${base64(GODOT_HACKATIME)} | base64 -d > /opt/godot/add-hackatime && chmod 755 /opt/godot/run /opt/godot/move-uploads /opt/godot/add-hackatime && echo /opt/godot/run > /defaults/autostart && echo ${base64('<?xml version="1.0" encoding="utf-8"?>\n<openbox_menu xmlns="http://openbox.org/3.4/menu"><menu id="root-menu" label="MENU"></menu></openbox_menu>')} | base64 -d > /defaults/menu.xml`
       ].join("\n")
     },
     env: {
@@ -355,6 +399,9 @@ export const createContainer = async (password, type, authorization, name) => {
 
     if (isGui) {
       await setupGuiApp(sandbox, { image: config.image, build: config.build });
+      if (config.hackatime) {
+        await writeHackatimeConfig(sandbox, user.hackatime_api_key);
+      }
     } else {
       await setupCodeServer(sandbox, {
         workspacePath: toSandboxPath(workspaceDir),
@@ -470,6 +517,10 @@ export const startContainer = async (spaceId, authorization) => {
     }
 
     const password = space.password || crypto.randomBytes(16).toString('hex');
+
+    if (configFor(space.type)?.hackatime) {
+      await writeHackatimeConfig(sandbox, user.hackatime_api_key);
+    }
 
     const access_url = await startSpaceApp(sandbox, space, password);
 

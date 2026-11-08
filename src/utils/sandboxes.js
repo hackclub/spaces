@@ -214,6 +214,22 @@ export const setupGuiApp = async (sandbox, { image, build }) => {
   return build?.tag ?? image;
 };
 
+const HACKATIME_API_URL = "https://hackatime.hackclub.com/api/hackatime/v1";
+
+export const writeHackatimeConfig = async (sandbox, apiKey) => {
+  const key = sanitizeHackatimeKey(apiKey);
+  const write = 'printf "[settings]\\napi_url = %s\\n" "$URL" > "$FILE" && { [ -z "$KEY" ] || printf "api_key = %s\\n" "$KEY" >> "$FILE"; } && printf "heartbeat_rate_limit_seconds = 30\\n" >> "$FILE" && chown 1000:1000 "$FILE" && chmod 600 "$FILE"';
+
+  try {
+    await run(sandbox, key ? write : `[ -e "$FILE" ] || { ${write}; }`, {
+      sudo: true,
+      env: { FILE: `${GUI_CONFIG_PATH}/.wakatime.cfg`, URL: HACKATIME_API_URL, KEY: key }
+    });
+  } catch (err) {
+    console.error("Failed to set up Hackatime:", err.message);
+  }
+};
+
 const STOP_DOCKER = [
   "pkill -x dockerd",
   "for i in $(seq 1 60); do pgrep -x dockerd >/dev/null || break; sleep 0.5; done",
