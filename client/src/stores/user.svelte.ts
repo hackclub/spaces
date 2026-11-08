@@ -15,7 +15,8 @@ class UserData {
         hackatime_needs_switch: boolean,
         hackclub_id: string,
         hackclub_verification_status: string,
-        vscode_extensions: string
+        vscode_extensions: string,
+        github_username: string | null
     }>()
 
     async refresh() {

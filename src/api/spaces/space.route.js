@@ -8,7 +8,10 @@ import {
   deleteSpace,
   changeSpacePassword,
   availableSpaceTypes,
-  spaceConfigs
+  spaceConfigs,
+  getGithubConnection,
+  connectGithub,
+  disconnectGithub
 } from "../../utils/spaces.js";
 import { getUser } from "../../utils/user.js";
 import { readyTemplateTypes, templateVersions } from "../../utils/templates.js";
@@ -90,6 +93,30 @@ router.post("/start/:spaceId", containerOpsLimiter, async (req, res) => {
   try {
     const result = await startContainer(spaceId, authorization);
     res.json(result);
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+router.get("/github/:spaceId", containerOpsLimiter, async (req, res) => {
+  try {
+    res.json(await getGithubConnection(req.params.spaceId, req.authToken));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+router.post("/github/:spaceId/connect", containerOpsLimiter, async (req, res) => {
+  try {
+    res.json(await connectGithub(req.params.spaceId, req.authToken));
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+router.post("/github/:spaceId/disconnect", containerOpsLimiter, async (req, res) => {
+  try {
+    res.json(await disconnectGithub(req.params.spaceId, req.authToken));
   } catch (err) {
     sendError(res, err);
   }

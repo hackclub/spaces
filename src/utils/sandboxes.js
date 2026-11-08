@@ -192,6 +192,45 @@ export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey,
   }
 };
 
+const GITHUB_LOGIN_LOG = "/tmp/spaces-github-login.log";
+export const GITHUB_DEVICE_URL = "https://github.com/login/device";
+
+export const startGithubLogin = async (sandbox) => {
+  await run(sandbox, `pkill -f "[g]h auth login" || true; rm -f ${GITHUB_LOGIN_LOG}`);
+  await sandbox.runCommand({
+    cmd: "bash",
+    args: ["-lc", `gh auth login --hostname github.com --git-protocol https --web --skip-ssh-key < /dev/null > ${GITHUB_LOGIN_LOG} 2>&1`],
+    env: { BROWSER: "true" },
+    detached: true
+  });
+  const result = await run(
+    sandbox,
+    `for i in $(seq 1 60); do grep -oE "code: [A-Z0-9]{4}-[A-Z0-9]{4}" ${GITHUB_LOGIN_LOG} && exit 0; sleep 0.25; done; exit 1`,
+    { timeoutMs: 30000 }
+  );
+  return (await result.stdout()).match(/[A-Z0-9]{4}-[A-Z0-9]{4}/)?.[0] ?? null;
+};
+
+export const githubLoginPending = async (sandbox) => {
+  const result = await sandbox.runCommand({ cmd: "bash", args: ["-lc", 'pgrep -f "[g]h auth login" >/dev/null'] });
+  return result.exitCode === 0;
+};
+
+export const getGithubAccount = async (sandbox) => {
+  const result = await sandbox.runCommand({ cmd: "bash", args: ["-lc", "gh api user --jq '[.login, (.id | tostring), (.name // \"\")] | @tsv' 2>/dev/null"] });
+  if (result.exitCode !== 0) return null;
+  const [login, id, name] = (await result.stdout()).trim().split("\t");
+  return login && id ? { login, id, name } : null;
+};
+
+export const configureGitForGithub = (sandbox, { login, id, name }) => run(
+  sandbox,
+  'gh auth setup-git --hostname github.com && git config --global user.name "$NAME" && git config --global user.email "$EMAIL"',
+  { env: { NAME: name || login, EMAIL: `${id}+${login}@users.noreply.github.com` } }
+);
+
+export const githubLogout = (sandbox) => run(sandbox, `pkill -f "[g]h auth login" || true; gh auth logout --hostname github.com >/dev/null 2>&1 || true`);
+
 export const startCodeServer = async (sandbox, { password, workspacePath }) => {
   await run(sandbox, INSTALL_CODE_SERVER, { sudo: true });
   await run(sandbox, 'mkdir -p "$WORKSPACE"', { env: { WORKSPACE: workspacePath } });

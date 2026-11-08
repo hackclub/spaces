@@ -7,6 +7,7 @@
   import FlagIcon from "../assets/flag.svg?raw";
   import ShareWithClubToggle from "./ShareWithClubToggle.svelte";
   import ProgressNotice from "./ProgressNotice.svelte";
+  import GithubConnect from "./GithubConnect.svelte";
   import { userData } from "../stores/user.svelte";
   import { createConfirm } from "./confirm.js";
   import { findLegacyGodotProjects, downloadLegacyGodotProjects } from "./godot-legacy.js";
@@ -25,6 +26,9 @@
   let newSpaceName = "";
   let newSpaceRepo = "";
   let nameFromRepo = "";
+  let githubSpace = null;
+  let githubRepos = [];
+  let githubReposFor = "";
   let error = "";
   let loading = false;
   let actionLoading = {};
@@ -407,6 +411,25 @@
   function repoNameFrom(value) {
     const match = value.trim().match(/^(?:(?:https?:\/\/)?(?:www\.)?github\.com\/)?[A-Za-z0-9-]+\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$/);
     return match ? match[1] : "";
+  }
+
+  $: if (showCreateForm && userData.user?.github_username && githubReposFor !== userData.user.github_username) {
+    loadGithubRepos(userData.user.github_username);
+  }
+
+  async function loadGithubRepos(login) {
+    githubReposFor = login;
+    try {
+      const response = await fetch(`https://api.github.com/users/${encodeURIComponent(login)}/repos?per_page=100&sort=pushed`, {
+        headers: { Accept: "application/vnd.github+json" },
+      });
+      const repos = response.ok ? await response.json() : [];
+      githubRepos = Array.isArray(repos)
+        ? repos.filter((repo) => !repo.private).map((repo) => ({ value: repo.full_name, label: repo.description || "" }))
+        : [];
+    } catch (err) {
+      githubRepos = [];
+    }
   }
 
   function handleRepoInput() {
@@ -938,10 +961,20 @@
                   disabled={loading}
                   bind:value={newSpaceRepo}
                   on:input={handleRepoInput}
-                  placeholder="https://github.com/you/project"
+                  list="spaceRepoList"
+                  placeholder={userData.user.github_username ? `${userData.user.github_username}/project` : "https://github.com/you/project"}
                   aria-describedby="spaceRepoHint"
                 />
-                <p class="form-hint" id="spaceRepoHint">Public repos only. It's copied into your space so you can keep working on it.</p>
+                <datalist id="spaceRepoList">
+                  {#each githubRepos as repo (repo.value)}
+                    <option value={repo.value}>{repo.label}</option>
+                  {/each}
+                </datalist>
+                <p class="form-hint" id="spaceRepoHint">
+                  {userData.user.github_username
+                    ? "Start typing to pick one of your public repos, or paste a link to any public repo."
+                    : "Public repos only. It's copied into your space so you can keep working on it."}
+                </p>
               </div>
             {/if}
 
@@ -1311,6 +1344,16 @@
                       </button>
                     {/if}
 
+                    {#if !isGuiType(space.type) && space.access_url}
+                      <button
+                        type="button"
+                        class="action-btn github"
+                        on:click={() => (githubSpace = space)}
+                      >
+                        GitHub
+                      </button>
+                    {/if}
+
                     <button
                       type="button"
                       class="action-btn stop"
@@ -1379,4 +1422,8 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if githubSpace}
+  <GithubConnect space={githubSpace} on:close={() => (githubSpace = null)} />
 {/if}

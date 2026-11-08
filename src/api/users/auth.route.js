@@ -48,7 +48,8 @@ router.get("/me", async (req, res) => {
         hackatime_needs_switch: hackatimeAvailable && !hackatimeLinked && Boolean(user.hackatime_api_key),
         hackclub_id: user.hackclub_id,
         hackclub_verification_status: user.hackclub_verification_status,
-        vscode_extensions: user.vscode_extensions
+        vscode_extensions: user.vscode_extensions,
+        github_username: user.github_username ?? null
       }
     })
   } catch (_) {

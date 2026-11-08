@@ -620,6 +620,11 @@
   color: var(--red);
 }
 
+.action-btn.github {
+  background: var(--darkless);
+  color: var(--white);
+}
+
 .optional-mark {
   font-weight: normal;
   color: var(--slate);
@@ -833,6 +838,7 @@
 
 .space-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
