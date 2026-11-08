@@ -19,6 +19,7 @@
   const dispatch = createEventDispatcher();
 
   let showCreateForm = false;
+  let createDialog;
   let newSpaceType = "code-server";
   let newSpaceName = "";
   let error = "";
@@ -119,6 +120,24 @@
     } catch (err) {
       console.error("Failed to load space types:", err);
     }
+  }
+
+  $: if (createDialog) {
+    if (showCreateForm && !createDialog.open) createDialog.showModal();
+    else if (!showCreateForm && createDialog.open) createDialog.close();
+  }
+
+  function closeCreateDialog() {
+    if (!loading) showCreateForm = false;
+  }
+
+  function handleDialogCancel(event) {
+    event.preventDefault();
+    closeCreateDialog();
+  }
+
+  function handleDialogClick(event) {
+    if (event.target === createDialog) closeCreateDialog();
   }
 
   const SEARCH_THRESHOLD = 6;
@@ -699,18 +718,37 @@
       <div class="right-actions">
         <button
           class="btn-primary"
-          on:click={() => (showCreateForm = !showCreateForm)}
+          on:click={() => (showCreateForm = true)}
         >
-          {showCreateForm ? "Cancel" : "+ Create New Space"}
+          + Create New Space
         </button>
 
         <button class="btn-secondary" on:click={loadSpaces}> Refresh </button>
       </div>
     </div>
 
+    <dialog
+      class="create-dialog"
+      bind:this={createDialog}
+      aria-labelledby="create-dialog-title"
+      on:cancel={handleDialogCancel}
+      on:close={() => (showCreateForm = false)}
+      on:click={handleDialogClick}
+    >
     {#if showCreateForm}
       <div class="create-form">
-        <h3 class="create-form-title">Create New Space</h3>
+        <div class="create-dialog-head">
+          <h3 class="create-form-title" id="create-dialog-title">Create a new space</h3>
+          <button
+            type="button"
+            class="create-dialog-close"
+            on:click={closeCreateDialog}
+            disabled={loading}
+            aria-label="Close"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" /></svg>
+          </button>
+        </div>
 
         <div class="create-layout">
           <fieldset class="type-picker" disabled={loading}>
@@ -843,6 +881,7 @@
         </div>
       </div>
     {/if}
+    </dialog>
 
     <div class="spaces-list">
       <h3 class="section-title">Your Spaces</h3>

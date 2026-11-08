@@ -315,6 +315,94 @@
   vertical-align: middle;
 }
 
+.create-dialog {
+  width: min(1040px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: var(--white);
+  color: var(--black);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.create-dialog:focus {
+  outline: none;
+}
+
+.create-dialog::backdrop {
+  background: rgba(18, 18, 23, 0.6);
+}
+
+.create-dialog[open] {
+  animation: create-dialog-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes create-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .create-dialog[open] {
+    animation: none;
+  }
+}
+
+.create-dialog .create-form {
+  margin-bottom: 0;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.create-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.create-dialog-head .create-form-title {
+  margin: 0;
+}
+
+.create-dialog-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: 2px solid var(--smoke);
+  border-radius: 99999px;
+  background: transparent;
+  color: var(--slate);
+  cursor: pointer;
+  transition: border-color 0.125s ease-in-out, color 0.125s ease-in-out;
+}
+
+.create-dialog-close:hover:not(:disabled) {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.create-dialog-close:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.create-dialog-close:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .create-layout {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
@@ -576,6 +664,13 @@
 }
 
 @media (max-width: 520px) {
+  .create-dialog {
+    width: 100vw;
+    max-height: 100dvh;
+    height: 100dvh;
+    border-radius: 0;
+  }
+
   .create-form {
     padding: 20px;
   }
