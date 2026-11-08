@@ -42,7 +42,8 @@
       : isReadyType(type)
         ? ["Creating your machine...", "Starting the desktop..."]
         : ["Creating your machine...", "Downloading the app, this is the slow part...", "Starting the desktop..."];
-  let dropdownOpen = false;
+  let typeSearch = "";
+  let typeCategory = "All";
   let clubData = null;
   let spaceShareStatus = {};
   let searchQuery = "";
@@ -100,15 +101,10 @@
   }
 
   let spaceTypes = [
-    {
-      value: "code-server",
-      label: "VS Code Server",
-      description: "Web-based code editor",
-      kind: "editor",
-    },
-    { value: "blender", label: "Blender 3D", description: "3D modeling and animation", kind: "gui" },
-    { value: "kicad", label: "KiCad", description: "PCB design software", kind: "gui" },
-    { value: "freecad", label: "FreeCAD", description: "CAD software", kind: "gui" },
+    { value: "code-server", label: "VS Code Server", description: "Web-based code editor", kind: "editor", category: "Code", tracksHackatime: true },
+    { value: "blender", label: "Blender 3D", description: "3D modeling and animation", kind: "gui", category: "3D & design" },
+    { value: "kicad", label: "KiCad", description: "PCB design software", kind: "gui", category: "Electronics" },
+    { value: "freecad", label: "FreeCAD", description: "CAD software", kind: "gui", category: "3D & design" },
   ];
 
   async function loadSpaceTypes() {
@@ -125,8 +121,28 @@
     }
   }
 
-  $: stableTypes = spaceTypes.filter((spaceType) => !spaceType.beta);
-  $: betaTypes = spaceTypes.filter((spaceType) => spaceType.beta);
+  const SEARCH_THRESHOLD = 6;
+  const KIND_LABELS = { editor: "Code editor", gui: "Desktop app" };
+
+  $: typeCategories = [...new Set(spaceTypes.map((spaceType) => spaceType.category || "Other"))];
+  $: if (typeCategory !== "All" && !typeCategories.includes(typeCategory)) typeCategory = "All";
+  $: if (spaceTypes.length && !spaceTypes.some((spaceType) => spaceType.value === newSpaceType)) newSpaceType = spaceTypes[0].value;
+  $: typeQuery = typeSearch.trim().toLowerCase();
+  $: visibleTypes = spaceTypes
+    .filter((spaceType) => typeCategory === "All" || (spaceType.category || "Other") === typeCategory)
+    .filter((spaceType) => !typeQuery || [spaceType.label, spaceType.description, spaceType.category, spaceType.details]
+      .some((text) => text?.toLowerCase().includes(typeQuery)));
+  $: typeGroups = typeCategories
+    .map((category) => ({ category, types: visibleTypes.filter((spaceType) => (spaceType.category || "Other") === category) }))
+    .filter((group) => group.types.length);
+  $: showTypeGroups = typeCategory === "All" && typeCategories.length > 1;
+
+  function startupHint(spaceType) {
+    if (spaceType.kind !== "gui") return "Usually ready in about 15 seconds.";
+    return spaceType.ready
+      ? "Usually ready in about 15 seconds."
+      : "Setting it up takes 1 to 2 minutes the first time. After that it starts in seconds.";
+  }
   let revealedPasswords = new Set();
 
   function togglePasswordReveal(spaceId) {
@@ -562,15 +578,6 @@
     }
   }
 
-  function toggleDropdown() {
-    dropdownOpen = !dropdownOpen;
-  }
-
-  function selectSpaceType(value) {
-    newSpaceType = value;
-    dropdownOpen = false;
-  }
-
   $: selectedType =
     spaceTypes.find((type) => type.value === newSpaceType) || spaceTypes[0];
 
@@ -693,92 +700,135 @@
       <div class="create-form">
         <h3 class="create-form-title">Create New Space</h3>
 
-        {#if newSpaceType == "code-server" && !userData.user.hackatime_api_key}
-          <div class="warn-message">
-            Add your Hackatime API key in the settings to track time spent
-            coding in Spaces!
-          </div>
-        {/if}
+        <div class="create-layout">
+          <fieldset class="type-picker" disabled={loading}>
+            <legend class="form-label">Space type</legend>
 
-        <div class="form-group">
-          <label class="form-label" for="type">Space Type</label>
-          <div class="custom-select">
-            <button
-              type="button"
-              class="select-trigger"
-              class:open={dropdownOpen}
-              on:click={toggleDropdown}
-            >
-              {selectedType.label}
-            </button>
-            <div class="select-arrow" class:open={dropdownOpen}></div>
-            <div class="select-dropdown" class:open={dropdownOpen}>
-              {#each [...stableTypes, ...betaTypes] as spaceType, i}
-                {#if spaceType.beta && i === stableTypes.length}
-                  <div class="select-group">Beta</div>
+            {#if spaceTypes.length > SEARCH_THRESHOLD || typeCategories.length > 1}
+              <div class="type-filters">
+                {#if spaceTypes.length > SEARCH_THRESHOLD}
+                  <input
+                    class="form-input type-search"
+                    type="search"
+                    placeholder="Search space types"
+                    aria-label="Search space types"
+                    bind:value={typeSearch}
+                  />
                 {/if}
-                <div
-                  class="select-option"
-                  class:selected={spaceType.value === newSpaceType}
-                  on:click={() => selectSpaceType(spaceType.value)}
-                  on:keypress={(e) =>
-                    e.key === "Enter" && selectSpaceType(spaceType.value)}
-                  role="option"
-                  tabindex="0"
-                  aria-selected={spaceType.value === newSpaceType}
-                >
-                  <div class="option-label">
-                    {spaceType.label}
-                    {#if spaceType.beta}<span class="beta-badge">Beta</span>{/if}
+                {#if typeCategories.length > 1}
+                  <div class="type-chips" role="group" aria-label="Filter by category">
+                    {#each ["All", ...typeCategories] as category}
+                      <button
+                        type="button"
+                        class="type-chip"
+                        class:active={typeCategory === category}
+                        aria-pressed={typeCategory === category}
+                        on:click={() => (typeCategory = category)}
+                      >
+                        {category}
+                      </button>
+                    {/each}
                   </div>
-                  <div class="option-description">{spaceType.description}</div>
-                </div>
+                {/if}
+              </div>
+            {/if}
+
+            <div class="type-list">
+              {#each typeGroups as group (group.category)}
+                {#if showTypeGroups}
+                  <p class="type-group-label">{group.category}</p>
+                {/if}
+                {#each group.types as spaceType (spaceType.value)}
+                  <label class="type-option" class:selected={spaceType.value === newSpaceType}>
+                    <input
+                      class="visually-hidden"
+                      type="radio"
+                      name="space-type"
+                      value={spaceType.value}
+                      bind:group={newSpaceType}
+                    />
+                    <span class="type-option-text">
+                      <span class="type-option-name">{spaceType.label}</span>
+                      <span class="type-option-summary">{spaceType.description}</span>
+                    </span>
+                    <span class="type-option-tags">
+                      {#if spaceType.beta}<span class="beta-badge">Beta</span>{/if}
+                      {#if spaceType.kind === "gui" && spaceType.ready}<span class="type-tag quick">Quick start</span>{/if}
+                      <span class="type-tag">{KIND_LABELS[spaceType.kind] ?? "Space"}</span>
+                    </span>
+                  </label>
+                {/each}
+              {:else}
+                <p class="type-empty">
+                  No space types match{typeSearch.trim() ? ` "${typeSearch.trim()}"` : ""}.
+                  <button type="button" class="type-reset" on:click={() => { typeSearch = ""; typeCategory = "All"; }}>Show all</button>
+                </p>
               {/each}
             </div>
+          </fieldset>
+
+          <div class="type-summary" aria-live="polite">
+            <div class="type-summary-head">
+              <h4 class="type-summary-title">{selectedType.label}</h4>
+              {#if selectedType.beta}<span class="beta-badge">Beta</span>{/if}
+            </div>
+            <p class="type-summary-text">{selectedType.details && selectedType.details !== selectedType.label && selectedType.details !== selectedType.description ? selectedType.details : selectedType.description}</p>
+            <p class="type-summary-meta">{KIND_LABELS[selectedType.kind] ?? "Space"} in your browser · {startupHint(selectedType)}</p>
+
+            {#if selectedType.beta}
+              <p class="type-summary-note">This space type is in beta, so things may still change or break.</p>
+            {/if}
+
+            {#if selectedType.tracksHackatime && !userData.user.hackatime_api_key}
+              <div class="warn-message">
+                Add your Hackatime API key in Settings to track the time you spend in this space.
+              </div>
+            {:else if selectedType.tracksHackatime}
+              <p class="type-summary-note">Time you spend in this space is tracked on Hackatime.</p>
+            {/if}
+
+            {#if !isGuiType(newSpaceType)}
+              <div class="form-group">
+                <label class="form-label" for="spaceName">Name</label>
+                <p class="password-info">
+                  Name your space after what you're working on. It shows on your
+                  dashboard, and Hackatime uses it to track time for this project,
+                  so give each project its own name. Use letters, numbers, dashes,
+                  underscores or dots.
+                </p>
+                <input
+                  class="form-input"
+                  id="spaceName"
+                  type="text"
+                  maxlength="64"
+                  required
+                  disabled={loading}
+                  bind:value={newSpaceName}
+                  placeholder="my-project"
+                />
+              </div>
+            {/if}
+
+            {#if error}
+              <div class="error-message">{error}</div>
+            {/if}
+
+            <button class="btn-primary type-create" on:click={createSpace} disabled={loading}>
+              {loading ? "Creating..." : `Create ${selectedType.label} space`}
+            </button>
+
+            {#if loading}
+              <ProgressNotice
+                expectedSeconds={isGuiType(newSpaceType) ? (isReadyType(newSpaceType) ? 15 : 90) : 25}
+                steps={createSteps(newSpaceType)}
+                done={createDone}
+                note={isGuiType(newSpaceType) && isReadyType(newSpaceType)
+                  ? "This should only take a few seconds."
+                  : "Setting up a new space takes a little while, up to about 2 minutes for desktop apps. It's only slow the first time: after that, your space starts in seconds."}
+              />
+            {/if}
           </div>
         </div>
-
-        {#if !isGuiType(newSpaceType)}
-          <div class="form-group">
-            <label class="form-label" for="spaceName">Name</label>
-            <p class="password-info">
-              Name your space after what you're working on. It shows on your
-              dashboard, and Hackatime uses it to track time for this project,
-              so give each project its own name. Use letters, numbers, dashes,
-              underscores or dots.
-            </p>
-            <input
-              class="form-input"
-              id="spaceName"
-              type="text"
-              maxlength="64"
-              required
-              bind:value={newSpaceName}
-              placeholder="my-project"
-            />
-          </div>
-        {:else}
-          <div class="form-group"></div>
-        {/if}
-
-        {#if error}
-          <div class="error-message">{error}</div>
-        {/if}
-
-        <button class="btn-primary" on:click={createSpace} disabled={loading}>
-          {loading ? "Creating..." : "Create Space"}
-        </button>
-
-        {#if loading}
-          <ProgressNotice
-            expectedSeconds={isGuiType(newSpaceType) ? (isReadyType(newSpaceType) ? 15 : 90) : 25}
-            steps={createSteps(newSpaceType)}
-            done={createDone}
-            note={isGuiType(newSpaceType) && isReadyType(newSpaceType)
-              ? "This should only take a few seconds."
-              : "Setting up a new space takes a little while, up to about 2 minutes for Blender, KiCad, FreeCAD and Godot. It's only slow the first time: after that, your space starts in seconds."}
-          />
-        {/if}
       </div>
     {/if}
 

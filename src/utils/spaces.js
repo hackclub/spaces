@@ -143,12 +143,14 @@ const base64 = (text) => Buffer.from(`${text}\n`).toString("base64");
 export const spaceConfigs = {
   "code-server": {
     kind: "editor",
+    category: "Code",
     title: "VS Code Server",
     summary: "Web-based code editor",
     description: "VS Code Server"
   },
   "blender": {
     kind: "gui",
+    category: "3D & design",
     image: "linuxserver/blender",
     label: "Blender",
     title: "Blender 3D",
@@ -157,6 +159,7 @@ export const spaceConfigs = {
   },
   "kicad": {
     kind: "gui",
+    category: "Electronics",
     image: "linuxserver/kicad",
     label: "KiCad",
     title: "KiCad",
@@ -165,6 +168,7 @@ export const spaceConfigs = {
   },
   "godot": {
     kind: "gui",
+    category: "Games",
     image: "ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
     label: "Godot",
     title: "Godot",
@@ -207,6 +211,7 @@ export const spaceConfigs = {
   },
   "freecad": {
     kind: "gui",
+    category: "3D & design",
     image: "linuxserver/freecad",
     label: "FreeCAD",
     title: "FreeCAD",
@@ -225,8 +230,11 @@ export const availableSpaceTypes = (user, readyTypes = new Set()) => Object.entr
     value,
     label: config.title,
     description: config.summary,
+    details: config.description,
     kind: config.kind,
+    category: config.category ?? "Other",
     beta: Boolean(config.beta),
+    tracksHackatime: config.kind === "editor" || Boolean(config.hackatime),
     ready: readyTypes.has(value)
   }));
 
