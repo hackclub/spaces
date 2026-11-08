@@ -6,6 +6,7 @@
   import SpaceModerationModal from './SpaceModerationModal.svelte';
   import AdminLogs from './AdminLogs.svelte';
   import AdminRoles from './AdminRoles.svelte';
+  import AdminHackatime from './AdminHackatime.svelte';
   import { userData } from '../stores/user.svelte';
   import { createConfirm } from './confirm.js';
 
@@ -48,7 +49,7 @@
     (can('stats.view') || can('sandbox.view') || can('templates.manage')) && 'analytics',
     can('users.view') && 'users',
     can('spaces.view') && 'spaces',
-    can('usage.view') && 'usage',
+    (can('usage.view') || can('hackatime.view')) && 'usage',
     can('logs.view') && 'logs',
     me?.is_superadmin && 'roles'
   ].filter(Boolean);
@@ -270,7 +271,7 @@
 
   $: applyUrl(url);
   $: activeTab, userSearch, userFilter, userSort, spaceSearch, spaceType, spaceStatus, spaceSort, usageDays, statsDays, syncUrl();
-  $: if (activeTab === 'usage') loadUsage(usageDays);
+  $: if (activeTab === 'usage' && can('usage.view')) loadUsage(usageDays);
   $: if (activeTab === 'analytics' && can('stats.view')) loadStats(statsDays);
   $: roleOptions = [...new Map(users.flatMap((user) => user.roles ?? []).map((role) => [role.id, role])).values()].sort((a, b) => a.name.localeCompare(b.name));
   $: userFilterFn = userFilter.startsWith('role:')
@@ -908,6 +909,7 @@
     {/if}
   {/if}
   {#if activeTab === 'usage'}
+    {#if can('usage.view')}
     <div class="spaces-controls">
       <select bind:value={usageDays} class="sort-select">
         <option value={1}>Last 24 hours</option>
@@ -963,6 +965,10 @@
       </div>
     {:else}
       <p class="stat-sub">Couldn't load usage.</p>
+    {/if}
+    {/if}
+    {#if can('hackatime.view')}
+      <AdminHackatime canImport={Boolean(me?.is_superadmin)} />
     {/if}
   {/if}
 

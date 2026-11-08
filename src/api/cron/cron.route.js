@@ -4,6 +4,7 @@ import { stopExpiredSpaces } from "../../utils/auto-stop.js";
 import { deleteExpiredSessions } from "../../utils/sessions.js";
 import { rebuildTemplates } from "../../utils/templates.js";
 import { spaceConfigs } from "../../utils/spaces.js";
+import { syncSpacesActivity } from "../../utils/hackatime.js";
 
 const router = express.Router();
 
@@ -31,6 +32,12 @@ router.get("/templates", requireCronSecret, async (req, res) => {
     console.error(`Failed to rebuild the ${template.type} template:`, template.error);
   }
   res.status(200).json({ success: templates.every((result) => result.ok), templates });
+});
+
+router.get("/hackatime", requireCronSecret, async (req, res) => {
+  const lookbackHours = new Date().getUTCHours() === 4 ? 48 : 3;
+  const summary = await syncSpacesActivity({ lookbackMs: lookbackHours * 60 * 60 * 1000 });
+  res.status(200).json({ success: true, lookbackHours, ...summary });
 });
 
 export default router;

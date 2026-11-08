@@ -4,6 +4,7 @@ import { requirePermission, requireSuperadmin } from '../../middlewares/admin.mi
 import { getUserRoles, canManageUser, STAFF_ONLY_MESSAGE } from '../../utils/permissions.js';
 import { deleteSpace, stopContainer, spaceConfigs } from '../../utils/spaces.js';
 import { listTemplates, rebuildTemplates } from '../../utils/templates.js';
+import { getHackatimeReport, hackatimeConfigured, startHetznerImport, continueHetznerImport, hetznerImportProgress, retryFailedHetznerImports } from '../../utils/hackatime.js';
 import { getSandboxStats } from '../../utils/sandboxes.js';
 import { getUsage } from '../../utils/space-runs.js';
 import { getStats } from '../../utils/stats.js';
@@ -421,6 +422,39 @@ router.post('/users/:userId/delete', requirePermission('users.delete'), async (r
       success: false,
       message: 'Failed to delete user'
     });
+  }
+});
+
+router.post('/hackatime', requirePermission('hackatime.view'), async (req, res) => {
+  try {
+    const days = req.body?.days === null ? null : [7, 30, 90].includes(Number(req.body?.days)) ? Number(req.body.days) : 30;
+    res.status(200).json({ success: true, data: await getHackatimeReport({ days }) });
+  } catch (error) {
+    console.error('Error building the Hackatime report:', error);
+    res.status(500).json({ success: false, message: 'Failed to load Hackatime time' });
+  }
+});
+
+router.post('/hackatime/import', requireSuperadmin, async (req, res) => {
+  try {
+    if (!hackatimeConfigured()) {
+      return res.status(400).json({ success: false, message: 'Add HACKATIME_ADMIN_KEY in Vercel first' });
+    }
+
+    const before = await hetznerImportProgress();
+    let found = null;
+    if (before.pending + before.done + before.failed === 0) {
+      found = await startHetznerImport();
+      await logAdminAction(req.user, 'hackatime.import', { details: { found } });
+    } else if (req.body?.retryFailed === true) {
+      await retryFailedHetznerImports();
+    }
+
+    const progress = await continueHetznerImport();
+    res.status(200).json({ success: true, data: { found, progress } });
+  } catch (error) {
+    console.error('Error importing old-server Hackatime time:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to import' });
   }
 });
 

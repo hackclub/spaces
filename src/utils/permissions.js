@@ -3,6 +3,7 @@ import pg from './db.js';
 export const PERMISSIONS = [
   { key: 'stats.view', category: 'Insights', label: 'See stats and growth charts' },
   { key: 'usage.view', category: 'Insights', label: 'See how many hours each person uses spaces' },
+  { key: 'hackatime.view', category: 'Insights', label: 'See Hackatime time tracked in spaces' },
   { key: 'users.view', category: 'User data', label: 'See the users list, including emails' },
   { key: 'spaces.view', category: 'User data', label: 'See the spaces list, including lock reasons' },
   { key: 'users.limits', category: 'User management', label: 'Change how many spaces someone can have and run' },
