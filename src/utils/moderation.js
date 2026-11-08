@@ -92,19 +92,24 @@ export const readSpaceFile = async (space, file, { maxBytes }) => {
   const sandbox = await sandboxFor(space);
   const { exitCode, stdout } = await runAsRoot(
     sandbox,
-    'test -f "$FILE" || exit 3; size=$(stat -c %s "$FILE"); [ "$size" -le "$MAX" ] || { echo "$size"; exit 4; }; base64 -w0 "$FILE"',
+    'test -f "$FILE" || exit 3; size=$(stat -L -c %s "$FILE"); [ "$size" -le "$MAX" ] || { echo "$size"; exit 4; }; head -c "$((MAX + 1))" "$FILE" | base64 -w0',
     { FILE: file, MAX: String(maxBytes) }
   );
+  const tooBig = (size) => fileError(`That file is ${size ? `${Math.ceil(size / 1024 / 1024)} MB, ` : ''}over the ${Math.round(maxBytes / 1024 / 1024)} MB limit here. Use full access to get it.`, 413);
   if (exitCode === 3) {
     throw fileError('That file does not exist', 404);
   }
   if (exitCode === 4) {
-    throw fileError(`That file is ${Math.ceil(Number(stdout.trim()) / 1024 / 1024)} MB, over the ${Math.round(maxBytes / 1024 / 1024)} MB limit here. Use full access to get it.`, 413);
+    throw tooBig(Number(stdout.trim()));
   }
   if (exitCode !== 0) {
     throw new Error(`Reading ${file} failed with exit code ${exitCode}`);
   }
-  return Buffer.from(stdout.trim(), 'base64');
+  const content = Buffer.from(stdout.trim(), 'base64');
+  if (content.length > maxBytes) {
+    throw tooBig(null);
+  }
+  return content;
 };
 
 export const looksLikeText = (buffer) => !buffer.subarray(0, 8000).includes(0);
