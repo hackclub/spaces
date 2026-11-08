@@ -67,6 +67,7 @@
       {#if user.club_leader}<span class="badge">Club leader</span>{:else if user.in_club}<span class="badge">Club member</span>{/if}
       <span class="badge">{user.hackclub_linked ? `Hack Club: ${user.hackclub_verification_status || 'linked'}` : 'No Hack Club account'}</span>
       {#if user.has_password}<span class="badge">Club password login</span>{/if}
+      {#if user.beta_access}<span class="badge">Beta tester</span>{/if}
       <span class="badge">{user.spaceCount} space{user.spaceCount === 1 ? '' : 's'}{user.runningCount ? `, ${user.runningCount} running` : ''}</span>
     </div>
 
@@ -108,6 +109,24 @@
                 <button class="btn" disabled={busy !== ''} on:click={() => act('roles', 'roles', { is_superadmin: true }, `Make ${user.username} a superadmin? They'll be able to open any space, read the admin log and make other superadmins.`)}>Make superadmin</button>
               {/if}
             </div>
+          {/if}
+        </section>
+      {/if}
+
+      {#if me?.is_superadmin}
+        <section>
+          <h3>Beta</h3>
+          <p class="note">
+            {user.is_superadmin
+              ? 'Superadmins always see beta space types.'
+              : user.beta_access
+                ? 'They can see and create beta space types. Removing access keeps their existing beta spaces working.'
+                : "They can't see beta space types."}
+          </p>
+          {#if !user.is_superadmin}
+            <button class="btn" disabled={busy !== ''} on:click={() => act('beta', 'beta', { beta_access: !user.beta_access })}>
+              {busy === 'beta' ? 'Saving...' : user.beta_access ? 'Remove beta access' : 'Give beta access'}
+            </button>
           {/if}
         </section>
       {/if}

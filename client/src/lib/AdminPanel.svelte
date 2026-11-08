@@ -211,6 +211,7 @@
     all: () => true,
     admins: (user) => user.is_admin || user.is_superadmin,
     superadmins: (user) => user.is_superadmin,
+    beta: (user) => user.beta_access || user.is_superadmin,
     leaders: (user) => user.club_leader,
     members: (user) => user.in_club && !user.club_leader,
     verified: (user) => VERIFIED_STATUSES.includes(user.hackclub_verification_status),
@@ -595,6 +596,7 @@
         <option value="all">All users</option>
         <option value="admins">Admins</option>
         <option value="superadmins">Superadmins</option>
+        <option value="beta">Beta testers</option>
         <option value="leaders">Club leaders</option>
         <option value="members">Club members</option>
         <option value="verified">Hack Club verified</option>

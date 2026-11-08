@@ -5,6 +5,7 @@
   const LABELS = {
     'user.limits': 'Changed limits',
     'user.roles': 'Changed roles',
+    'user.beta': 'Changed beta access',
     'user.sign_out': 'Signed out everywhere',
     'user.stop_spaces': 'Stopped running spaces',
     'user.delete': 'Deleted user',
@@ -36,6 +37,7 @@
     switch (entry.action) {
       case 'user.limits': return Object.entries(d).map(([field, change]) => `${field === 'max_running' ? 'running at once' : 'max spaces'} ${change.from} → ${change.to}`).join(', ');
       case 'user.roles': return `${roleText(d.from)} → ${roleText(d.to)}`;
+      case 'user.beta': return d.to ? 'given' : 'removed';
       case 'user.sign_out': return `${d.sessions} device${d.sessions === 1 ? '' : 's'}`;
       case 'user.stop_spaces': return d.spaces?.length ? d.spaces.map((id) => `#${id}`).join(', ') : 'none running';
       case 'user.delete': return `${d.username ?? ''}, ${d.spaces?.length ?? 0} space${d.spaces?.length === 1 ? '' : 's'}`;

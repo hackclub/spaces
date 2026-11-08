@@ -59,29 +59,49 @@ export const toSandboxPath = (workspaceDir) => `${SANDBOX_ROOT}${sanitizeWorkspa
 export const spaceConfigs = {
   "code-server": {
     kind: "editor",
+    title: "VS Code Server",
+    summary: "Web-based code editor",
     description: "VS Code Server"
   },
   "blender": {
     kind: "gui",
     image: "linuxserver/blender",
     label: "Blender",
+    title: "Blender 3D",
+    summary: "3D modeling and animation",
     description: "Blender 3D"
   },
   "kicad": {
     kind: "gui",
     image: "linuxserver/kicad",
     label: "KiCad",
+    title: "KiCad",
+    summary: "PCB design software",
     description: "KiCad PCB Design"
   },
   "freecad": {
     kind: "gui",
     image: "linuxserver/freecad",
     label: "FreeCAD",
+    title: "FreeCAD",
+    summary: "CAD software",
     description: "FreeCAD is a general-purpose parametric 3D computer-aided design (CAD) modeler and a building information modeling (BIM) software application with finite element method (FEM) support."
   }
 };
 
 const configFor = (type) => spaceConfigs[(type || "").toLowerCase()];
+
+export const hasBetaAccess = (user) => Boolean(user?.beta_access || user?.is_superadmin);
+
+export const availableSpaceTypes = (user) => Object.entries(spaceConfigs)
+  .filter(([, config]) => !config.beta || hasBetaAccess(user))
+  .map(([value, config]) => ({
+    value,
+    label: config.title,
+    description: config.summary,
+    kind: config.kind,
+    beta: Boolean(config.beta)
+  }));
 
 export const lockedError = (space, action = "used") => {
   const error = new Error(`This space was paused by Hack Club moderators and can't be ${action}${space.locked_reason ? `. Reason: ${space.locked_reason}` : "."}`);
@@ -206,9 +226,9 @@ export const createContainer = async (password, type, authorization, name) => {
   const typeLower = type.toLowerCase();
 
   const config = spaceConfigs[typeLower];
-  if (!config) {
+  if (!config || (config.beta && !hasBetaAccess(user))) {
     const error = new Error("Invalid space type");
-    error.validTypes = Object.keys(spaceConfigs);
+    error.validTypes = availableSpaceTypes(user).map((spaceType) => spaceType.value);
     throw error;
   }
 

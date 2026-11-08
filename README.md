@@ -159,6 +159,7 @@ Creating a space needs a verified Hack Club account or a club membership. Each u
 | POST | `/start/:spaceId` | Start a space. Returns `{ "message", "spaceId", "containerId" }`. |
 | POST | `/stop/:spaceId` | Stop a space. Vercel saves its snapshot. |
 | GET | `/status/:spaceId` | `{ "spaceId", "containerId", "type", "description", "accessUrl", "status", "running", "startedAt" }` |
+| GET | `/types` | The space types this user can create: `{ value, label, description, kind, beta }`. Beta types only show for users with beta access and superadmins. |
 | GET | `/list` | The user's spaces, each with `id`, `type`, `name`, `folder` (VS Code spaces only), `access_url`, `password`, `running`, `is_favorite`, `last_opened_at` and `status` |
 | POST | `/password/:spaceId` | Change a space's password. Body: `{ "password" }` (8 to 128 characters). A running space restarts its app. |
 | DELETE | `/delete/:spaceId` | Delete a space and its sandbox |
@@ -203,6 +204,7 @@ Admin only (admins and superadmins). Every route is a POST, and every change is 
 | `/spaces` | All spaces with their name, owner, dates and sandbox name |
 | `/users/:userId/update` | Change `max_spaces` (0–100) or `max_running` (spaces running at once, 0–10). Admins can only change regular users. |
 | `/users/:userId/roles` | Superadmins only: set `is_admin` / `is_superadmin`. Superadmins are always admins too, and nobody can change their own roles. |
+| `/users/:userId/beta` | Superadmins only: give or remove beta access. Body: `{ "beta_access": true }` |
 | `/users/:userId/sign-out` | End all of a user's logins |
 | `/users/:userId/stop-spaces` | Stop all of a user's running spaces |
 | `/users/:userId/delete` | Delete a user and their spaces. Superadmins can't be deleted until their role is removed. |

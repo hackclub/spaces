@@ -124,6 +124,7 @@ router.post('/users', requireAdmin, async (req, res) => {
         'users.username',
         'users.max_spaces',
         'users.max_running',
+        'users.beta_access',
         'users.is_admin',
         'users.is_superadmin',
         'users.hackclub_verification_status',
@@ -261,6 +262,39 @@ router.post('/users/:userId/roles', requireSuperadmin, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to update roles'
+    });
+  }
+});
+
+router.post('/users/:userId/beta', requireSuperadmin, async (req, res) => {
+  try {
+    const target = await findTarget(req, res);
+    if (!target) return;
+
+    if (typeof req.body.beta_access !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'Beta access must be true or false' });
+    }
+
+    const [updatedUser] = await pg('users')
+      .where('id', target.id)
+      .update({ beta_access: req.body.beta_access })
+      .returning(['id', 'beta_access']);
+
+    await logAdminAction(req.user, 'user.beta', {
+      targetUser: target,
+      details: { from: Boolean(target.beta_access), to: req.body.beta_access }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: req.body.beta_access ? 'Beta access given' : 'Beta access removed',
+      data: updatedUser
+    });
+  } catch (error) {
+    console.error('Error updating beta access:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update beta access'
     });
   }
 });

@@ -6,7 +6,8 @@ import {
   getContainerStatus,
   getUserSpaces,
   deleteSpace,
-  changeSpacePassword
+  changeSpacePassword,
+  availableSpaceTypes
 } from "../../utils/spaces.js";
 import { getUser } from "../../utils/user.js";
 import { 
@@ -111,6 +112,16 @@ router.get("/status/:spaceId", containerOpsLimiter, async (req, res) => {
   try {
     const result = await getContainerStatus(spaceId, authorization);
     res.json(result);
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+router.get("/types", async (req, res) => {
+  try {
+    const user = await getUser(req.authToken);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+    res.json({ types: availableSpaceTypes(user) });
   } catch (err) {
     sendError(res, err);
   }

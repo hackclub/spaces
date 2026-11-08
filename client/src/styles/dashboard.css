@@ -403,6 +403,27 @@
   margin-bottom: 4px;
 }
 
+.select-group {
+  padding: 8px 16px 4px;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  border-top: 1px solid var(--smoke);
+}
+
+.beta-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--white);
+  background: var(--purple);
+  vertical-align: middle;
+}
+
 .option-description {
   font-size: 14px;
   color: var(--muted);

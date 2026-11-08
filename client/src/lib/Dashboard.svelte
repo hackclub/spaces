@@ -27,7 +27,10 @@
   const holdFinishedBar = () => new Promise((resolve) => setTimeout(resolve, 800));
 
   const GUI_TYPES = ["kicad", "blender", "freecad"];
-  const isGuiType = (type) => GUI_TYPES.includes((type || "").toLowerCase());
+  $: isGuiType = (type) => {
+    const known = spaceTypes.find((spaceType) => spaceType.value === (type || "").toLowerCase());
+    return known ? known.kind === "gui" : GUI_TYPES.includes((type || "").toLowerCase());
+  };
   const createSteps = (type) =>
     isGuiType(type)
       ? ["Creating your machine...", "Downloading the app, this is the slow part...", "Starting the desktop..."]
@@ -47,6 +50,7 @@
   onMount(() => {
     loadClubData();
     loadSpaces();
+    loadSpaceTypes();
 
     showSafariNotSupported = /^((?!chrome|android).)*safari/i.test(
       navigator.userAgent,
@@ -88,20 +92,34 @@
     }
   }
 
-  const spaceTypes = [
+  let spaceTypes = [
     {
       value: "code-server",
       label: "VS Code Server",
       description: "Web-based code editor",
+      kind: "editor",
     },
-    {
-      value: "blender",
-      label: "Blender 3D",
-      description: "3D modeling and animation",
-    },
-    { value: "kicad", label: "KiCad", description: "PCB design software" },
-    { value: "freecad", label: "FreeCAD", description: "CAD software" },
+    { value: "blender", label: "Blender 3D", description: "3D modeling and animation", kind: "gui" },
+    { value: "kicad", label: "KiCad", description: "PCB design software", kind: "gui" },
+    { value: "freecad", label: "FreeCAD", description: "CAD software", kind: "gui" },
   ];
+
+  async function loadSpaceTypes() {
+    try {
+      const response = await fetch(`${API_BASE}/spaces/types`, {
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (response.ok && Array.isArray(data.types) && data.types.length) {
+        spaceTypes = data.types;
+      }
+    } catch (err) {
+      console.error("Failed to load space types:", err);
+    }
+  }
+
+  $: stableTypes = spaceTypes.filter((spaceType) => !spaceType.beta);
+  $: betaTypes = spaceTypes.filter((spaceType) => spaceType.beta);
   let revealedPasswords = new Set();
 
   function togglePasswordReveal(spaceId) {
@@ -696,7 +714,10 @@
             </button>
             <div class="select-arrow" class:open={dropdownOpen}></div>
             <div class="select-dropdown" class:open={dropdownOpen}>
-              {#each spaceTypes as spaceType}
+              {#each [...stableTypes, ...betaTypes] as spaceType, i}
+                {#if spaceType.beta && i === stableTypes.length}
+                  <div class="select-group">Beta</div>
+                {/if}
                 <div
                   class="select-option"
                   class:selected={spaceType.value === newSpaceType}
@@ -707,7 +728,10 @@
                   tabindex="0"
                   aria-selected={spaceType.value === newSpaceType}
                 >
-                  <div class="option-label">{spaceType.label}</div>
+                  <div class="option-label">
+                    {spaceType.label}
+                    {#if spaceType.beta}<span class="beta-badge">Beta</span>{/if}
+                  </div>
                   <div class="option-description">{spaceType.description}</div>
                 </div>
               {/each}
@@ -715,7 +739,7 @@
           </div>
         </div>
 
-        {#if newSpaceType !== "kicad" && newSpaceType !== "blender" && newSpaceType !== "freecad"}
+        {#if !isGuiType(newSpaceType)}
           <div class="form-group">
             <label class="form-label" for="spaceName">Name</label>
             <p class="password-info">
