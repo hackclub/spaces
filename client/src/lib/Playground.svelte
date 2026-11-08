@@ -12,14 +12,6 @@
 
   const playgroundTools = [
     { 
-      id: 'godot', 
-      name: 'Godot', 
-      description: 'Open-source 2D and 3D game engine',
-      icon: 'https://godotengine.org/assets/favicon.png',
-      status: 'available',
-      url: 'https://spaces-playground.hackclub.dev/godot/'
-    },
-    { 
       id: 'love2d', 
       name: 'LÖVE 2D', 
       description: 'Framework for making 2D games in Lua',
@@ -129,9 +121,9 @@
     {#if legacyGodotProjects.length}
       <div class="browser-notice legacy-notice">
         <span class="notice-text">
-          <strong>Your old Godot projects:</strong> the Godot playground moved to a new address to keep your account safe,
-          so {legacyGodotProjects.length === 1 ? 'the project' : `the ${legacyGodotProjects.length} projects`} you saved in this browser
-          ({legacyGodotProjects.join(', ')}) didn't come along. Download them as a zip, then open Godot and import the zip there.
+          <strong>Your Godot projects:</strong> the Godot playground has been removed. {legacyGodotProjects.length === 1 ? 'The project' : `The ${legacyGodotProjects.length} projects`}
+          you made in it ({legacyGodotProjects.join(', ')}) {legacyGodotProjects.length === 1 ? 'is' : 'are'} still saved in this browser.
+          Download them as a zip to keep working on them in Godot on your computer.
         </span>
         <button class="legacy-download" on:click={downloadLegacyProjects} disabled={legacyDownloading}>
           {legacyDownloading ? 'Preparing...' : 'Download my Godot projects'}

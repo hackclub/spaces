@@ -7,7 +7,7 @@ const router = express.Router();
 
 router.use(extractAuth);
 
-export const PLAYGROUND_TOOLS = ['godot', 'love2d'];
+export const PLAYGROUND_TOOLS = ['love2d'];
 
 router.post('/visit', async (req, res) => {
   try {
