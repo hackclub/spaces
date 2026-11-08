@@ -11,6 +11,7 @@ Spaces is a web app that creates secure cloud based development environments, ac
   - A session lasts at most 3 hours. A Vercel cron job calls `/api/v1/cron/auto-stop` every 5 minutes to stop spaces that have run longer and to fix the database for spaces that already stopped.
 - **VS Code spaces** run [code-server](https://github.com/coder/code-server) directly in the sandbox, on Vercel's default `universal` image. code-server is installed on first start, and the user's files live in `/vercel/sandbox/<space name>`. New spaces get [in-space.md](in-space.md) as their `README.md`, which lists the tools the image includes and how to install more with `sudo apt`. Spaces copied from the old server get it as `WELCOME.md`, so their own README is left alone.
 - **Blender, KiCad and FreeCAD spaces** run Docker inside the sandbox, with the [linuxserver.io](https://www.linuxserver.io/) image for each app. The app's files live in `/vercel/sandbox/config`. The browser logs in with HTTP basic auth: username `abc`, with the space's password.
+- **JetBrains spaces** (IntelliJ IDEA, WebStorm, RubyMine and RustRover, in beta) run the same way, on the `linuxserver/webtop:debian-xfce` desktop with 4 vCPUs. Each has an image built from a pinned IDE release (checked against JetBrains' SHA-256) with the language's tools: a JDK and Maven, Node.js, Ruby, or rustup and a C toolchain. The WakaTime plugin is in the IDE's own plugins folder, so Hackatime works with the key from Settings. Users sign in with their own JetBrains account the first time; the IDEs are free for non-commercial use. To update an IDE, change its `url` and `build` in [src/utils/spaces.js](src/utils/spaces.js).
 - **Database:** PostgreSQL, hosted on Hack Club's Orchard. Migrations run with knex on every deploy.
 - **Login:** email codes (sent through an Airtable automation on the "Spaces Emails" table), Hack Club Auth (OAuth at auth.hackclub.com), or email and password for club members. Club membership and leader status come from the Clubs API.
 
@@ -178,6 +179,10 @@ Creating a space needs a verified Hack Club account or a club membership. Each u
 | `blender` | Blender 3D | `linuxserver/blender` in Docker |
 | `kicad` | KiCad PCB Design | `linuxserver/kicad` in Docker |
 | `freecad` | CAD software | `linuxserver/freecad` in Docker |
+| `intellij` (beta) | IntelliJ IDEA | IntelliJ IDEA on `linuxserver/webtop:debian-xfce` in Docker |
+| `webstorm` (beta) | WebStorm | WebStorm on `linuxserver/webtop:debian-xfce` in Docker |
+| `rubymine` (beta) | RubyMine | RubyMine on `linuxserver/webtop:debian-xfce` in Docker |
+| `rustrover` (beta) | RustRover | RustRover on `linuxserver/webtop:debian-xfce` in Docker |
 
 ### Clubs API (`/api/v1/clubs`)
 
