@@ -529,8 +529,20 @@
       actionLoading = actionLoading;
     }
   }
+  function withoutCredentials(url) {
+    try {
+      const parsed = new URL(url, window.location.origin);
+      parsed.username = "";
+      parsed.password = "";
+      return parsed.toString();
+    } catch (err) {
+      return url;
+    }
+  }
+
   async function copySpaceUrl(spaceId, access_url) {
     if (!access_url) return;
+    access_url = withoutCredentials(access_url);
     const showSuccess = () => {
       copyFeedback = {
         ...copyFeedback,
