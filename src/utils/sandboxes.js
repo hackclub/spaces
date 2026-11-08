@@ -218,7 +218,7 @@ const HACKATIME_API_URL = "https://hackatime.hackclub.com/api/hackatime/v1";
 
 export const writeHackatimeConfig = async (sandbox, apiKey) => {
   const key = sanitizeHackatimeKey(apiKey);
-  const write = 'printf "[settings]\\napi_url = %s\\n" "$URL" > "$FILE" && { [ -z "$KEY" ] || printf "api_key = %s\\n" "$KEY" >> "$FILE"; } && printf "heartbeat_rate_limit_seconds = 30\\n" >> "$FILE" && chown 1000:1000 "$FILE" && chmod 600 "$FILE"';
+  const write = 'rm -f "$FILE" && printf "[settings]\\napi_url = %s\\n" "$URL" > "$FILE" && { [ -z "$KEY" ] || printf "api_key = %s\\n" "$KEY" >> "$FILE"; } && printf "heartbeat_rate_limit_seconds = 30\\n" >> "$FILE" && chown -h 1000:1000 "$FILE" && chmod 600 "$FILE"';
 
   try {
     await run(sandbox, key ? write : `[ -e "$FILE" ] || { ${write}; }`, {
@@ -281,7 +281,7 @@ export const startGuiApp = async (sandbox, { image, password, build, env = {}, r
     sandbox,
     [
       `docker rm -f ${GUI_CONTAINER} >/dev/null 2>&1 || true`,
-      ...resetFiles.map((file) => `rm -f "$CONFIG"/${JSON.stringify(file)}`),
+      ...resetFiles.map((file) => `dir=$(realpath -m "$(dirname "$CONFIG"/${JSON.stringify(file)})"); case "$dir/" in "$(realpath -m "$CONFIG")"/*) rm -f "$dir"/${JSON.stringify(file.split("/").pop())} ;; esac`),
       `docker run -d --name ${GUI_CONTAINER} -p ${GUI_PORT}:3000 -e PUID=1000 -e PGID=1000 -e PASSWORD="$SPACE_PASSWORD" -e SELKIES_FILE_TRANSFERS=upload,download -e SELKIES_UI_SIDEBAR_SHOW_FILES=True --shm-size=1g ${extraEnv} -v "$CONFIG":/config "$IMAGE" >/dev/null`
     ].join("; "),
     { sudo: true, env: { ...env, SPACE_PASSWORD: password, CONFIG: GUI_CONFIG_PATH, IMAGE: runImage }, timeoutMs: 2 * MINUTE }
