@@ -16,6 +16,11 @@ function askQuestion(question) {
 }
 
 async function main() {
+    if (process.env.NODE_ENV !== "development") {
+        console.error('This creates an admin anyone can log in as. It only runs with NODE_ENV=development, against a local database.')
+        process.exit(1)
+    }
+
     const email = (await askQuestion("Email for the dev account (press Enter for random@example.com): ")).trim() || "random@example.com"
 
     const [newUser] = await pg('users')
