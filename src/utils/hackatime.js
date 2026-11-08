@@ -25,7 +25,8 @@ const adminGet = async (path, params = {}, { timeoutMs = 60000 } = {}) => {
     signal: AbortSignal.timeout(timeoutMs)
   });
   if (!response.ok) {
-    throw new Error(`Hackatime ${path} answered ${response.status}`);
+    const body = await response.text().catch(() => '');
+    throw new Error(`Hackatime ${path} answered ${response.status}${body ? `: ${body.slice(0, 200)}` : ''}`);
   }
   return response.json();
 };
@@ -145,7 +146,12 @@ export const hetznerImportProgress = async () => {
   const count = (status, lookup) => rows
     .filter((row) => row.status === status && Boolean(row.lookup) === lookup)
     .reduce((sum, row) => sum + Number(row.n), 0);
+  const lastLookupError = await pg('hackatime_imports')
+    .where({ hackatime_user_id: '', status: 'failed' })
+    .orderBy('updated_at', 'desc')
+    .first('machine', 'error', 'updated_at');
   return {
+    lookupError: lastLookupError ? `${lastLookupError.machine.slice(LOOKUP_PREFIX.length)}: ${lastLookupError.error}` : null,
     lookingUp: count('pending', true),
     lookupFailed: count('failed', true),
     pending: count('pending', false),
@@ -191,6 +197,7 @@ export const continueHetznerImport = async ({ budgetMs = 150000 } = {}) => {
         await lookUpIp(job.machine.slice(LOOKUP_PREFIX.length));
         await pg('hackatime_imports').where({ hackatime_user_id: '', machine: job.machine }).update({ status: 'done', error: null, updated_at: pg.fn.now() });
       } catch (err) {
+        console.error(`Hackatime lookup for ${job.machine} failed:`, err.message);
         await pg('hackatime_imports').where({ hackatime_user_id: '', machine: job.machine }).update({ status: 'failed', error: err.message.slice(0, 500), updated_at: pg.fn.now() });
       }
       break;

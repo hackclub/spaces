@@ -53,7 +53,7 @@
     if (progress.lookingUp > 0) return 'Finding who used the old server. This step can take a few minutes...';
     const parts = [`${progress.done} done`, `${progress.pending} left`];
     if (progress.failed) parts.push(`${progress.failed} failed`);
-    if (progress.lookupFailed) parts.push('a lookup failed, retry it');
+    if (progress.lookupFailed) parts.push(`a lookup failed (${progress.lookupError ?? 'unknown error'}), retry it`);
     return parts.join(', ');
   }
 
