@@ -214,7 +214,7 @@ export const setupGuiApp = async (sandbox, { image, build }) => {
   return build?.tag ?? image;
 };
 
-export const startGuiApp = async (sandbox, { image, password, build, env = {} }) => {
+export const startGuiApp = async (sandbox, { image, password, build, env = {}, resetFiles = [] }) => {
   const runImage = await setupGuiApp(sandbox, { image, build });
   const extraEnv = Object.keys(env).map((name) => `-e ${name}="$${name}"`).join(" ");
 
@@ -222,6 +222,7 @@ export const startGuiApp = async (sandbox, { image, password, build, env = {} })
     sandbox,
     [
       `docker rm -f ${GUI_CONTAINER} >/dev/null 2>&1 || true`,
+      ...resetFiles.map((file) => `rm -f "$CONFIG"/${JSON.stringify(file)}`),
       `docker run -d --name ${GUI_CONTAINER} -p ${GUI_PORT}:3000 -e PUID=1000 -e PGID=1000 -e PASSWORD="$SPACE_PASSWORD" -e SELKIES_FILE_TRANSFERS=upload,download -e SELKIES_UI_SIDEBAR_SHOW_FILES=True --shm-size=1g ${extraEnv} -v "$CONFIG":/config "$IMAGE" >/dev/null`
     ].join("; "),
     { sudo: true, env: { ...env, SPACE_PASSWORD: password, CONFIG: GUI_CONFIG_PATH, IMAGE: runImage }, timeoutMs: 2 * MINUTE }
