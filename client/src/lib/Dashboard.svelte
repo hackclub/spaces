@@ -22,6 +22,8 @@
   let createDialog;
   let newSpaceType = "code-server";
   let newSpaceName = "";
+  let newSpaceRepo = "";
+  let nameFromRepo = "";
   let error = "";
   let loading = false;
   let actionLoading = {};
@@ -352,6 +354,19 @@
     }
   }
 
+  function repoNameFrom(value) {
+    const match = value.trim().match(/^(?:(?:https?:\/\/)?(?:www\.)?github\.com\/)?[A-Za-z0-9-]+\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/?#].*)?$/);
+    return match ? match[1] : "";
+  }
+
+  function handleRepoInput() {
+    const repoName = repoNameFrom(newSpaceRepo);
+    if (!newSpaceName.trim() || newSpaceName === nameFromRepo) {
+      newSpaceName = repoName;
+      nameFromRepo = repoName;
+    }
+  }
+
   async function createSpace() {
     error = "";
 
@@ -362,6 +377,7 @@
         return;
       }
       body.name = newSpaceName.trim();
+      if (newSpaceRepo.trim()) body.repo = newSpaceRepo.trim();
     }
 
     loading = true;
@@ -384,6 +400,8 @@
         await holdFinishedBar();
         showCreateForm = false;
         newSpaceName = "";
+        newSpaceRepo = "";
+        nameFromRepo = "";
         await loadSpaces();
       } else {
         if (
@@ -843,6 +861,24 @@
                   aria-describedby="spaceNameHint"
                 />
                 <p class="form-hint" id="spaceNameHint">Letters, numbers, dashes, underscores and dots.</p>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="spaceRepo">Start from a GitHub repo <span class="optional-mark">(optional)</span></label>
+                <input
+                  class="form-input"
+                  id="spaceRepo"
+                  type="text"
+                  inputmode="url"
+                  autocomplete="off"
+                  spellcheck="false"
+                  disabled={loading}
+                  bind:value={newSpaceRepo}
+                  on:input={handleRepoInput}
+                  placeholder="https://github.com/you/project"
+                  aria-describedby="spaceRepoHint"
+                />
+                <p class="form-hint" id="spaceRepoHint">Public repos only. It's copied into your space so you can keep working on it.</p>
               </div>
             {/if}
 

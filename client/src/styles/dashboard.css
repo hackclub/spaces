@@ -610,6 +610,11 @@
   color: var(--red);
 }
 
+.optional-mark {
+  font-weight: normal;
+  color: var(--slate);
+}
+
 .form-hint {
   margin: 6px 0 0 0;
   font-size: 13px;

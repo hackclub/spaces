@@ -56,6 +56,19 @@ const sanitizeSpaceName = (name) => {
   return cleaned;
 };
 
+const GITHUB_REPO_PATTERN = /^(?:(?:https?:\/\/)?(?:www\.)?github\.com\/)?([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))\/([A-Za-z0-9_.-]{1,100}?)(?:\.git)?(?:\/(?:tree|blob|commits?)\/[^\s]*)?\/?(?:[?#][^\s]*)?$/;
+
+export const parseGithubRepo = (value) => {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const match = value.trim().match(GITHUB_REPO_PATTERN);
+  if (!match || match[2].startsWith(".") || match[2].startsWith("-")) {
+    const error = new Error("Use a GitHub repo link like https://github.com/you/project");
+    error.statusCode = 400;
+    throw error;
+  }
+  return { owner: match[1], name: match[2], url: `https://github.com/${match[1]}/${match[2]}.git` };
+};
+
 export const spaceNameFor = (workspaceDir) => path.posix.basename(sanitizeWorkspaceDir(workspaceDir));
 
 export const toSandboxPath = (workspaceDir) => `${SANDBOX_ROOT}${sanitizeWorkspaceDir(workspaceDir).slice("/config".length)}`;
@@ -417,7 +430,7 @@ const reserveSpaceSlot = (user, { spaceId = null, placeholder = null }) => pg.tr
   return reservedId;
 });
 
-export const createContainer = async (password, type, authorization, name) => {
+export const createContainer = async (password, type, authorization, name, repo = null) => {
   if (process.env.SPACES_CREATION_PAUSED === 'true') {
     const error = new Error("Space creation is temporarily paused for maintenance. Your existing spaces are unaffected.");
     error.statusCode = 503;
@@ -460,7 +473,8 @@ export const createContainer = async (password, type, authorization, name) => {
 
   const isGui = config.kind === "gui";
   password = crypto.randomBytes(16).toString('hex');
-  const spaceName = isGui ? null : sanitizeSpaceName(name);
+  const githubRepo = isGui ? null : parseGithubRepo(repo);
+  const spaceName = isGui ? null : sanitizeSpaceName(name) || sanitizeSpaceName(githubRepo?.name);
   if (!isGui && !spaceName) {
     const error = new Error("Give your space a name, using letters, numbers, dashes, underscores or dots.");
     error.statusCode = 400;
@@ -500,7 +514,8 @@ export const createContainer = async (password, type, authorization, name) => {
         workspacePath: toSandboxPath(workspaceDir),
         hackatimeApiKey: user.hackatime_api_key,
         extensions: user.vscode_extensions,
-        hackatimeMachine: hackatimeMachineFor(reservedId)
+        hackatimeMachine: hackatimeMachineFor(reservedId),
+        repoUrl: githubRepo?.url
       });
     }
 
@@ -549,6 +564,12 @@ export const createContainer = async (password, type, authorization, name) => {
     await pg('spaces').where({ id: reservedId, creating: true }).del().catch((deleteErr) => {
       console.error(`Failed to remove the placeholder for ${sandboxName}:`, deleteErr.message);
     });
+
+    if (err.userMessage) {
+      const error = new Error(err.userMessage);
+      error.statusCode = 400;
+      throw error;
+    }
 
     throw new Error("Failed to create space");
   }

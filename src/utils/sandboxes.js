@@ -136,10 +136,28 @@ export const writeWelcomeFile = async (sandbox, workspacePath, fileName) => {
   }
 };
 
-export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey, extensions, hackatimeMachine = "" }) => {
+const cloneRepo = async (sandbox, { repoUrl, workspacePath }) => {
+  try {
+    await run(sandbox, 'git clone --quiet -- "$REPO" "$WORKSPACE"', {
+      env: { REPO: repoUrl, WORKSPACE: workspacePath, GIT_TERMINAL_PROMPT: "0" },
+      timeoutMs: 5 * MINUTE
+    });
+  } catch (err) {
+    console.error(`Failed to clone ${repoUrl}:`, err.message);
+    const error = new Error(`Couldn't clone ${repoUrl}`);
+    error.userMessage = "Couldn't copy that repo. Check the link, and make sure the repo is public.";
+    throw error;
+  }
+};
+
+export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey, extensions, hackatimeMachine = "", repoUrl = null }) => {
   await run(sandbox, INSTALL_CODE_SERVER, { sudo: true });
-  await run(sandbox, 'mkdir -p "$WORKSPACE"', { env: { WORKSPACE: workspacePath } });
-  await writeWelcomeFile(sandbox, workspacePath, "README.md");
+  if (repoUrl) {
+    await cloneRepo(sandbox, { repoUrl, workspacePath });
+  } else {
+    await run(sandbox, 'mkdir -p "$WORKSPACE"', { env: { WORKSPACE: workspacePath } });
+    await writeWelcomeFile(sandbox, workspacePath, "README.md");
+  }
 
   if (sanitizeHackatimeKey(hackatimeApiKey)) {
     await ensureHackatime(sandbox, hackatimeApiKey, hackatimeMachine);

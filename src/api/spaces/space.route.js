@@ -52,11 +52,11 @@ const withoutCredentials = (url) => {
 };
 
 router.post("/create", containerOpsLimiter, async (req, res) => {
-  const { password, type, name, homeDir } = req.body;
+  const { password, type, name, homeDir, repo } = req.body;
   const authorization = req.authToken;
   
   try {
-    const result = await createContainer(password, type, authorization, name ?? homeDir);
+    const result = await createContainer(password, type, authorization, name ?? homeDir, repo);
     res.json(result);
   } catch (err) {
     if (err.validTypes) {
