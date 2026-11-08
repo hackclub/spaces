@@ -1,6 +1,10 @@
 <script>
   import { onMount } from "svelte";
   import { API_BASE } from "../config.js";
+  import { createConfirm } from "./confirm.js";
+
+  const confirmer = createConfirm();
+  const { armed } = confirmer;
 
   let clubData = null;
   let ships = [];
@@ -123,10 +127,6 @@
   }
 
   async function unlinkClub() {
-    if (!confirm("Are you sure you want to unlink from your club?")) {
-      return;
-    }
-
     linkLoading = true;
     error = "";
     message = "";
@@ -299,10 +299,10 @@
           </button>
           <button
             class="btn-danger"
-            on:click={unlinkClub}
+            on:click={() => confirmer.ask("unlink", unlinkClub)}
             disabled={linkLoading}
           >
-            {linkLoading ? "Unlinking..." : "Unlink Club"}
+            {linkLoading ? "Unlinking..." : $armed === "unlink" ? "Really unlink?" : "Unlink Club"}
           </button>
         </div>
       </div>

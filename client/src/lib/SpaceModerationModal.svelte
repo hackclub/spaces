@@ -1,6 +1,14 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { API_BASE } from '../config.js';
+  import { createConfirm } from './confirm.js';
+
+  const confirmer = createConfirm(6000);
+  const { armed } = confirmer;
+  const PROMPTS = {
+    lock: "Lock this space? It stops now, its password changes, and the owner can't start or delete it until it's unlocked.",
+    unlock: 'Unlock this space? The owner gets it back.'
+  };
 
   export let space;
 
@@ -59,7 +67,10 @@
       error = 'Give a reason. The owner sees it on their dashboard.';
       return;
     }
-    if (!confirm(`Lock space #${space.id}? It stops now, its password changes, and the owner can't start or delete it until it's unlocked.`)) return;
+    confirmer.ask('lock', doLock);
+  }
+
+  async function doLock() {
     if (await moderate('lock', 'lock', { reason: lockReason.trim() })) {
       space = { ...space, running: false, locked_at: new Date().toISOString(), locked_reason: lockReason.trim() };
       lockReason = '';
@@ -67,8 +78,11 @@
     }
   }
 
-  async function unlock() {
-    if (!confirm(`Unlock space #${space.id}? The owner gets it back.`)) return;
+  function unlock() {
+    confirmer.ask('unlock', doUnlock);
+  }
+
+  async function doUnlock() {
     if (await moderate('unlock', 'unlock', { reason: unlockNote.trim() || null })) {
       space = { ...space, locked_at: null, locked_reason: null };
       unlockNote = '';
@@ -328,6 +342,7 @@
       {/if}
     </section>
 
+    {#if $armed && PROMPTS[$armed]}<p class="result prompt">{PROMPTS[$armed]} Click the same button again to confirm.</p>{/if}
     {#if message}<p class="result">{message}</p>{/if}
     {#if error}<p class="result error">{error}</p>{/if}
   </div>
@@ -569,6 +584,10 @@
     margin: 16px 0 0 0;
     font-size: 13px;
     color: #1e7e34;
+  }
+
+  .result.prompt {
+    color: #b45309;
   }
 
   .result.error {

@@ -8,6 +8,10 @@
   import ShareWithClubToggle from "./ShareWithClubToggle.svelte";
   import ProgressNotice from "./ProgressNotice.svelte";
   import { userData } from "../stores/user.svelte";
+  import { createConfirm } from "./confirm.js";
+
+  const confirmer = createConfirm();
+  const { armed } = confirmer;
 
   export let spaces = [];
   export let username = "";
@@ -479,14 +483,6 @@
   }
 
   async function deleteSpace(spaceId) {
-    if (
-      !confirm(
-        "Are you sure you want to delete this space? This action cannot be undone.",
-      )
-    ) {
-      return;
-    }
-
     actionLoading[spaceId] = "deleting";
     actionError[spaceId] = "";
     actionLoading = actionLoading;
@@ -1159,9 +1155,10 @@
 
                   <button
                     class="action-btn delete"
-                    on:click={() => deleteSpace(space.id)}
+                    on:click={() => confirmer.ask(`delete-${space.id}`, () => deleteSpace(space.id))}
+                    title={$armed === `delete-${space.id}` ? "Click again to delete this space for good" : "Delete this space"}
                   >
-                    Delete
+                    {$armed === `delete-${space.id}` ? "Really delete?" : "Delete"}
                   </button>
                 {/if}
               </div>

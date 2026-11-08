@@ -6,6 +6,10 @@
   import SpaceModerationModal from './SpaceModerationModal.svelte';
   import AdminLogs from './AdminLogs.svelte';
   import { userData } from '../stores/user.svelte';
+  import { createConfirm } from './confirm.js';
+
+  const confirmer = createConfirm();
+  const { armed } = confirmer;
 
   let analytics = {
     totalUsers: 0,
@@ -95,7 +99,6 @@
 
   async function deleteSelectedSpaces() {
     if (selectedSpaces.size === 0) return;
-    if (!confirm(`Are you sure you want to delete ${selectedSpaces.size} space(s)?`)) return;
 
     const deleted = [];
     for (const spaceId of selectedSpaces) {
@@ -407,7 +410,6 @@
   }
 
   async function deleteSpace(spaceId) {
-    if (!confirm('Are you sure you want to delete this space?')) return;
     
     try {
       const response = await fetch(`${API_BASE}/admin/spaces/${spaceId}/delete`, {
@@ -714,8 +716,8 @@
     </div>
     <div class="spaces-controls">
       {#if selectedSpaces.size > 0}
-        <button on:click={deleteSelectedSpaces} class="delete-selected-btn">
-          Delete Selected ({selectedSpaces.size})
+        <button on:click={() => confirmer.ask('delete-selected', deleteSelectedSpaces)} class="delete-selected-btn">
+          {$armed === 'delete-selected' ? `Really delete ${selectedSpaces.size}?` : `Delete Selected (${selectedSpaces.size})`}
         </button>
       {/if}
     </div>
@@ -756,7 +758,7 @@
                   {#if me?.is_superadmin}
                     <button class="manage-btn" on:click={() => (moderating = space)}>Moderate</button>
                   {/if}
-                  <button on:click={() => deleteSpace(space.id)} class="delete-btn">Delete</button>
+                  <button on:click={() => confirmer.ask(`delete-${space.id}`, () => deleteSpace(space.id))} class="delete-btn">{$armed === `delete-${space.id}` ? 'Really delete?' : 'Delete'}</button>
                 </td>
               </tr>
             {/each}

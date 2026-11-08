@@ -1,6 +1,11 @@
 <script>
   import { createEventDispatcher } from 'svelte';
   import { API_BASE } from '../config.js';
+  import { createConfirm } from './confirm.js';
+
+  const confirmer = createConfirm(6000);
+  const { armed } = confirmer;
+  let prompts = {};
 
   export let user;
   export let me;
@@ -17,8 +22,16 @@
   $: isStaff = user.is_admin || user.is_superadmin;
   $: canManage = me?.is_superadmin || !isStaff;
 
-  async function act(name, path, body = {}, confirmText = null) {
-    if (confirmText && !confirm(confirmText)) return;
+  function act(name, path, body = {}, confirmText = null) {
+    if (!confirmText) return run(name, path, body);
+    const key = `${name}:${path}:${JSON.stringify(body)}`;
+    prompts = { ...prompts, [key]: confirmText };
+    message = '';
+    error = '';
+    return confirmer.ask(key, () => run(name, path, body));
+  }
+
+  async function run(name, path, body) {
     busy = name;
     message = '';
     error = '';
@@ -159,6 +172,7 @@
       {/if}
     {/if}
 
+    {#if $armed && prompts[$armed]}<p class="result prompt">{prompts[$armed]} Click the same button again to confirm.</p>{/if}
     {#if message}<p class="result">{message}</p>{/if}
     {#if error}<p class="result error">{error}</p>{/if}
   </div>
@@ -312,6 +326,10 @@
     margin: 16px 0 0 0;
     font-size: 13px;
     color: #1e7e34;
+  }
+
+  .result.prompt {
+    color: #b45309;
   }
 
   .result.error {
