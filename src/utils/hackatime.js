@@ -8,10 +8,10 @@ const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const HETZNER_IPV4 = '65.108.71.92';
 const HETZNER_IPV6_PREFIX = '2a01:4f9:6b:4755:';
-const HETZNER_LOOKUP_IPS = [HETZNER_IPV4, '2a01:4f9:6b:4755::2'];
+const HETZNER_SWITCH = new Date('2026-11-03T00:00:00Z');
 const HETZNER_UNTIL = new Date('2026-11-09T00:00:00Z');
-const LOOKUP_PREFIX = 'ip:';
-const LOOKUP_TIMEOUT_MS = 270000;
+const SYNC_BUDGET_MS = 240000;
+const IMPORT_BUDGET_MS = 150000;
 
 export const hackatimeConfigured = () => Boolean(process.env.HACKATIME_ADMIN_KEY);
 
@@ -97,34 +97,66 @@ const saveBuckets = async ({ source, machine, hackatimeUserId, spaceId = null, u
   return rows.length;
 };
 
-export const syncSpacesActivity = async ({ lookbackMs = 3 * HOUR_MS } = {}) => {
+const sanitizeKey = (key) => (key || '').replace(/[^a-zA-Z0-9\-_]/g, '');
+
+export const resolveHackatimeUserId = async (user) => {
+  if (user.hackatime_user_id) return user.hackatime_user_id;
+  const key = sanitizeKey(user.hackatime_api_key);
+  if (!key) return null;
+
+  const response = await fetch(new URL('/api/hackatime/v1/users/current', HACKATIME_URL), {
+    headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+    signal: AbortSignal.timeout(20000)
+  });
+  if (response.status === 401 || response.status === 403 || response.status === 404) return null;
+  if (!response.ok) throw new Error(`Hackatime users/current answered ${response.status}`);
+
+  const id = (await response.json())?.data?.id;
+  if (!id) return null;
+  await pg('users').where('id', user.id).update({ hackatime_user_id: String(id) });
+  return String(id);
+};
+
+export const syncSpacesActivity = async ({ lookbackMs = 3 * HOUR_MS, budgetMs = SYNC_BUDGET_MS } = {}) => {
   if (!hackatimeConfigured()) return { skipped: 'HACKATIME_ADMIN_KEY is not set' };
 
+  const deadline = Date.now() + budgetMs;
   const fromHour = Math.floor((Date.now() - lookbackMs) / HOUR_MS) * HOUR_MS;
   const recentIds = await pg('space_runs')
     .whereNotNull('space_id')
     .where((query) => query.whereNull('stopped_at').orWhere('stopped_at', '>=', new Date(fromHour)))
     .distinct('space_id')
     .pluck('space_id');
-  const spaces = recentIds.length ? await pg('spaces').whereIn('id', recentIds).select('id', 'user_id') : [];
+  const spaces = recentIds.length
+    ? await pg('spaces')
+      .join('users', 'users.id', 'spaces.user_id')
+      .whereIn('spaces.id', recentIds)
+      .select('spaces.id', 'spaces.user_id', 'users.hackatime_api_key', 'users.hackatime_user_id')
+    : [];
 
-  const summary = { spaces: spaces.length, hours: 0, failed: 0 };
+  const summary = { spaces: spaces.length, hours: 0, failed: 0, noKey: 0, unfinished: 0 };
   for (const space of spaces) {
-    const machine = hackatimeMachineFor(space.id);
+    if (Date.now() > deadline) {
+      summary.unfinished += 1;
+      continue;
+    }
     try {
-      const { users = [] } = await adminGet('user/get_users_by_machine', { machine });
-      for (const hackatimeUserId of new Set(users.map((user) => String(user.user_id)))) {
-        const heartbeats = await fetchHeartbeats({ hackatimeUserId, machine, start: fromHour - GAP_SECONDS * 1000, end: Date.now() });
-        summary.hours += await saveBuckets({
-          source: 'spaces',
-          machine,
-          hackatimeUserId,
-          spaceId: space.id,
-          userId: space.user_id,
-          buckets: bucketize(heartbeats.map((heartbeat) => heartbeat.time)),
-          fromHour
-        });
+      const hackatimeUserId = await resolveHackatimeUserId({ id: space.user_id, hackatime_api_key: space.hackatime_api_key, hackatime_user_id: space.hackatime_user_id });
+      if (!hackatimeUserId) {
+        summary.noKey += 1;
+        continue;
       }
+      const machine = hackatimeMachineFor(space.id);
+      const heartbeats = await fetchHeartbeats({ hackatimeUserId, machine, start: fromHour - GAP_SECONDS * 1000, end: Date.now() });
+      summary.hours += await saveBuckets({
+        source: 'spaces',
+        machine,
+        hackatimeUserId,
+        spaceId: space.id,
+        userId: space.user_id,
+        buckets: bucketize(heartbeats.map((heartbeat) => heartbeat.time)),
+        fromHour
+      });
     } catch (err) {
       summary.failed += 1;
       console.error(`Failed to sync Hackatime time for space ${space.id}:`, err.message);
@@ -139,76 +171,50 @@ const isHetznerIp = (ip) => {
 };
 
 export const hetznerImportProgress = async () => {
-  const rows = await pg('hackatime_imports')
-    .select('status', pg.raw("hackatime_user_id = '' as lookup"))
-    .count('* as n')
-    .groupBy('status', 'lookup');
-  const count = (status, lookup) => rows
-    .filter((row) => row.status === status && Boolean(row.lookup) === lookup)
-    .reduce((sum, row) => sum + Number(row.n), 0);
-  const lastLookupError = await pg('hackatime_imports')
-    .where({ hackatime_user_id: '', status: 'failed' })
-    .orderBy('updated_at', 'desc')
-    .first('machine', 'error', 'updated_at');
+  const rows = await pg('hackatime_imports').select('status').count('* as n').groupBy('status');
+  const counts = Object.fromEntries(rows.map((row) => [row.status, Number(row.n)]));
+  const lastError = await pg('hackatime_imports').where('status', 'failed').orderBy('updated_at', 'desc').first('error');
   return {
-    lookupError: lastLookupError ? `${lastLookupError.machine.slice(LOOKUP_PREFIX.length)}: ${lastLookupError.error}` : null,
-    lookingUp: count('pending', true),
-    lookupFailed: count('failed', true),
-    pending: count('pending', false),
-    done: count('done', false),
-    failed: count('failed', false),
+    pending: counts.pending ?? 0,
+    done: counts.done ?? 0,
+    failed: counts.failed ?? 0,
+    noKey: counts.no_key ?? 0,
+    lastError: lastError?.error ?? null,
     started: rows.length > 0
   };
 };
 
 export const startHetznerImport = async () => {
-  await pg('hackatime_imports')
-    .insert(HETZNER_LOOKUP_IPS.map((ip) => ({ hackatime_user_id: '', machine: `${LOOKUP_PREFIX}${ip}` })))
-    .onConflict(['hackatime_user_id', 'machine'])
-    .ignore();
+  const userIds = await pg('spaces').where('created_at', '<', HETZNER_SWITCH).distinct('user_id').pluck('user_id');
+  if (userIds.length) {
+    await pg('hackatime_imports').insert(userIds.map((userId) => ({ user_id: userId }))).onConflict('user_id').ignore();
+  }
+  return userIds.length;
 };
 
-const lookUpIp = async (ip) => {
-  const { users = [] } = await adminGet('user/get_users_by_ip', { ip }, { timeoutMs: LOOKUP_TIMEOUT_MS });
-  const pairs = new Map();
-  for (const user of users) {
-    const pair = { hackatime_user_id: String(user.user_id), machine: user.machine ?? '' };
-    pairs.set(`${pair.hackatime_user_id}|${pair.machine}`, pair);
-  }
-  if (pairs.size) {
-    await pg('hackatime_imports').insert([...pairs.values()]).onConflict(['hackatime_user_id', 'machine']).ignore();
-  }
-  return pairs.size;
-};
-
-export const continueHetznerImport = async ({ budgetMs = 150000 } = {}) => {
+export const continueHetznerImport = async ({ budgetMs = IMPORT_BUDGET_MS } = {}) => {
   const deadline = Date.now() + budgetMs;
 
   while (Date.now() < deadline) {
-    const job = await pg('hackatime_imports')
-      .where('status', 'pending')
-      .orderByRaw("hackatime_user_id = '' desc")
-      .orderBy('updated_at')
-      .first();
+    const job = await pg('hackatime_imports').where('status', 'pending').orderBy('updated_at').first();
     if (!job) break;
 
-    if (job.hackatime_user_id === '') {
-      try {
-        await lookUpIp(job.machine.slice(LOOKUP_PREFIX.length));
-        await pg('hackatime_imports').where({ hackatime_user_id: '', machine: job.machine }).update({ status: 'done', error: null, updated_at: pg.fn.now() });
-      } catch (err) {
-        console.error(`Hackatime lookup for ${job.machine} failed:`, err.message);
-        await pg('hackatime_imports').where({ hackatime_user_id: '', machine: job.machine }).update({ status: 'failed', error: err.message.slice(0, 500), updated_at: pg.fn.now() });
-      }
-      break;
-    }
+    const finish = (status, error = null) => pg('hackatime_imports')
+      .where('user_id', job.user_id)
+      .update({ status, error: error ? error.slice(0, 500) : null, updated_at: pg.fn.now() });
 
     try {
-      const heartbeats = (await fetchHeartbeats({
-        hackatimeUserId: job.hackatime_user_id,
-        machine: job.machine || undefined,
-        end: HETZNER_UNTIL.getTime()
-      })).filter((heartbeat) => isHetznerIp(heartbeat.ip_address));
+      const user = await pg('users').where('id', job.user_id).first('id', 'hackatime_api_key', 'hackatime_user_id');
+      const hackatimeUserId = user ? await resolveHackatimeUserId(user) : null;
+      if (!hackatimeUserId) {
+        await finish('no_key');
+        continue;
+      }
+
+      const { first } = await pg('spaces').where('user_id', job.user_id).min('created_at as first').first();
+      const start = first ? new Date(first).getTime() - DAY_MS : undefined;
+      const heartbeats = (await fetchHeartbeats({ hackatimeUserId, start, end: HETZNER_UNTIL.getTime() }))
+        .filter((heartbeat) => isHetznerIp(heartbeat.ip_address));
 
       const byMachine = new Map();
       for (const heartbeat of heartbeats) {
@@ -217,16 +223,13 @@ export const continueHetznerImport = async ({ budgetMs = 150000 } = {}) => {
         byMachine.get(machine).push(heartbeat.time);
       }
       for (const [machine, times] of byMachine) {
-        await saveBuckets({ source: 'hetzner', machine, hackatimeUserId: job.hackatime_user_id, buckets: bucketize(times) });
+        await saveBuckets({ source: 'hetzner', machine, hackatimeUserId, userId: job.user_id, buckets: bucketize(times) });
       }
 
-      await pg('hackatime_imports')
-        .where({ hackatime_user_id: job.hackatime_user_id, machine: job.machine })
-        .update({ status: 'done', error: null, updated_at: pg.fn.now() });
+      await finish('done');
     } catch (err) {
-      await pg('hackatime_imports')
-        .where({ hackatime_user_id: job.hackatime_user_id, machine: job.machine })
-        .update({ status: 'failed', error: err.message.slice(0, 500), updated_at: pg.fn.now() });
+      console.error(`Failed to import old server Hackatime time for user ${job.user_id}:`, err.message);
+      await finish('failed', err.message);
     }
   }
 

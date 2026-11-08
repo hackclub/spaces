@@ -50,10 +50,9 @@
   }
 
   function describeImport(progress) {
-    if (progress.lookingUp > 0) return 'Finding who used the old server. This step can take a few minutes...';
-    const parts = [`${progress.done} done`, `${progress.pending} left`];
-    if (progress.failed) parts.push(`${progress.failed} failed`);
-    if (progress.lookupFailed) parts.push(`a lookup failed (${progress.lookupError ?? 'unknown error'}), retry it`);
+    const parts = [`${progress.done} people done`, `${progress.pending} left`];
+    if (progress.noKey) parts.push(`${progress.noKey} without a Hackatime key`);
+    if (progress.failed) parts.push(`${progress.failed} failed (${progress.lastError ?? 'unknown error'})`);
     return parts.join(', ');
   }
 
@@ -74,7 +73,7 @@
         progress = data.data.progress;
         retryFailed = false;
         importMessage = describeImport(progress);
-      } while (progress.pending > 0 || progress.lookingUp > 0);
+      } while (progress.pending > 0);
       await load();
     } catch (err) {
       importMessage = err.message;
@@ -140,13 +139,13 @@
         <button class="btn" on:click={() => runImport(false)} disabled={importing || !report.configured}>
           {importing ? 'Importing...' : report.hetznerImport.started ? 'Continue old server import' : 'Import old server time'}
         </button>
-        {#if (report.hetznerImport.failed || report.hetznerImport.lookupFailed) && !importing}
+        {#if report.hetznerImport.failed && !importing}
           <button class="btn" on:click={() => runImport(true)}>Retry failed</button>
         {/if}
         <span class="note">
           {importMessage || (report.hetznerImport.started
             ? describeImport(report.hetznerImport)
-            : 'Finds heartbeats sent from the old Hetzner server and adds them here.')}
+            : "Goes through everyone who had a space on the old server and adds the time their Hackatime heartbeats came from it. People without a Hackatime key in Settings can't be included.")}
         </span>
       </div>
     {/if}

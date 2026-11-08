@@ -443,8 +443,8 @@ router.post('/hackatime/import', requireSuperadmin, async (req, res) => {
 
     const before = await hetznerImportProgress();
     if (!before.started) {
-      await startHetznerImport();
-      await logAdminAction(req.user, 'hackatime.import', {});
+      const users = await startHetznerImport();
+      await logAdminAction(req.user, 'hackatime.import', { details: { users } });
     } else if (req.body?.retryFailed === true) {
       await retryFailedHetznerImports();
     }
