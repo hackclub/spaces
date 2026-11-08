@@ -79,6 +79,36 @@ export const spaceConfigs = {
     summary: "PCB design software",
     description: "KiCad PCB Design"
   },
+  "godot": {
+    kind: "gui",
+    image: "linuxserver/webtop:debian-xfce",
+    label: "Godot",
+    title: "Godot",
+    summary: "Game engine, the full desktop editor",
+    description: "Godot Engine",
+    beta: true,
+    vcpus: 4,
+    setup: [
+      "set -e",
+      "GODOT_VERSION=4.7.2-stable",
+      'DIR="$CONFIG/godot"',
+      'if [ "$(cat "$DIR/VERSION" 2>/dev/null)" != "$GODOT_VERSION" ] || [ ! -x "$DIR/godot" ]; then',
+      '  tmp=$(mktemp -d)',
+      '  curl -fsSL -o "$tmp/godot.zip" "https://github.com/godotengine/godot/releases/download/$GODOT_VERSION/Godot_v${GODOT_VERSION}_linux.x86_64.zip"',
+      '  python3 -m zipfile -e "$tmp/godot.zip" "$tmp/out"',
+      '  mkdir -p "$DIR"',
+      '  mv "$tmp"/out/Godot_v*_linux.x86_64 "$DIR/godot"',
+      '  chmod +x "$DIR/godot"',
+      '  echo "$GODOT_VERSION" > "$DIR/VERSION"',
+      '  rm -rf "$tmp"',
+      "fi",
+      'mkdir -p "$CONFIG/.config/autostart" "$CONFIG/Desktop" "$CONFIG/projects"',
+      'printf "%s\\n" "[Desktop Entry]" "Type=Application" "Name=Godot" "Exec=/config/godot/godot --rendering-driver opengl3 --project-manager" "Terminal=false" > "$CONFIG/.config/autostart/godot.desktop"',
+      'cp "$CONFIG/.config/autostart/godot.desktop" "$CONFIG/Desktop/godot.desktop"',
+      'chmod +x "$CONFIG/Desktop/godot.desktop"',
+      'chown -R 1000:1000 "$DIR" "$CONFIG/.config" "$CONFIG/Desktop" "$CONFIG/projects"'
+    ].join("\n")
+  },
   "freecad": {
     kind: "gui",
     image: "linuxserver/freecad",
@@ -112,7 +142,7 @@ export const lockedError = (space, action = "used") => {
 export const startSpaceApp = (sandbox, space, password) => {
   const config = configFor(space.type);
   if (config?.kind === "gui") {
-    return startGuiApp(sandbox, { image: config.image, password });
+    return startGuiApp(sandbox, { image: config.image, password, setup: config.setup });
   }
   return startCodeServer(sandbox, { password, workspacePath: toSandboxPath(space.workspace_dir) });
 };
@@ -246,10 +276,10 @@ export const createContainer = async (password, type, authorization, name) => {
   let sandbox = null;
 
   try {
-    sandbox = await createSandbox(sandboxName, isGui ? { port: GUI_PORT, vcpus: GUI_VCPUS } : {});
+    sandbox = await createSandbox(sandboxName, isGui ? { port: GUI_PORT, vcpus: config.vcpus ?? GUI_VCPUS } : {});
 
     if (isGui) {
-      await setupGuiApp(sandbox, { image: config.image });
+      await setupGuiApp(sandbox, { image: config.image, setup: config.setup });
     } else {
       await setupCodeServer(sandbox, {
         workspacePath: toSandboxPath(workspaceDir),

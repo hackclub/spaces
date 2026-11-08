@@ -195,7 +195,7 @@ const guiAccessUrl = (domain, password) => {
   return url.toString();
 };
 
-export const setupGuiApp = async (sandbox, { image }) => {
+export const setupGuiApp = async (sandbox, { image, setup }) => {
   await run(
     sandbox,
     "command -v dockerd >/dev/null 2>&1 || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker.io)",
@@ -204,10 +204,13 @@ export const setupGuiApp = async (sandbox, { image }) => {
   await run(sandbox, START_DOCKER, { sudo: true, timeoutMs: 2 * MINUTE });
   await run(sandbox, 'docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull -q "$IMAGE"', { sudo: true, env: { IMAGE: image }, timeoutMs: 10 * MINUTE });
   await run(sandbox, 'mkdir -p "$CONFIG" && chown 1000:1000 "$CONFIG"', { sudo: true, env: { CONFIG: GUI_CONFIG_PATH } });
+  if (setup) {
+    await run(sandbox, setup, { sudo: true, env: { CONFIG: GUI_CONFIG_PATH }, timeoutMs: 10 * MINUTE });
+  }
 };
 
-export const startGuiApp = async (sandbox, { image, password }) => {
-  await setupGuiApp(sandbox, { image });
+export const startGuiApp = async (sandbox, { image, password, setup }) => {
+  await setupGuiApp(sandbox, { image, setup });
 
   await run(
     sandbox,
