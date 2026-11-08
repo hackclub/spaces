@@ -56,6 +56,48 @@ export const spaceNameFor = (workspaceDir) => path.posix.basename(sanitizeWorksp
 
 export const toSandboxPath = (workspaceDir) => `${SANDBOX_ROOT}${sanitizeWorkspaceDir(workspaceDir).slice("/config".length)}`;
 
+const GODOT_LAUNCHER = [
+  "#!/bin/sh",
+  "new=\"\"",
+  "IFS=:",
+  "for lib in $LD_PRELOAD; do case \"$lib\" in *libudev*) ;; *) new=\"${new:+$new:}$lib\" ;; esac; done",
+  "unset IFS",
+  "export LD_PRELOAD=\"$new\"",
+  "/opt/godot/move-uploads &",
+  "while true; do",
+  "  /opt/godot/godot --rendering-driver opengl3 --accessibility disabled --single-window --project-manager",
+  "  while pgrep -f \"^/opt/godot/godot\" >/dev/null; do sleep 2; done",
+  "done"
+].join("\n");
+
+const GODOT_UPLOAD_MOVER = [
+  "#!/bin/sh",
+  "DROP=/config",
+  "open_project() {",
+  "  for pid in $(pgrep -f \"^/opt/godot/godot.* --path \"); do",
+  "    dir=$(tr \"\\000\" \"\\n\" < /proc/$pid/cmdline | grep -A1 -x -- --path | tail -n 1)",
+  "    [ -f \"$dir/project.godot\" ] && { echo \"$dir\"; return; }",
+  "  done",
+  "}",
+  "while true; do",
+  "  sleep 3",
+  "  for file in \"$DROP\"/*; do",
+  "    [ -f \"$file\" ] || continue",
+  "    [ $(( $(date +%s) - $(stat -c %Y \"$file\") )) -ge 3 ] || continue",
+  "    project=$(open_project)",
+  "    [ -n \"$project\" ] || continue",
+  "    name=$(basename \"$file\")",
+  "    case \"$name\" in *.*) base=${name%.*}; ext=.${name##*.} ;; *) base=$name; ext= ;; esac",
+  "    dest=\"$project/$name\"",
+  "    n=1",
+  "    while [ -e \"$dest\" ]; do dest=\"$project/$base-$n$ext\"; n=$((n + 1)); done",
+  "    mv \"$file\" \"$dest\"",
+  "  done",
+  "done"
+].join("\n");
+
+const base64 = (text) => Buffer.from(`${text}\n`).toString("base64");
+
 export const spaceConfigs = {
   "code-server": {
     kind: "editor",
@@ -89,20 +131,31 @@ export const spaceConfigs = {
     beta: true,
     vcpus: 4,
     build: {
-      tag: "spaces-godot:4.7.2-4",
+      tag: "spaces-godot:4.7.2-5",
       dockerfile: [
         "FROM ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
         "ARG GODOT_VERSION=4.7.2-stable",
         "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl unzip libxcursor1 libxinerama1 libxrandr2 libxi6 libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri libfontconfig1 libasound2t64 libpulse0 && curl -fsSL -o /tmp/godot.zip \"https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip\" && unzip -q /tmp/godot.zip -d /opt/godot && mv /opt/godot/Godot_v*_linux.x86_64 /opt/godot/godot && chmod 755 /opt/godot/godot && rm -rf /tmp/godot.zip /var/lib/apt/lists/*",
-        "RUN printf '%s\\n' '#!/bin/sh' 'new=\"\"' 'IFS=:' 'for lib in $LD_PRELOAD; do case \"$lib\" in *libudev*) ;; *) new=\"${new:+$new:}$lib\" ;; esac; done' 'unset IFS' 'export LD_PRELOAD=\"$new\"' 'while true; do' '  /opt/godot/godot --rendering-driver opengl3 --accessibility disabled --single-window --project-manager' '  while pgrep -f \"^/opt/godot/godot\" >/dev/null; do sleep 2; done' 'done' > /opt/godot/run && chmod 755 /opt/godot/run && printf '%s\\n' '/opt/godot/run' > /defaults/autostart && printf '%s\\n' '<?xml version=\"1.0\" encoding=\"utf-8\"?>' '<openbox_menu xmlns=\"http://openbox.org/3.4/menu\">' '<menu id=\"root-menu\" label=\"MENU\">' '<item label=\"Godot\"><action name=\"Execute\"><command>/opt/godot/run</command></action></item>' '</menu>' '</openbox_menu>' > /defaults/menu.xml"
+        `RUN echo ${base64(GODOT_LAUNCHER)} | base64 -d > /opt/godot/run && echo ${base64(GODOT_UPLOAD_MOVER)} | base64 -d > /opt/godot/move-uploads && chmod 755 /opt/godot/run /opt/godot/move-uploads && echo /opt/godot/run > /defaults/autostart && echo ${base64('<?xml version="1.0" encoding="utf-8"?>\n<openbox_menu xmlns="http://openbox.org/3.4/menu"><menu id="root-menu" label="MENU"></menu></openbox_menu>')} | base64 -d > /defaults/menu.xml`
       ].join("\n")
     },
     env: {
       HARDEN_DESKTOP: "true",
       HARDEN_OPENBOX: "true",
+      RESTART_APP: "false",
+      FILE_MANAGER_PATH: "/config",
       SELKIES_UI_SIDEBAR_SHOW_APPS: "false|locked",
-      SELKIES_UI_SHOW_SIDEBAR: "false|locked",
-      RESTART_APP: "false"
+      SELKIES_UI_SIDEBAR_SHOW_VIDEO_SETTINGS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_SCREEN_SETTINGS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_AUDIO_SETTINGS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_STATS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_SHORTCUTS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_SHARING: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_GAMEPADS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_SOFT_BUTTONS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_GAMING_MODE: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_TRACKPAD: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_WEBCAM: "false|locked"
     },
     resetFiles: [".config/openbox/autostart", ".config/openbox/menu.xml", ".config/openbox/menu.xml.bak"]
   },
