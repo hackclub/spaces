@@ -30,7 +30,7 @@
     },
     { "source": "/love", "destination": "https://spaces-playground.hackclub.dev/love/", "permanent": false },
     {
-      "source": "/((?!love/).*)",
+      "source": "/((?!love/|_vercel/).*)",
       "has": [{ "type": "host", "value": "spaces-playground.hackclub.dev" }],
       "destination": "https://spaces.hackclub.com/",
       "permanent": false

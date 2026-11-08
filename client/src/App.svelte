@@ -30,7 +30,7 @@
     let showClubs = false;
     let showAuth = false;
     let showClubMemberAuth = false;
-    let currentView = "spaces";
+    $: currentView = url === "/playground" || url.startsWith("/playground?") ? "playground" : "spaces";
 
     onMount(async () => {
         applyTheme(get(currentTheme));
@@ -132,7 +132,7 @@
                     on:signout={handleSignOut}
                     on:settings={() => (showSettings = true)}
                     on:clubs={() => (showClubs = true)}
-                    on:switchview={(e) => (currentView = e.detail.view)}
+                    on:switchview={(e) => navigate(e.detail.view === "playground" ? "/playground" : "/")}
                 />
             {:else}
                 <Dashboard
@@ -141,7 +141,7 @@
                     on:signout={handleSignOut}
                     on:settings={() => (showSettings = true)}
                     on:clubs={() => (showClubs = true)}
-                    on:switchview={(e) => (currentView = e.detail.view)}
+                    on:switchview={(e) => navigate(e.detail.view === "playground" ? "/playground" : "/")}
                 />
             {/if}
         {/if}

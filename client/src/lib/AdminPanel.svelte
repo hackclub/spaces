@@ -482,7 +482,7 @@
       <p class="loading-note">Loading growth stats...</p>
     {:else if stats}
       <p class="stat-sub">
-        Sign-ups and logins are recorded from {formatDate(stats.recordedSince.users)}, and space use from {formatDate(stats.recordedSince.runs)}. Days before that are left empty.
+        Sign-ups and logins are recorded from {formatDate(stats.recordedSince.users)}, space use from {formatDate(stats.recordedSince.runs)}, and Playground visits from {formatDate(stats.recordedSince.playground)}. Days before that are left empty.
         Deleted users and spaces aren't counted. Days are in UTC.
       </p>
       <div class="analytics growth-cards">
@@ -506,6 +506,11 @@
           <p class="stat">{sumOf(statRows, 'newSpaces')}</p>
           <p class="stat-sub">{stats.spaceTypes.map(t => `${t.count} ${t.type}`).join(', ') || 'in this period'}</p>
         </div>
+        <div class="stat-card">
+          <h3>Playground Visitors</h3>
+          <p class="stat">{stats.playground?.visitors ?? '—'}</p>
+          <p class="stat-sub">{stats.playground ? `${stats.playground.godot} opened Godot, ${stats.playground.love2d} opened LÖVE` : 'not recorded yet'}</p>
+        </div>
       </div>
       <div class="charts">
         <StatChart title="New users per day" rows={statRows} key="newUsers" />
@@ -516,6 +521,7 @@
         <StatChart title="Total spaces" rows={statRows} key="totalSpaces" kind="line" />
         <StatChart title="Spaces started per day" rows={statRows} key="starts" />
         <StatChart title="Hours of space use per day" rows={statRows} key="hours" format={formatHours} />
+        <StatChart title="People who opened the Playground per day" rows={statRows} key="playgroundVisitors" detail={row => `${row.playgroundLaunches} tool launch${row.playgroundLaunches === 1 ? '' : 'es'}`} />
       </div>
       <details class="stats-table">
         <summary>Show as a table</summary>
@@ -533,6 +539,8 @@
                 <th>Total Spaces</th>
                 <th>Starts</th>
                 <th>Hours</th>
+                <th>Playground</th>
+                <th>Tool Launches</th>
               </tr>
             </thead>
             <tbody>
@@ -548,6 +556,8 @@
                   <td>{row.totalSpaces}</td>
                   <td>{row.starts ?? '—'}</td>
                   <td>{row.hours === null ? '—' : formatHours(row.hours)}</td>
+                  <td>{row.playgroundVisitors ?? '—'}</td>
+                  <td>{row.playgroundLaunches ?? '—'}</td>
                 </tr>
               {/each}
             </tbody>

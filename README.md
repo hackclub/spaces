@@ -224,6 +224,12 @@ Superadmins only. Every route is a POST and is written to the audit log. Owners 
 | `/spaces/:spaceId/full-access` | Get the space's login to open it as its owner. Body: `{ "reason" }` (required). Joins the running session if the owner is using it; otherwise starts only the space's app, without marking the space as running. |
 | `/spaces/:spaceId/release` | Stop a space that was woken up for moderation, unless its owner is using it |
 
+### Playground API (`/api/v1/playground`)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/visit` | Record that the logged-in user opened the Playground (`{ "tool": null }`) or launched a tool (`"godot"` or `"love2d"`). Counted in the admin stats. |
+
 ### Other
 
 | Method | Path | Description |

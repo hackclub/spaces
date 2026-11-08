@@ -1,5 +1,6 @@
 <script>
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount } from 'svelte';
+  import { API_BASE } from '../config.js';
   import { currentTheme } from '../stores/theme.js';
   import { themes } from '../themes.js';
   import FlagIcon from '../assets/flag.svg?raw';
@@ -27,6 +28,18 @@
     }
   ];
 
+  function recordVisit(tool = null) {
+    fetch(`${API_BASE}/playground/visit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      keepalive: true,
+      body: JSON.stringify({ tool })
+    }).catch(() => {});
+  }
+
+  onMount(() => recordVisit());
+
   function handleSignOut() {
     dispatch('signout');
   }
@@ -48,6 +61,7 @@
       return;
     }
     if (tool.url) {
+      recordVisit(tool.id);
       window.location.href = tool.url;
     }
   }

@@ -20,9 +20,10 @@ export const getStats = async (days) => {
   const start = new Date(today.getTime() - (days - 1) * DAY_MS);
   const weekAgo = new Date(Date.now() - 7 * DAY_MS);
 
-  const [usersSince, runsSince] = await Promise.all([
+  const [usersSince, runsSince, playgroundSince] = await Promise.all([
     migrationTime('20261107_add_signup_dates_and_logins.js'),
-    migrationTime('20261102_add_space_runs.js')
+    migrationTime('20261102_add_space_runs.js'),
+    migrationTime('20261108_add_playground_visits.js')
   ]);
 
   const [
@@ -36,7 +37,9 @@ export const getStats = async (days) => {
     logins,
     newSpaces,
     spaceTypes,
-    runs
+    runs,
+    playgroundDays,
+    playgroundTotals
   ] = await Promise.all([
     countOf(pg('users')),
     countOf(pg('spaces')),
@@ -57,7 +60,16 @@ export const getStats = async (days) => {
       from generate_series(?::timestamptz, now(), interval '1 day') as d(day)
       left join space_runs r on r.started_at < d.day + interval '1 day' and coalesce(r.stopped_at, now()) > d.day
       group by d.day
-    `, [start])
+    `, [start]),
+    pg('playground_visits').where('created_at', '>=', start).select(dayOf('created_at'))
+      .select(pg.raw('count(distinct user_id) filter (where tool is null)::int as visitors'))
+      .select(pg.raw('(count(*) filter (where tool is not null))::int as launches'))
+      .groupBy('day'),
+    pg('playground_visits').where('created_at', '>=', start)
+      .select(pg.raw('count(distinct user_id) filter (where tool is null)::int as visitors'))
+      .select(pg.raw("count(distinct user_id) filter (where tool = 'godot')::int as godot"))
+      .select(pg.raw("count(distinct user_id) filter (where tool = 'love2d')::int as love2d"))
+      .first()
   ]);
 
   const usersSinceDay = usersSince ? utcDay(usersSince) : null;
@@ -66,6 +78,8 @@ export const getStats = async (days) => {
   const loginsByDay = byDay(logins);
   const newSpacesByDay = byDay(newSpaces);
   const runsByDay = byDay(runs.rows);
+  const playgroundByDay = byDay(playgroundDays);
+  const playgroundSinceDay = playgroundSince ? utcDay(playgroundSince) : null;
 
   let usersSoFar = usersBefore;
   let spacesSoFar = spacesBefore;
@@ -75,6 +89,7 @@ export const getStats = async (days) => {
     const day = utcDay(new Date(time));
     const usersRecorded = usersSinceDay !== null && day >= usersSinceDay;
     const runsRecorded = runsSinceDay !== null && day >= runsSinceDay;
+    const playgroundRecorded = playgroundSinceDay !== null && day >= playgroundSinceDay;
     const joined = Number(newUsersByDay[day]?.n ?? 0);
     const created = Number(newSpacesByDay[day]?.n ?? 0);
     const run = runsByDay[day];
@@ -92,7 +107,9 @@ export const getStats = async (days) => {
       starts: runsRecorded ? run?.starts ?? 0 : null,
       hours: runsRecorded ? run?.hours ?? 0 : null,
       newSpaces: created,
-      totalSpaces: spacesSoFar
+      totalSpaces: spacesSoFar,
+      playgroundVisitors: playgroundRecorded ? playgroundByDay[day]?.visitors ?? 0 : null,
+      playgroundLaunches: playgroundRecorded ? playgroundByDay[day]?.launches ?? 0 : null
     });
   }
 
@@ -100,8 +117,10 @@ export const getStats = async (days) => {
     days,
     recordedSince: {
       users: usersSince,
-      runs: runsSince
+      runs: runsSince,
+      playground: playgroundSince
     },
+    playground: playgroundSince ? playgroundTotals : null,
     totals: {
       users: totalUsers,
       spaces: totalSpaces,
