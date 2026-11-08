@@ -141,7 +141,6 @@
   }
 
   const SEARCH_THRESHOLD = 6;
-  const KIND_LABELS = { editor: "Code editor", gui: "Desktop app" };
 
   $: typeCategories = [...new Set(spaceTypes.map((spaceType) => spaceType.category || "Other"))];
   $: if (typeCategory !== "All" && !typeCategories.includes(typeCategory)) typeCategory = "All";
@@ -796,10 +795,9 @@
                       <span class="type-option-name">{spaceType.label}</span>
                       <span class="type-option-summary">{spaceType.description}</span>
                     </span>
-                    <span class="type-option-tags">
-                      {#if spaceType.beta}<span class="beta-badge">Beta</span>{/if}
-                      <span class="type-tag">{KIND_LABELS[spaceType.kind] ?? "Space"}</span>
-                    </span>
+                    {#if spaceType.beta}
+                      <span class="type-option-tags"><span class="beta-badge">Beta</span></span>
+                    {/if}
                   </label>
                 {/each}
               {:else}

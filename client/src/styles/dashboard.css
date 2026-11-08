@@ -551,16 +551,6 @@
   margin-left: 0;
 }
 
-.type-tag {
-  padding: 1px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: bold;
-  color: var(--slate);
-  background: var(--smoke);
-  white-space: nowrap;
-}
-
 .type-empty {
   margin: 8px 0;
   color: var(--slate);
