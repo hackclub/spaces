@@ -1,5 +1,5 @@
 import { getUser } from '../utils/user.js';
-import { getPermissions } from '../utils/permissions.js';
+import { resolveAccess } from '../utils/permissions.js';
 
 const requireRole = (allowed, message) => async (req, res, next) => {
   try {
@@ -21,17 +21,17 @@ const requireRole = (allowed, message) => async (req, res, next) => {
       });
     }
 
-    const permissions = await getPermissions(user);
+    const access = await resolveAccess(user, req);
 
-    if (!allowed(user, permissions)) {
+    if (!allowed(access.user, access.permissions)) {
       return res.status(403).json({
         success: false,
         message
       });
     }
 
-    req.user = user;
-    req.permissions = permissions;
+    req.user = access.user;
+    req.permissions = access.permissions;
     next();
   } catch (error) {
     console.error('Error in admin middleware:', error);

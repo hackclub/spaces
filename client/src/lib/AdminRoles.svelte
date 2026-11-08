@@ -201,6 +201,9 @@
             {busy === 'save' ? 'Saving...' : isNew ? 'Create role' : 'Save role'}
           </button>
           {#if !isNew}
+            <button class="btn" disabled={busy !== '' || changed} title={changed ? 'Save your changes first' : ''} on:click={() => dispatch('viewas', selected)}>
+              See the panel as this role
+            </button>
             <button class="btn danger" disabled={busy !== '' || members.length > 0} title={members.length ? 'Remove everyone from this role first' : ''} on:click={() => confirmer.ask('delete-role', remove)}>
               {busy === 'delete' ? 'Deleting...' : $armed === 'delete-role' ? 'Really delete?' : 'Delete role'}
             </button>

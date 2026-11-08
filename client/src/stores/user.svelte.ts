@@ -5,6 +5,9 @@ class UserData {
         username: string,
         email: string,
         is_admin: boolean,
+        is_superadmin: boolean,
+        permissions: string[],
+        viewing_as: { id: number, name: string }[] | null,
         hackatime_api_key: string,
         hackclub_id: string,
         hackclub_verification_status: string,
@@ -22,6 +25,17 @@ class UserData {
             this.user = json.data
             return true
         }
+    }
+
+    async viewAs(roleIds: number[]) {
+        const secure = window.location.protocol === "https:" ? "; Secure" : ""
+        document.cookie = `view_as=${roleIds.join(",")}; path=/; SameSite=Strict${secure}`
+        return this.refresh()
+    }
+
+    async stopViewing() {
+        document.cookie = "view_as=; path=/; max-age=0; SameSite=Strict"
+        return this.refresh()
     }
 }
 

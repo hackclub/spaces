@@ -38,6 +38,25 @@ export const getPermissions = async (user) => {
   return new Set(roles.flatMap((role) => role.permissions || []).filter((key) => PERMISSION_KEYS.has(key)));
 };
 
+export const VIEW_AS_COOKIE = 'view_as';
+
+export const resolveAccess = async (user, req) => {
+  const roleIds = user?.is_superadmin
+    ? String(req.cookies?.[VIEW_AS_COOKIE] ?? '').split(',').map(Number).filter((id) => Number.isInteger(id) && id > 0)
+    : [];
+  const roles = roleIds.length ? await pg('roles').whereIn('id', roleIds).select('id', 'name', 'permissions').orderBy('name') : [];
+
+  if (!roles.length) {
+    return { user, permissions: await getPermissions(user), viewingAs: null };
+  }
+
+  return {
+    user: { ...user, is_superadmin: false },
+    permissions: new Set(roles.flatMap((role) => role.permissions || []).filter((key) => PERMISSION_KEYS.has(key))),
+    viewingAs: roles.map(({ id, name }) => ({ id, name }))
+  };
+};
+
 export const hasPermission = async (user, permission) => (await getPermissions(user)).has(permission);
 
 export const isStaff = async (user) => Boolean(user.is_superadmin)

@@ -103,7 +103,9 @@
                     >Back to Dashboard</button
                 >
             </div>
-            <AdminPanel {url} {navigate} />
+            {#key userData.user}
+                <AdminPanel {url} {navigate} />
+            {/key}
         {:else if showSettings}
             <div class="nav-header">
                 <button on:click={() => (showSettings = false)}

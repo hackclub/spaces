@@ -5,7 +5,7 @@ import { strictLimiter, authLimiter } from '../../middlewares/rate-limit.middlew
 import { validateEmail, validateUsername, normalizeEmail } from '../../utils/validation.js';
 import { extractAuth } from '../../middlewares/auth.middleware.js';
 import { getUser } from '../../utils/user.js';
-import { getPermissions } from '../../utils/permissions.js';
+import { resolveAccess } from '../../utils/permissions.js';
 import { createSession, deleteSession, setSessionCookie } from '../../utils/sessions.js';
 
 const router = express.Router();
@@ -24,16 +24,18 @@ router.get("/me", async (req, res) => {
       return res.status(401).json({ success: false });
     }
 
-    const permissions = [...await getPermissions(user)];
+    const access = await resolveAccess(user, req);
+    const permissions = [...access.permissions];
 
     return res.status(200).json({
       success: true,
       data: {
         username: user.username,
         email: user.email,
-        is_admin: permissions.length > 0,
-        is_superadmin: Boolean(user.is_superadmin),
+        is_admin: permissions.length > 0 || Boolean(access.viewingAs),
+        is_superadmin: Boolean(access.user.is_superadmin),
         permissions,
+        viewing_as: access.viewingAs,
         hackatime_api_key: user.hackatime_api_key,
         hackclub_id: user.hackclub_id,
         hackclub_verification_status: user.hackclub_verification_status,

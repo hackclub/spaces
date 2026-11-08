@@ -489,6 +489,16 @@
     if (can('stats.view')) loadAnalytics();
   }
 
+  async function viewAs(role) {
+    await userData.viewAs([role.id]);
+    navigate('/admin');
+  }
+
+  async function stopViewing() {
+    await userData.stopViewing();
+    navigate('/admin/roles');
+  }
+
   function roleLabel(user) {
     const names = [user.is_superadmin && 'Superadmin', ...(user.roles ?? []).map((role) => role.name)].filter(Boolean);
     return names.length ? names.join(', ') : '—';
@@ -497,6 +507,16 @@
 
 <div class="admin-panel">
   <h1>Admin Panel</h1>
+
+  {#if me?.viewing_as}
+    <div class="view-as-banner" role="status">
+      <span>
+        You're seeing the panel as <strong>{me.viewing_as.map((role) => role.name).join(', ')}</strong>.
+        Anything you do here is real and logged as you, with only this role's permissions.
+      </span>
+      <button on:click={stopViewing}>Stop and go back to superadmin</button>
+    </div>
+  {/if}
 
   <div class="tabs">
     {#each TABS as tab}
@@ -951,7 +971,7 @@
   {/if}
 
   {#if activeTab === 'roles' && me?.is_superadmin}
-    <AdminRoles {users} on:changed={loadUsers} />
+    <AdminRoles {users} on:changed={loadUsers} on:viewas={(e) => viewAs(e.detail)} />
   {/if}
 </div>
 
@@ -1003,6 +1023,31 @@
   .tabs button.active {
     border-bottom-color: #007bff;
     font-weight: bold;
+  }
+
+  .view-as-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    border-radius: 8px;
+    background: #fff3cd;
+    color: #664d03;
+    border: 1px solid #ffe69c;
+    font-size: 14px;
+  }
+
+  .view-as-banner button {
+    padding: 6px 12px;
+    border: 1px solid #664d03;
+    border-radius: 4px;
+    background: #fff;
+    color: #664d03;
+    cursor: pointer;
+    white-space: nowrap;
   }
 
   .analytics {
