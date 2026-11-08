@@ -156,12 +156,7 @@
     .filter((group) => group.types.length);
   $: showTypeGroups = typeCategory === "All" && typeCategories.length > 1;
 
-  function startupHint(spaceType) {
-    if (spaceType.kind !== "gui") return "Usually ready in about 15 seconds.";
-    return spaceType.ready
-      ? "Usually ready in about 15 seconds."
-      : "Setting it up takes 1 to 2 minutes the first time. After that it starts in seconds.";
-  }
+  $: createEstimate = !isGuiType(newSpaceType) ? 15 : isReadyType(newSpaceType) ? 10 : 60;
   let revealedPasswords = new Set();
 
   function togglePasswordReveal(spaceId) {
@@ -823,7 +818,6 @@
               {#if selectedType.beta}<span class="beta-badge">Beta</span>{/if}
             </div>
             <p class="type-summary-text">{selectedType.details && selectedType.details !== selectedType.label && selectedType.details !== selectedType.description ? selectedType.details : selectedType.description}</p>
-            <p class="type-summary-meta">{KIND_LABELS[selectedType.kind] ?? "Space"} in your browser · {startupHint(selectedType)}</p>
 
             {#if selectedType.beta}
               <p class="type-summary-note">This space type is in beta, so things may still change or break.</p>
@@ -839,13 +833,7 @@
 
             {#if !isGuiType(newSpaceType)}
               <div class="form-group">
-                <label class="form-label" for="spaceName">Name</label>
-                <p class="password-info">
-                  Name your space after what you're working on. It shows on your
-                  dashboard, and Hackatime uses it to track time for this project,
-                  so give each project its own name. Use letters, numbers, dashes,
-                  underscores or dots.
-                </p>
+                <label class="form-label" for="spaceName">Name <span class="required-mark" aria-hidden="true">*</span></label>
                 <input
                   class="form-input"
                   id="spaceName"
@@ -855,7 +843,9 @@
                   disabled={loading}
                   bind:value={newSpaceName}
                   placeholder="my-project"
+                  aria-describedby="spaceNameHint"
                 />
+                <p class="form-hint" id="spaceNameHint">Letters, numbers, dashes, underscores and dots.</p>
               </div>
             {/if}
 
@@ -872,9 +862,7 @@
                 expectedSeconds={isGuiType(newSpaceType) ? (isReadyType(newSpaceType) ? 15 : 90) : 25}
                 steps={createSteps(newSpaceType)}
                 done={createDone}
-                note={isGuiType(newSpaceType) && isReadyType(newSpaceType)
-                  ? "This should only take a few seconds."
-                  : "Setting up a new space takes a little while, up to about 2 minutes for desktop apps. It's only slow the first time: after that, your space starts in seconds."}
+                note={`~${createEstimate} seconds`}
               />
             {/if}
           </div>

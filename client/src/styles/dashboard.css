@@ -614,17 +614,21 @@
 }
 
 .type-summary-text {
-  margin: 0 0 12px 0;
+  margin: 0 0 20px 0;
   font-size: 15px;
   line-height: 1.5;
   color: var(--slate);
   max-width: 65ch;
 }
 
-.type-summary-meta {
-  margin: 0 0 20px 0;
-  font-size: 14px;
-  color: var(--muted);
+.required-mark {
+  color: var(--red);
+}
+
+.form-hint {
+  margin: 6px 0 0 0;
+  font-size: 13px;
+  color: var(--slate);
 }
 
 .type-summary-note {
