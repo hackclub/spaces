@@ -61,3 +61,7 @@ export const hasPermission = async (user, permission) => (await getPermissions(u
 
 export const isStaff = async (user) => Boolean(user.is_superadmin)
   || Boolean(await pg('user_roles').where('user_id', user.id).first());
+
+export const canManageUser = async (actor, target) => !target || Boolean(actor.is_superadmin) || !(await isStaff(target));
+
+export const STAFF_ONLY_MESSAGE = 'Only superadmins can manage people with roles';

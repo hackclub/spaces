@@ -1,7 +1,7 @@
 import express from 'express';
 import pg from '../../utils/db.js';
 import { requirePermission, requireSuperadmin } from '../../middlewares/admin.middleware.js';
-import { isStaff, getUserRoles } from '../../utils/permissions.js';
+import { getUserRoles, canManageUser, STAFF_ONLY_MESSAGE } from '../../utils/permissions.js';
 import { deleteSpace, stopContainer, spaceConfigs } from '../../utils/spaces.js';
 import { listTemplates, rebuildTemplates } from '../../utils/templates.js';
 import { getSandboxStats } from '../../utils/sandboxes.js';
@@ -13,16 +13,14 @@ const router = express.Router();
 
 const INACTIVE_DAYS = 90;
 
-const canManage = async (actor, target) => Boolean(actor.is_superadmin) || !(await isStaff(target));
-
 const findTarget = async (req, res) => {
   const target = await pg('users').where('id', req.params.userId).first();
   if (!target) {
     res.status(404).json({ success: false, message: 'User not found' });
     return null;
   }
-  if (!(await canManage(req.user, target))) {
-    res.status(403).json({ success: false, message: 'Only superadmins can manage people with roles' });
+  if (!(await canManageUser(req.user, target))) {
+    res.status(403).json({ success: false, message: STAFF_ONLY_MESSAGE });
     return null;
   }
   return target;
@@ -483,6 +481,9 @@ router.post('/spaces/:spaceId/delete', requirePermission('spaces.delete'), async
     }
 
     const owner = await pg('users').where('id', space.user_id).first();
+    if (!(await canManageUser(req.user, owner))) {
+      return res.status(403).json({ success: false, message: STAFF_ONLY_MESSAGE });
+    }
 
     await logAdminAction(req.user, 'space.delete', {
       targetUser: owner,

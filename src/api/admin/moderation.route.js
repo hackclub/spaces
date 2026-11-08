@@ -2,6 +2,7 @@ import express from 'express';
 import pg from '../../utils/db.js';
 import { requirePermission } from '../../middlewares/admin.middleware.js';
 import { logAdminAction } from '../../utils/admin-log.js';
+import { canManageUser, STAFF_ONLY_MESSAGE } from '../../utils/permissions.js';
 import path from 'path';
 import {
   lockSpace,
@@ -27,6 +28,10 @@ const findSpace = async (req, res) => {
     return null;
   }
   const owner = await pg('users').where('id', space.user_id).first();
+  if (!(await canManageUser(req.user, owner))) {
+    res.status(403).json({ success: false, message: STAFF_ONLY_MESSAGE });
+    return null;
+  }
   return { space, owner };
 };
 
