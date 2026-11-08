@@ -146,6 +146,7 @@ export const spaceConfigs = {
     category: "Code",
     title: "VS Code Server",
     summary: "Web-based code editor",
+    about: "VS Code in your browser, on its own Linux machine with a terminal, so you can install the languages and tools your project needs. Your files stay there between sessions.",
     description: "VS Code Server"
   },
   "blender": {
@@ -155,6 +156,7 @@ export const spaceConfigs = {
     label: "Blender",
     title: "Blender 3D",
     summary: "3D modeling and animation",
+    about: "Blender is a free and open-source 3D creation suite for modeling, sculpting, animation, rendering and video editing.",
     description: "Blender 3D"
   },
   "kicad": {
@@ -164,6 +166,7 @@ export const spaceConfigs = {
     label: "KiCad",
     title: "KiCad",
     summary: "PCB design software",
+    about: "KiCad is a free and open-source electronics design suite for drawing schematics and laying out printed circuit boards, with 3D board previews and Gerber files for manufacturing.",
     description: "KiCad PCB Design"
   },
   "godot": {
@@ -173,6 +176,7 @@ export const spaceConfigs = {
     label: "Godot",
     title: "Godot",
     summary: "Game engine, the full desktop editor",
+    about: "Godot is a free and open-source engine for making 2D and 3D games, with the full desktop editor and GDScript, its Python-like scripting language.",
     description: "Godot Engine",
     beta: true,
     vcpus: 4,
@@ -216,6 +220,7 @@ export const spaceConfigs = {
     label: "FreeCAD",
     title: "FreeCAD",
     summary: "CAD software",
+    about: "FreeCAD is a free and open-source parametric 3D CAD modeler for designing real-world objects and mechanical parts, with tools for architecture and finite element analysis.",
     description: "FreeCAD is a general-purpose parametric 3D computer-aided design (CAD) modeler and a building information modeling (BIM) software application with finite element method (FEM) support."
   }
 };
@@ -230,7 +235,7 @@ export const availableSpaceTypes = (user, readyTypes = new Set()) => Object.entr
     value,
     label: config.title,
     description: config.summary,
-    details: config.description,
+    details: config.about ?? config.description,
     kind: config.kind,
     category: config.category ?? "Other",
     beta: Boolean(config.beta),
