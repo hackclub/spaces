@@ -1,7 +1,8 @@
 import express from 'express';
 import pg from '../../utils/db.js';
 import { requireAdmin, requireSuperadmin } from '../../middlewares/admin.middleware.js';
-import { deleteSpace, stopContainer } from '../../utils/spaces.js';
+import { deleteSpace, stopContainer, spaceConfigs } from '../../utils/spaces.js';
+import { listTemplates, rebuildTemplates } from '../../utils/templates.js';
 import { getSandboxStats } from '../../utils/sandboxes.js';
 import { getUsage } from '../../utils/space-runs.js';
 import { getStats } from '../../utils/stats.js';
@@ -391,6 +392,31 @@ router.post('/users/:userId/delete', requireAdmin, async (req, res) => {
       success: false,
       message: 'Failed to delete user'
     });
+  }
+});
+
+router.post('/templates', requireSuperadmin, async (req, res) => {
+  try {
+    res.status(200).json({ success: true, data: await listTemplates(spaceConfigs) });
+  } catch (error) {
+    console.error('Error listing templates:', error);
+    res.status(500).json({ success: false, message: 'Failed to list templates' });
+  }
+});
+
+router.post('/templates/rebuild', requireSuperadmin, async (req, res) => {
+  try {
+    const results = await rebuildTemplates(spaceConfigs, { force: true });
+    await logAdminAction(req.user, 'rebuild_templates', {
+      details: { templates: results.map(({ type, ok, error }) => (ok ? { type, ok } : { type, ok, error })) }
+    });
+    res.status(200).json({
+      success: results.every((result) => result.ok),
+      data: { results, templates: await listTemplates(spaceConfigs) }
+    });
+  } catch (error) {
+    console.error('Error rebuilding templates:', error);
+    res.status(500).json({ success: false, message: 'Failed to rebuild templates' });
   }
 });
 

@@ -28,10 +28,10 @@ const credentials = () => {
 
 export const sandboxNameFor = (uuid) => `space-${uuid}`;
 
-export const createSandbox = (name, { port = CODE_SERVER_PORT, vcpus = VCPUS } = {}) => Sandbox.create({
+export const createSandbox = (name, { port = CODE_SERVER_PORT, vcpus = VCPUS, snapshotId = null } = {}) => Sandbox.create({
   ...credentials(),
   name,
-  image: SANDBOX_IMAGE,
+  ...(snapshotId ? { source: { type: "snapshot", snapshotId } } : { image: SANDBOX_IMAGE }),
   region: SANDBOX_REGION,
   failoverRegions: SANDBOX_FAILOVER_REGIONS,
   ports: [port],
@@ -212,6 +212,49 @@ export const setupGuiApp = async (sandbox, { image, build }) => {
     );
   }
   return build?.tag ?? image;
+};
+
+const STOP_DOCKER = [
+  "pkill -x dockerd",
+  "for i in $(seq 1 60); do pgrep -x dockerd >/dev/null || break; sleep 0.5; done",
+  "pkill -x containerd",
+  "for i in $(seq 1 60); do pgrep -x containerd >/dev/null || break; sleep 0.5; done",
+  "sync"
+].join("; ");
+
+export const buildTemplateSnapshot = async (type, { image, build, vcpus }) => {
+  const sandbox = await Sandbox.create({
+    ...credentials(),
+    name: `spaces-template-${type}-${Date.now()}`,
+    image: SANDBOX_IMAGE,
+    region: SANDBOX_REGION,
+    timeout: 30 * MINUTE,
+    resources: { vcpus: vcpus ?? GUI_VCPUS },
+    persistent: false,
+    tags: { app: "spaces-template" }
+  });
+
+  try {
+    await setupGuiApp(sandbox, { image, build });
+    await run(sandbox, STOP_DOCKER, { sudo: true, timeoutMs: 2 * MINUTE });
+    const snapshot = await sandbox.snapshot({ expiration: 0 });
+    return { snapshotId: snapshot.snapshotId, sizeBytes: snapshot.sizeBytes };
+  } finally {
+    await sandbox.delete().catch((err) => {
+      console.error(`Failed to clean up template sandbox for ${type}:`, err.message);
+    });
+  }
+};
+
+export const deleteSnapshot = async (snapshotId) => {
+  try {
+    const snapshot = await Snapshot.get({ ...credentials(), snapshotId });
+    await snapshot.delete();
+  } catch (err) {
+    if (err?.response?.status !== 404) {
+      throw err;
+    }
+  }
 };
 
 export const startGuiApp = async (sandbox, { image, password, build, env = {}, resetFiles = [] }) => {

@@ -19,6 +19,9 @@
     inactiveDays: 90
   };
   let sandboxStats = null;
+  let templates = null;
+  let rebuildingTemplates = false;
+  let templateMessage = '';
   let users = [];
   let spaces = [];
   let loadingAnalytics = true;
@@ -288,6 +291,7 @@
   function loadData() {
     loadAnalytics();
     loadSandboxStats();
+    if (me?.is_superadmin) loadTemplates();
     loadUsers();
     loadSpaces();
   }
@@ -324,6 +328,46 @@
       sandboxStats = null;
     } finally {
       loadingSandboxStats = false;
+    }
+  }
+
+  async function loadTemplates() {
+    try {
+      const response = await fetch(`${API_BASE}/admin/templates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      const data = await response.json();
+      templates = response.ok ? data.data : null;
+    } catch (err) {
+      console.error('Failed to load templates:', err);
+      templates = null;
+    }
+  }
+
+  async function rebuildTemplates() {
+    rebuildingTemplates = true;
+    templateMessage = '';
+    try {
+      const response = await fetch(`${API_BASE}/admin/templates/rebuild`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      const data = await response.json();
+      if (data.data?.templates) templates = data.data.templates;
+      const failed = (data.data?.results || []).filter((result) => !result.ok);
+      templateMessage = response.ok && !failed.length
+        ? 'All templates rebuilt.'
+        : failed.length
+          ? `Couldn't rebuild ${failed.map((result) => result.type).join(', ')}: ${failed[0].error}`
+          : data.message || 'Failed to rebuild templates';
+    } catch (err) {
+      templateMessage = 'Failed to rebuild templates';
+    } finally {
+      rebuildingTemplates = false;
+      loadSandboxStats();
     }
   }
 
@@ -593,6 +637,46 @@
       </div>
     {:else}
       <p class="stat-sub">Couldn't load sandbox stats from Vercel.</p>
+    {/if}
+
+    {#if me?.is_superadmin}
+      <h2 class="section-heading">Templates</h2>
+      <p class="stat-sub">
+        New Blender, KiCad, FreeCAD and Godot spaces start from these, so they skip installing and downloading the app.
+        They rebuild by themselves once a week, or within a day when a space type's image changes.
+      </p>
+      {#if templates}
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Image</th>
+                <th>Status</th>
+                <th>Built</th>
+                <th>Size</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each templates as template}
+                <tr>
+                  <td>{template.label}</td>
+                  <td class="sandbox-name">{template.source}</td>
+                  <td>{template.current ? 'Ready' : template.builtAt ? 'Outdated, using the slow path' : 'Not built, using the slow path'}</td>
+                  <td>{template.builtAt ? new Date(template.builtAt).toLocaleString() : '—'}</td>
+                  <td>{template.sizeBytes ? formatBytes(template.sizeBytes) : '—'}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {:else}
+        <p class="stat-sub">Couldn't load templates.</p>
+      {/if}
+      <button class="show-more-btn" on:click={rebuildTemplates} disabled={rebuildingTemplates}>
+        {rebuildingTemplates ? 'Rebuilding, this takes a few minutes...' : 'Rebuild templates now'}
+      </button>
+      {#if templateMessage}<p class="stat-sub">{templateMessage}</p>{/if}
     {/if}
   {/if}
 

@@ -35,10 +35,13 @@
     const known = spaceTypes.find((spaceType) => spaceType.value === (type || "").toLowerCase());
     return known ? known.kind === "gui" : GUI_TYPES.includes((type || "").toLowerCase());
   };
-  const createSteps = (type) =>
-    isGuiType(type)
-      ? ["Creating your machine...", "Downloading the app, this is the slow part...", "Starting the desktop..."]
-      : ["Creating your machine...", "Installing VS Code...", "Starting VS Code..."];
+  $: isReadyType = (type) => Boolean(spaceTypes.find((spaceType) => spaceType.value === (type || "").toLowerCase())?.ready);
+  $: createSteps = (type) =>
+    !isGuiType(type)
+      ? ["Creating your machine...", "Installing VS Code...", "Starting VS Code..."]
+      : isReadyType(type)
+        ? ["Creating your machine...", "Starting the desktop..."]
+        : ["Creating your machine...", "Downloading the app, this is the slow part...", "Starting the desktop..."];
   let dropdownOpen = false;
   let clubData = null;
   let spaceShareStatus = {};
@@ -768,10 +771,12 @@
 
         {#if loading}
           <ProgressNotice
-            expectedSeconds={isGuiType(newSpaceType) ? 90 : 25}
+            expectedSeconds={isGuiType(newSpaceType) ? (isReadyType(newSpaceType) ? 15 : 90) : 25}
             steps={createSteps(newSpaceType)}
             done={createDone}
-            note="Setting up a new space takes a little while, up to about 2 minutes for Blender, KiCad and FreeCAD. It's only slow the first time: after that, your space starts in seconds."
+            note={isGuiType(newSpaceType) && isReadyType(newSpaceType)
+              ? "This should only take a few seconds."
+              : "Setting up a new space takes a little while, up to about 2 minutes for Blender, KiCad, FreeCAD and Godot. It's only slow the first time: after that, your space starts in seconds."}
           />
         {/if}
       </div>

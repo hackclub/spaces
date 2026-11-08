@@ -2,6 +2,7 @@ import pg from "./db.js";
 import { getUser, checkUserSpaceLimit, ensureHackclubVerified } from "./user.js";
 import { getUserPrimaryMembership } from "./clubs.js";
 import { recordRunStart, recordRunStop } from "./space-runs.js";
+import { findTemplate } from "./templates.js";
 import path from "path";
 import crypto from "crypto";
 import {
@@ -173,14 +174,15 @@ const configFor = (type) => spaceConfigs[(type || "").toLowerCase()];
 
 export const hasBetaAccess = (user) => Boolean(user?.beta_access || user?.is_superadmin);
 
-export const availableSpaceTypes = (user) => Object.entries(spaceConfigs)
+export const availableSpaceTypes = (user, readyTypes = new Set()) => Object.entries(spaceConfigs)
   .filter(([, config]) => !config.beta || hasBetaAccess(user))
   .map(([value, config]) => ({
     value,
     label: config.title,
     description: config.summary,
     kind: config.kind,
-    beta: Boolean(config.beta)
+    beta: Boolean(config.beta),
+    ready: readyTypes.has(value)
   }));
 
 export const lockedError = (space, action = "used") => {
@@ -269,6 +271,26 @@ export const changeSpacePassword = async (spaceId, newPassword, authorization) =
   };
 };
 
+const createGuiSandbox = async (sandboxName, type, config) => {
+  const options = { port: GUI_PORT, vcpus: config.vcpus ?? GUI_VCPUS };
+  const template = await findTemplate(type, config).catch((err) => {
+    console.error(`Failed to look up the ${type} template:`, err.message);
+    return null;
+  });
+
+  if (template) {
+    try {
+      return await createSandbox(sandboxName, { ...options, snapshotId: template.snapshot_id });
+    } catch (err) {
+      console.error(`Failed to create ${sandboxName} from the ${type} template, falling back:`, err.message);
+      const leftover = await findSandbox(sandboxName).catch(() => null);
+      await leftover?.delete().catch(() => {});
+    }
+  }
+
+  return createSandbox(sandboxName, options);
+};
+
 export const createContainer = async (password, type, authorization, name) => {
   if (process.env.SPACES_CREATION_PAUSED === 'true') {
     const error = new Error("Space creation is temporarily paused for maintenance. Your existing spaces are unaffected.");
@@ -326,7 +348,9 @@ export const createContainer = async (password, type, authorization, name) => {
   let sandbox = null;
 
   try {
-    sandbox = await createSandbox(sandboxName, isGui ? { port: GUI_PORT, vcpus: config.vcpus ?? GUI_VCPUS } : {});
+    sandbox = isGui
+      ? await createGuiSandbox(sandboxName, typeLower, config)
+      : await createSandbox(sandboxName);
 
     if (isGui) {
       await setupGuiApp(sandbox, { image: config.image, build: config.build });

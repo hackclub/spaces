@@ -7,9 +7,11 @@ import {
   getUserSpaces,
   deleteSpace,
   changeSpacePassword,
-  availableSpaceTypes
+  availableSpaceTypes,
+  spaceConfigs
 } from "../../utils/spaces.js";
 import { getUser } from "../../utils/user.js";
+import { readyTemplateTypes } from "../../utils/templates.js";
 import { 
   getUserPrimaryMembership,
   shareSpaceWithClub,
@@ -121,7 +123,8 @@ router.get("/types", async (req, res) => {
   try {
     const user = await getUser(req.authToken);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
-    res.json({ types: availableSpaceTypes(user) });
+    const readyTypes = await readyTemplateTypes(spaceConfigs).catch(() => new Set());
+    res.json({ types: availableSpaceTypes(user, readyTypes) });
   } catch (err) {
     sendError(res, err);
   }

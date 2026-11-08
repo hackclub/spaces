@@ -18,7 +18,8 @@
     }
   },
   "crons": [
-    { "path": "/api/v1/cron/auto-stop", "schedule": "*/5 * * * *" }
+    { "path": "/api/v1/cron/auto-stop", "schedule": "*/5 * * * *" },
+    { "path": "/api/v1/cron/templates", "schedule": "0 4 * * *" }
   ],
   "redirects": [
     { "source": "/godot", "destination": "/godot/", "permanent": false },
