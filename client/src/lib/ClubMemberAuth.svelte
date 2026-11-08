@@ -14,7 +14,6 @@
   let codeSent = false;
   let error = '';
   let loading = false;
-  let membershipInfo = null;
 
   async function checkMembership() {
     error = '';
@@ -26,22 +25,22 @@
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, verificationCode: parseInt(verificationCode) }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        membershipInfo = data.data;
+        const membershipInfo = data.data;
         if (membershipInfo.hasExistingAccount && membershipInfo.hasPasswordAuth) {
-          step = 'login';
+          resetToEmail();
+          error = 'You already have an account. Log in with your password.';
         } else if (membershipInfo.hasExistingAccount) {
           error = 'This email already has an account using a different login method. Please use email verification or Hack Club OAuth.';
         } else if (membershipInfo.isLeader) {
           error = 'Club leaders sign in with their Hack Club account. Go back and choose Continue with Hack Club.';
         } else {
           step = 'signup';
-          await sendCode();
         }
       } else {
         error = data.message || 'No club membership found for this email';
@@ -51,6 +50,31 @@
     } finally {
       loading = false;
     }
+  }
+
+  async function startSignup() {
+    if (!email) {
+      error = 'Enter your club email first';
+      return;
+    }
+
+    loading = true;
+    password = '';
+    verificationCode = '';
+    await sendCode();
+    loading = false;
+
+    if (codeSent) {
+      step = 'verify';
+    }
+  }
+
+  async function resendCode() {
+    loading = true;
+    verificationCode = '';
+    await sendCode();
+    loading = false;
+    step = 'verify';
   }
 
   async function sendCode() {
@@ -170,7 +194,6 @@
     verificationCode = '';
     codeSent = false;
     error = '';
-    membershipInfo = null;
   }
 </script>
 
@@ -186,25 +209,23 @@
         <h2 class="auth-title">
           {#if step === 'email'}
             Club Member Login
-          {:else if step === 'signup'}
-            Create Account
           {:else}
-            Welcome Back
+            Create Account
           {/if}
         </h2>
         <p class="auth-subtitle">
           {#if step === 'email'}
             Sign in with your club email and password
-          {:else if step === 'signup'}
-            Set up your account as a club member
+          {:else if step === 'verify'}
+            Confirm your email to set up your account
           {:else}
-            Log in to your club member account
+            Set up your account as a club member
           {/if}
         </p>
       </div>
 
       {#if step === 'email'}
-        <form on:submit|preventDefault={checkMembership}>
+        <form on:submit|preventDefault={handleLogin}>
           <div class="form-group">
             <label class="form-label" for="email">
               Email
@@ -219,12 +240,30 @@
             />
           </div>
 
+          <div class="form-group">
+            <label class="form-label" for="password">
+              Password
+            </label>
+            <input
+              class="form-input"
+              id="password"
+              type="password"
+              bind:value={password}
+              required
+              placeholder="Enter your password"
+            />
+          </div>
+
           {#if error}
             <div class="error-message">{error}</div>
           {/if}
 
-          <button class="primary-button" type="submit" disabled={loading || !email}>
-            {loading ? 'Checking...' : 'Continue'}
+          <button class="primary-button" type="submit" disabled={loading || !email || !password}>
+            {loading ? 'Logging in...' : 'Log In'}
+          </button>
+
+          <button class="secondary-button" type="button" on:click={startSignup} disabled={loading || !email}>
+            First time here? Create an account
           </button>
         </form>
 
@@ -233,13 +272,13 @@
         </div>
       {/if}
 
-      {#if step === 'signup'}
+      {#if step === 'verify'}
         <div class="verification-notice">
-          <p class="verification-title">Club membership verified</p>
-          <p class="verification-text">Your email is on a Hack Club club's member list. Enter the code we sent to finish signing up.</p>
+          <p class="verification-title">Check your email</p>
+          <p class="verification-text">We emailed a code to <strong>{email}</strong>. It expires in 5 minutes.</p>
         </div>
 
-        <form on:submit|preventDefault={handleSignup}>
+        <form on:submit|preventDefault={checkMembership}>
           <div class="form-group">
             <label class="form-label" for="verificationCode">
               Verification code
@@ -255,11 +294,33 @@
               maxlength="6"
               placeholder="6-digit code"
             />
-            {#if codeSent}
-              <p class="verification-text">We emailed a code to <strong>{email}</strong>. It expires in 5 minutes.</p>
-            {/if}
           </div>
 
+          {#if error}
+            <div class="error-message">{error}</div>
+          {/if}
+
+          <button class="primary-button" type="submit" disabled={loading || !verificationCode}>
+            {loading ? 'Checking...' : 'Continue'}
+          </button>
+
+          <button class="secondary-button" type="button" on:click={resendCode} disabled={loading}>
+            Resend code
+          </button>
+
+          <button class="secondary-button" type="button" on:click={resetToEmail}>
+            Use different email
+          </button>
+        </form>
+      {/if}
+
+      {#if step === 'signup'}
+        <div class="verification-notice">
+          <p class="verification-title">Club membership verified</p>
+          <p class="verification-text">Your email is on a Hack Club club's member list. Choose a username and password to finish signing up.</p>
+        </div>
+
+        <form on:submit|preventDefault={handleSignup}>
           <div class="form-group">
             <label class="form-label" for="username">
               Username
@@ -312,7 +373,7 @@
             {loading ? 'Creating Account...' : 'Create Account'}
           </button>
 
-          <button class="secondary-button" type="button" on:click={sendCode} disabled={loading}>
+          <button class="secondary-button" type="button" on:click={resendCode} disabled={loading}>
             Resend code
           </button>
 
@@ -322,48 +383,6 @@
         </form>
       {/if}
 
-      {#if step === 'login'}
-        <form on:submit|preventDefault={handleLogin}>
-          <div class="form-group">
-            <label class="form-label" for="email-display">
-              Email
-            </label>
-            <input
-              class="form-input"
-              id="email-display"
-              type="email"
-              value={email}
-              disabled
-            />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="password">
-              Password
-            </label>
-            <input
-              class="form-input"
-              id="password"
-              type="password"
-              bind:value={password}
-              required
-              placeholder="Enter your password"
-            />
-          </div>
-
-          {#if error}
-            <div class="error-message">{error}</div>
-          {/if}
-
-          <button class="primary-button" type="submit" disabled={loading || !password}>
-            {loading ? 'Logging in...' : 'Log In'}
-          </button>
-
-          <button class="secondary-button" type="button" on:click={resetToEmail}>
-            Use different email
-          </button>
-        </form>
-      {/if}
     </div>
   </div>
 

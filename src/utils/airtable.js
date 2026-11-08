@@ -122,7 +122,7 @@ export const sendEmail = async (email) => {
   };
 };
 
-export const checkEmail = async (email, codeToCheck) => {
+export const verifyCode = async (email, codeToCheck) => {
   const normalized = normalizeCodeEmail(email);
 
   const latest = await pg('verification_codes')
@@ -131,7 +131,7 @@ export const checkEmail = async (email, codeToCheck) => {
     .first();
 
   if (!latest || latest.used_at || Date.now() - new Date(latest.created_at).getTime() > CODE_TTL_MS) {
-    return false;
+    return null;
   }
 
   const [counted] = await pg('verification_codes')
@@ -142,22 +142,30 @@ export const checkEmail = async (email, codeToCheck) => {
     .returning(['id']);
 
   if (!counted) {
-    return false;
+    return null;
   }
 
   const record = await base('Spaces Emails').find(latest.airtable_record_id);
   if (String(record.fields.code) !== String(codeToCheck)) {
-    return false;
+    return null;
   }
 
+  return latest.id;
+};
+
+export const consumeCode = async (codeId) => {
+  if (!codeId) return false;
+
   const [used] = await pg('verification_codes')
-    .where('id', latest.id)
+    .where('id', codeId)
     .whereNull('used_at')
     .update({ used_at: new Date() })
     .returning(['id']);
 
   return Boolean(used);
 };
+
+export const checkEmail = async (email, codeToCheck) => consumeCode(await verifyCode(email, codeToCheck));
 
 export { base };
 export default airtable;

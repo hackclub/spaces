@@ -14,6 +14,7 @@
   let loading = false;
   let message = '';
   let displayMode = 'login';
+  let needsAccount = false;
 
   onMount(() => {
     const hash = window.location.hash.startsWith('#') 
@@ -52,7 +53,8 @@
         'oauth_token_failed': 'Failed to complete authorization. Please try again.',
         'oauth_hackclub_already_linked': 'This Hack Club account is already linked to another user.',
         'oauth_link_user_mismatch': 'You are logged into a different Spaces account than the one that started linking. Log in again and retry.',
-        'oauth_callback_failed': 'Something went wrong. Please try again.'
+        'oauth_callback_failed': 'Something went wrong. Please try again.',
+        'oauth_rate_limited': 'Too many sign-in attempts from your network. Please try again in a few minutes.'
       };
       error = errorMessages[oauthError] || 'OAuth error. Please try again.';
       window.history.replaceState({}, '', window.location.pathname);
@@ -83,21 +85,7 @@
         message = 'Verification code sent to your email!';
         mode = 'verify';
       } else {
-        if (response.status === 404 && mode === 'login') {
-          error = "We couldn't find your account. Let's create one!";
-          setTimeout(() => {
-            error = '';
-            authIntent = 'signup';
-            setTimeout(() => {
-              mode = 'signup';
-            }, 400);
-            setTimeout(() => {
-              displayMode = 'signup';
-            }, 800);
-          }, 1500);
-        } else {
-          error = data.message || 'Failed to send verification code';
-        }
+        error = data.message || 'Failed to send verification code';
       }
     } catch (err) {
       error = ERROR_MESSAGES.NETWORK_ERROR;
@@ -129,6 +117,9 @@
           is_admin: data.data.is_admin,
           hackatime_api_key: data.data.hackatime_api_key
         });
+      } else if (response.status === 404) {
+        needsAccount = true;
+        error = data.message || 'No account uses this email yet. Choose a username to create one.';
       } else {
         error = data.message || 'Login failed';
       }
@@ -176,6 +167,7 @@
     error = '';
     message = '';
     verificationCode = '';
+    needsAccount = false;
     authIntent = newMode; // Update the auth intent
     setTimeout(() => {
       mode = newMode;
@@ -316,7 +308,7 @@
           <p class="verification-text">We sent a verification code to <strong>{email}</strong></p>
         </div>
 
-        <form on:submit|preventDefault={handleLogin}>
+        <form on:submit|preventDefault={needsAccount ? handleSignup : handleLogin}>
           <div class="form-group">
             <label class="form-label" for="code">
               Verification Code
@@ -331,13 +323,36 @@
             />
           </div>
 
+          {#if needsAccount}
+            <div class="form-group">
+              <label class="form-label" for="login-username">
+                Username
+              </label>
+              <input
+                class="form-input"
+                id="login-username"
+                type="text"
+                bind:value={username}
+                required
+                maxlength="100"
+                placeholder="Choose a username"
+              />
+            </div>
+          {/if}
+
           {#if error}
             <div class="error-message">{error}</div>
           {/if}
 
-          <button class="primary-button" type="submit" disabled={loading || !verificationCode}>
-            {loading ? 'Verifying...' : 'Login'}
-          </button>
+          {#if needsAccount}
+            <button class="primary-button" type="submit" disabled={loading || !verificationCode || !username}>
+              {loading ? 'Creating account...' : 'Create Account'}
+            </button>
+          {:else}
+            <button class="primary-button" type="submit" disabled={loading || !verificationCode}>
+              {loading ? 'Verifying...' : 'Login'}
+            </button>
+          {/if}
 
           <button class="secondary-button" type="button" on:click={() => switchMode('login')}>
             Resend Code

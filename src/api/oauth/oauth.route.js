@@ -4,6 +4,7 @@ import pg from '../../utils/db.js';
 import { getUser } from '../../utils/user.js';
 import { extractAuth } from '../../middlewares/auth.middleware.js';
 import { createSession, setSessionCookie } from '../../utils/sessions.js';
+import { oauthLoginLimiter } from '../../middlewares/rate-limit.middleware.js';
 
 const router = express.Router();
 router.use(extractAuth);
@@ -40,7 +41,7 @@ async function cleanupExpiredStates() {
   await pg('oauth_states').where('created_at', '<', tenMinutesAgo).delete();
 }
 
-router.get('/hackclub/login', async (req, res) => {
+router.get('/hackclub/login', oauthLoginLimiter, async (req, res) => {
   try {
     await cleanupExpiredStates();
 

@@ -2,8 +2,8 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import pg from '../../utils/db.js';
 import { checkMemberStatus, checkLeaderStatus, getOrCreateClubByName, linkUserToClub } from '../../utils/clubs.js';
-import { checkEmail } from '../../utils/airtable.js';
-import { authLimiter } from '../../middlewares/rate-limit.middleware.js';
+import { verifyCode, consumeCode } from '../../utils/airtable.js';
+import { authLimiter, accountIpLimiter } from '../../middlewares/rate-limit.middleware.js';
 import { validateEmail, validateUsername, validatePassword, normalizeEmail } from '../../utils/validation.js';
 import { createSession, setSessionCookie } from '../../utils/sessions.js';
 
@@ -11,7 +11,7 @@ const router = express.Router();
 
 const SALT_ROUNDS = 12;
 
-router.post('/club-member/signup', authLimiter, async (req, res) => {
+router.post('/club-member/signup', accountIpLimiter, authLimiter, async (req, res) => {
   try {
     const { email: rawEmail, username: rawUsername, password, verificationCode } = req.body;
 
@@ -48,8 +48,8 @@ router.post('/club-member/signup', authLimiter, async (req, res) => {
       });
     }
 
-    const codeValid = await checkEmail(email, Number.parseInt(verificationCode, 10));
-    if (!codeValid) {
+    const codeId = await verifyCode(email, Number.parseInt(verificationCode, 10));
+    if (!codeId) {
       return res.status(400).json({
         success: false,
         message: 'Invalid or expired verification code'
@@ -91,6 +91,13 @@ router.post('/club-member/signup', authLimiter, async (req, res) => {
       return res.status(409).json({
         success: false,
         message: existingUser.email === email ? 'Email already registered' : 'Username already taken'
+      });
+    }
+
+    if (!(await consumeCode(codeId))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification code'
       });
     }
 
@@ -153,7 +160,7 @@ router.post('/club-member/signup', authLimiter, async (req, res) => {
   }
 });
 
-router.post('/club-member/login', authLimiter, async (req, res) => {
+router.post('/club-member/login', accountIpLimiter, authLimiter, async (req, res) => {
   try {
     const { email: rawEmail, password } = req.body;
 
@@ -221,9 +228,9 @@ router.post('/club-member/login', authLimiter, async (req, res) => {
   }
 });
 
-router.post('/club-member/check', async (req, res) => {
+router.post('/club-member/check', accountIpLimiter, authLimiter, async (req, res) => {
   try {
-    const { email: rawEmail } = req.body;
+    const { email: rawEmail, verificationCode } = req.body;
 
     const emailValidation = validateEmail(rawEmail);
     if (!emailValidation.valid) {
@@ -233,6 +240,33 @@ router.post('/club-member/check', async (req, res) => {
       });
     }
     const email = emailValidation.normalized;
+
+    if (!verificationCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code is required'
+      });
+    }
+
+    const codeId = await verifyCode(email, Number.parseInt(verificationCode, 10));
+    if (!codeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification code'
+      });
+    }
+
+    const existingUser = await pg('users').where('email', email).first();
+
+    if (existingUser) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          hasExistingAccount: true,
+          hasPasswordAuth: Boolean(existingUser.password_hash)
+        }
+      });
+    }
 
     const { isMember, failed: memberCheckFailed } = await checkMemberStatus(email);
     const { isLeader, failed: leaderCheckFailed } = await checkLeaderStatus(email);
@@ -251,15 +285,11 @@ router.post('/club-member/check', async (req, res) => {
       });
     }
 
-    const existingUser = await pg('users').where('email', email).first();
-
     res.status(200).json({
       success: true,
       data: {
-        isMember: isMember || isLeader,
-        isLeader,
-        hasExistingAccount: !!existingUser,
-        hasPasswordAuth: existingUser?.password_hash ? true : false
+        hasExistingAccount: false,
+        isLeader
       }
     });
 

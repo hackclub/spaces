@@ -1,7 +1,7 @@
 import express from 'express';
-import { sendEmail, checkEmail } from '../../utils/airtable.js';
+import { sendEmail, verifyCode, consumeCode } from '../../utils/airtable.js';
 import pg from '../../utils/db.js';
-import { strictLimiter, authLimiter } from '../../middlewares/rate-limit.middleware.js';
+import { sendCodeIpLimiter, sendCodeGlobalLimiter, authLimiter, accountIpLimiter } from '../../middlewares/rate-limit.middleware.js';
 import { validateEmail, validateUsername, normalizeEmail } from '../../utils/validation.js';
 import { extractAuth } from '../../middlewares/auth.middleware.js';
 import { getUser } from '../../utils/user.js';
@@ -56,9 +56,9 @@ router.get('/send', (req, res) => {
 });
 
 // POST /api/v1/users/send
-router.post('/send', strictLimiter, async (req, res) => {
+router.post('/send', sendCodeIpLimiter, sendCodeGlobalLimiter, async (req, res) => {
   try {
-    const { email: rawEmail, mode } = req.body;
+    const { email: rawEmail } = req.body;
 
     const emailValidation = validateEmail(rawEmail);
     if (!emailValidation.valid) {
@@ -68,19 +68,6 @@ router.post('/send', strictLimiter, async (req, res) => {
       });
     }
     const email = emailValidation.normalized;
-
-    if (mode === 'login') {
-      const user = await pg('users')
-        .where('email', email)
-        .first();
-
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: 'No account found with this email. Please sign up first.'
-        });
-      }
-    }
 
     const result = await sendEmail(email);
 
@@ -109,7 +96,7 @@ router.post('/send', strictLimiter, async (req, res) => {
 });
 
 // POST /api/v1/users/signup 
-router.post('/signup', authLimiter, async (req, res) => {
+router.post('/signup', accountIpLimiter, authLimiter, async (req, res) => {
   try {
     const { email: rawEmail, username: rawUsername, verificationCode } = req.body;
 
@@ -138,8 +125,8 @@ router.post('/signup', authLimiter, async (req, res) => {
       });
     }
 
-    const codeValid = await checkEmail(email, verificationCode);
-    if (!codeValid) {
+    const codeId = await verifyCode(email, verificationCode);
+    if (!codeId) {
       return res.status(400).json({
         success: false,
         message: 'Invalid or expired verification code'
@@ -155,6 +142,13 @@ router.post('/signup', authLimiter, async (req, res) => {
       return res.status(409).json({
         success: false,
         message: existingUser.email === email ? 'Email already registered' : 'Username already taken'
+      });
+    }
+
+    if (!(await consumeCode(codeId))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification code'
       });
     }
 
@@ -202,7 +196,7 @@ router.post('/signup', authLimiter, async (req, res) => {
 });
 
 // POST /api/v1/users/login
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/login', accountIpLimiter, authLimiter, async (req, res) => {
   try {
     const { email: rawEmail, verificationCode } = req.body;
 
@@ -222,8 +216,8 @@ router.post('/login', authLimiter, async (req, res) => {
       });
     }
 
-    const codeValid = await checkEmail(email, verificationCode);
-    if (!codeValid) {
+    const codeId = await verifyCode(email, verificationCode);
+    if (!codeId) {
       return res.status(400).json({
         success: false,
         message: 'Invalid or expired verification code'
@@ -237,7 +231,14 @@ router.post('/login', authLimiter, async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found. Please sign up first.'
+        message: 'No account uses this email yet. Choose a username to create one.'
+      });
+    }
+
+    if (!(await consumeCode(codeId))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification code'
       });
     }
 
