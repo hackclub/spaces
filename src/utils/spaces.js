@@ -150,7 +150,7 @@ export const spaceConfigs = {
   },
   "blender": {
     kind: "gui",
-    category: "3D & design",
+    category: "CAD design",
     image: "linuxserver/blender",
     label: "Blender",
     title: "Blender 3D",
@@ -159,7 +159,7 @@ export const spaceConfigs = {
   },
   "kicad": {
     kind: "gui",
-    category: "Electronics",
+    category: "PCB design",
     image: "linuxserver/kicad",
     label: "KiCad",
     title: "KiCad",
@@ -168,7 +168,7 @@ export const spaceConfigs = {
   },
   "godot": {
     kind: "gui",
-    category: "Games",
+    category: "Game engines",
     image: "ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
     label: "Godot",
     title: "Godot",
@@ -211,7 +211,7 @@ export const spaceConfigs = {
   },
   "freecad": {
     kind: "gui",
-    category: "3D & design",
+    category: "CAD design",
     image: "linuxserver/freecad",
     label: "FreeCAD",
     title: "FreeCAD",

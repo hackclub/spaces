@@ -103,9 +103,9 @@
 
   let spaceTypes = [
     { value: "code-server", label: "VS Code Server", description: "Web-based code editor", kind: "editor", category: "Code", tracksHackatime: true },
-    { value: "blender", label: "Blender 3D", description: "3D modeling and animation", kind: "gui", category: "3D & design" },
-    { value: "kicad", label: "KiCad", description: "PCB design software", kind: "gui", category: "Electronics" },
-    { value: "freecad", label: "FreeCAD", description: "CAD software", kind: "gui", category: "3D & design" },
+    { value: "blender", label: "Blender 3D", description: "3D modeling and animation", kind: "gui", category: "CAD design" },
+    { value: "kicad", label: "KiCad", description: "PCB design software", kind: "gui", category: "PCB design" },
+    { value: "freecad", label: "FreeCAD", description: "CAD software", kind: "gui", category: "CAD design" },
   ];
 
   async function loadSpaceTypes() {
