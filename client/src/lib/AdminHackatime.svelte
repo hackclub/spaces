@@ -49,6 +49,14 @@
     expanded = expanded;
   }
 
+  function describeImport(progress) {
+    if (progress.lookingUp > 0) return 'Finding who used the old server. This step can take a few minutes...';
+    const parts = [`${progress.done} done`, `${progress.pending} left`];
+    if (progress.failed) parts.push(`${progress.failed} failed`);
+    if (progress.lookupFailed) parts.push('a lookup failed, retry it');
+    return parts.join(', ');
+  }
+
   async function runImport(retryFailed = false) {
     importing = true;
     importMessage = '';
@@ -65,8 +73,8 @@
         if (!response.ok) throw new Error(data.message || 'Import failed');
         progress = data.data.progress;
         retryFailed = false;
-        importMessage = `${progress.done} done, ${progress.pending} left${progress.failed ? `, ${progress.failed} failed` : ''}`;
-      } while (progress.pending > 0);
+        importMessage = describeImport(progress);
+      } while (progress.pending > 0 || progress.lookingUp > 0);
       await load();
     } catch (err) {
       importMessage = err.message;
@@ -130,14 +138,14 @@
     {#if canImport}
       <div class="import">
         <button class="btn" on:click={() => runImport(false)} disabled={importing || !report.configured}>
-          {importing ? 'Importing...' : report.hetznerImport.done ? 'Continue old server import' : 'Import old server time'}
+          {importing ? 'Importing...' : report.hetznerImport.started ? 'Continue old server import' : 'Import old server time'}
         </button>
-        {#if report.hetznerImport.failed && !importing}
-          <button class="btn" on:click={() => runImport(true)}>Retry {report.hetznerImport.failed} failed</button>
+        {#if (report.hetznerImport.failed || report.hetznerImport.lookupFailed) && !importing}
+          <button class="btn" on:click={() => runImport(true)}>Retry failed</button>
         {/if}
         <span class="note">
-          {importMessage || (report.hetznerImport.done + report.hetznerImport.pending + report.hetznerImport.failed
-            ? `${report.hetznerImport.done} done, ${report.hetznerImport.pending} left${report.hetznerImport.failed ? `, ${report.hetznerImport.failed} failed` : ''}`
+          {importMessage || (report.hetznerImport.started
+            ? describeImport(report.hetznerImport)
             : 'Finds heartbeats sent from the old Hetzner server and adds them here.')}
         </span>
       </div>

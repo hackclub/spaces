@@ -10,17 +10,19 @@ const HETZNER_IPV4 = '65.108.71.92';
 const HETZNER_IPV6_PREFIX = '2a01:4f9:6b:4755:';
 const HETZNER_LOOKUP_IPS = [HETZNER_IPV4, '2a01:4f9:6b:4755::2'];
 const HETZNER_UNTIL = new Date('2026-11-09T00:00:00Z');
+const LOOKUP_PREFIX = 'ip:';
+const LOOKUP_TIMEOUT_MS = 270000;
 
 export const hackatimeConfigured = () => Boolean(process.env.HACKATIME_ADMIN_KEY);
 
-const adminGet = async (path, params = {}) => {
+const adminGet = async (path, params = {}, { timeoutMs = 60000 } = {}) => {
   const url = new URL(`/api/admin/v1/${path}`, HACKATIME_URL);
   for (const [name, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== '') url.searchParams.set(name, String(value));
   }
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${process.env.HACKATIME_ADMIN_KEY}`, Accept: 'application/json' },
-    signal: AbortSignal.timeout(30000)
+    signal: AbortSignal.timeout(timeoutMs)
   });
   if (!response.ok) {
     throw new Error(`Hackatime ${path} answered ${response.status}`);
@@ -136,19 +138,36 @@ const isHetznerIp = (ip) => {
 };
 
 export const hetznerImportProgress = async () => {
-  const rows = await pg('hackatime_imports').select('status').count('* as n').groupBy('status');
-  const counts = Object.fromEntries(rows.map((row) => [row.status, Number(row.n)]));
-  return { pending: counts.pending ?? 0, done: counts.done ?? 0, failed: counts.failed ?? 0 };
+  const rows = await pg('hackatime_imports')
+    .select('status', pg.raw("hackatime_user_id = '' as lookup"))
+    .count('* as n')
+    .groupBy('status', 'lookup');
+  const count = (status, lookup) => rows
+    .filter((row) => row.status === status && Boolean(row.lookup) === lookup)
+    .reduce((sum, row) => sum + Number(row.n), 0);
+  return {
+    lookingUp: count('pending', true),
+    lookupFailed: count('failed', true),
+    pending: count('pending', false),
+    done: count('done', false),
+    failed: count('failed', false),
+    started: rows.length > 0
+  };
 };
 
 export const startHetznerImport = async () => {
+  await pg('hackatime_imports')
+    .insert(HETZNER_LOOKUP_IPS.map((ip) => ({ hackatime_user_id: '', machine: `${LOOKUP_PREFIX}${ip}` })))
+    .onConflict(['hackatime_user_id', 'machine'])
+    .ignore();
+};
+
+const lookUpIp = async (ip) => {
+  const { users = [] } = await adminGet('user/get_users_by_ip', { ip }, { timeoutMs: LOOKUP_TIMEOUT_MS });
   const pairs = new Map();
-  for (const ip of HETZNER_LOOKUP_IPS) {
-    const { users = [] } = await adminGet('user/get_users_by_ip', { ip });
-    for (const user of users) {
-      const pair = { hackatime_user_id: String(user.user_id), machine: user.machine ?? '' };
-      pairs.set(`${pair.hackatime_user_id}|${pair.machine}`, pair);
-    }
+  for (const user of users) {
+    const pair = { hackatime_user_id: String(user.user_id), machine: user.machine ?? '' };
+    pairs.set(`${pair.hackatime_user_id}|${pair.machine}`, pair);
   }
   if (pairs.size) {
     await pg('hackatime_imports').insert([...pairs.values()]).onConflict(['hackatime_user_id', 'machine']).ignore();
@@ -156,12 +175,26 @@ export const startHetznerImport = async () => {
   return pairs.size;
 };
 
-export const continueHetznerImport = async ({ budgetMs = 200000 } = {}) => {
+export const continueHetznerImport = async ({ budgetMs = 150000 } = {}) => {
   const deadline = Date.now() + budgetMs;
 
   while (Date.now() < deadline) {
-    const job = await pg('hackatime_imports').where('status', 'pending').orderBy('updated_at').first();
+    const job = await pg('hackatime_imports')
+      .where('status', 'pending')
+      .orderByRaw("hackatime_user_id = '' desc")
+      .orderBy('updated_at')
+      .first();
     if (!job) break;
+
+    if (job.hackatime_user_id === '') {
+      try {
+        await lookUpIp(job.machine.slice(LOOKUP_PREFIX.length));
+        await pg('hackatime_imports').where({ hackatime_user_id: '', machine: job.machine }).update({ status: 'done', error: null, updated_at: pg.fn.now() });
+      } catch (err) {
+        await pg('hackatime_imports').where({ hackatime_user_id: '', machine: job.machine }).update({ status: 'failed', error: err.message.slice(0, 500), updated_at: pg.fn.now() });
+      }
+      break;
+    }
 
     try {
       const heartbeats = (await fetchHeartbeats({

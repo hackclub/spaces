@@ -442,16 +442,15 @@ router.post('/hackatime/import', requireSuperadmin, async (req, res) => {
     }
 
     const before = await hetznerImportProgress();
-    let found = null;
-    if (before.pending + before.done + before.failed === 0) {
-      found = await startHetznerImport();
-      await logAdminAction(req.user, 'hackatime.import', { details: { found } });
+    if (!before.started) {
+      await startHetznerImport();
+      await logAdminAction(req.user, 'hackatime.import', {});
     } else if (req.body?.retryFailed === true) {
       await retryFailedHetznerImports();
     }
 
     const progress = await continueHetznerImport();
-    res.status(200).json({ success: true, data: { found, progress } });
+    res.status(200).json({ success: true, data: { progress } });
   } catch (error) {
     console.error('Error importing old-server Hackatime time:', error);
     res.status(500).json({ success: false, message: error.message || 'Failed to import' });
