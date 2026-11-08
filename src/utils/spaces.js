@@ -81,7 +81,7 @@ export const spaceConfigs = {
   },
   "godot": {
     kind: "gui",
-    image: "ghcr.io/linuxserver/baseimage-selkies:debianbookworm",
+    image: "ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
     label: "Godot",
     title: "Godot",
     summary: "Game engine, the full desktop editor",
@@ -89,19 +89,20 @@ export const spaceConfigs = {
     beta: true,
     vcpus: 4,
     build: {
-      tag: "spaces-godot:4.7.2-3",
+      tag: "spaces-godot:4.7.2-4",
       dockerfile: [
-        "FROM ghcr.io/linuxserver/baseimage-selkies:debianbookworm",
+        "FROM ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
         "ARG GODOT_VERSION=4.7.2-stable",
-        "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl unzip libxcursor1 libxinerama1 libxrandr2 libxi6 libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri libfontconfig1 libasound2 libpulse0 && curl -fsSL -o /tmp/godot.zip \"https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip\" && unzip -q /tmp/godot.zip -d /opt/godot && mv /opt/godot/Godot_v*_linux.x86_64 /opt/godot/godot && chmod 755 /opt/godot/godot && rm -rf /tmp/godot.zip /var/lib/apt/lists/*",
-        "RUN printf '%s\\n' '#!/bin/sh' 'new=\"\"' 'IFS=:' 'for lib in $LD_PRELOAD; do case \"$lib\" in *libudev*) ;; *) new=\"${new:+$new:}$lib\" ;; esac; done' 'unset IFS' 'export LD_PRELOAD=\"$new\"' 'exec /opt/godot/godot --rendering-driver opengl3 --accessibility disabled --project-manager \"$@\"' > /opt/godot/run && chmod 755 /opt/godot/run && printf '%s\\n' '/opt/godot/run' > /defaults/autostart && printf '%s\\n' '<?xml version=\"1.0\" encoding=\"utf-8\"?>' '<openbox_menu xmlns=\"http://openbox.org/3.4/menu\">' '<menu id=\"root-menu\" label=\"MENU\">' '<item label=\"Godot\"><action name=\"Execute\"><command>/opt/godot/run</command></action></item>' '</menu>' '</openbox_menu>' > /defaults/menu.xml"
+        "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl unzip libxcursor1 libxinerama1 libxrandr2 libxi6 libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri libfontconfig1 libasound2t64 libpulse0 && curl -fsSL -o /tmp/godot.zip \"https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip\" && unzip -q /tmp/godot.zip -d /opt/godot && mv /opt/godot/Godot_v*_linux.x86_64 /opt/godot/godot && chmod 755 /opt/godot/godot && rm -rf /tmp/godot.zip /var/lib/apt/lists/*",
+        "RUN printf '%s\\n' '#!/bin/sh' 'new=\"\"' 'IFS=:' 'for lib in $LD_PRELOAD; do case \"$lib\" in *libudev*) ;; *) new=\"${new:+$new:}$lib\" ;; esac; done' 'unset IFS' 'export LD_PRELOAD=\"$new\"' 'while true; do' '  /opt/godot/godot --rendering-driver opengl3 --accessibility disabled --single-window --project-manager' '  while pgrep -f \"^/opt/godot/godot\" >/dev/null; do sleep 2; done' 'done' > /opt/godot/run && chmod 755 /opt/godot/run && printf '%s\\n' '/opt/godot/run' > /defaults/autostart && printf '%s\\n' '<?xml version=\"1.0\" encoding=\"utf-8\"?>' '<openbox_menu xmlns=\"http://openbox.org/3.4/menu\">' '<menu id=\"root-menu\" label=\"MENU\">' '<item label=\"Godot\"><action name=\"Execute\"><command>/opt/godot/run</command></action></item>' '</menu>' '</openbox_menu>' > /defaults/menu.xml"
       ].join("\n")
     },
     env: {
       HARDEN_DESKTOP: "true",
       HARDEN_OPENBOX: "true",
       SELKIES_UI_SIDEBAR_SHOW_APPS: "false|locked",
-      RESTART_APP: "true"
+      SELKIES_UI_SHOW_SIDEBAR: "false|locked",
+      RESTART_APP: "false"
     },
     resetFiles: [".config/openbox/autostart", ".config/openbox/menu.xml", ".config/openbox/menu.xml.bak"]
   },
