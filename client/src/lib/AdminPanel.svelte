@@ -834,7 +834,10 @@
                 <td>{space.type}</td>
                 <td>{space.username}</td>
                 <td>{space.email}</td>
-                <td>{space.locked_at ? 'Locked' : space.running ? 'Running' : 'Stopped'}</td>
+                <td>
+                  {space.locked_at ? 'Locked' : space.running ? 'Running' : 'Stopped'}
+                  {#if space.locked_at && space.locked_reason}<p class="stat-sub">{space.locked_reason}</p>{/if}
+                </td>
                 <td>{lastOpened(space) ? new Date(lastOpened(space)).toLocaleString() : 'Never'}</td>
                 <td>{formatDate(space.created_at)}</td>
                 <td class="sandbox-name">{space.container_id ?? '—'}</td>
