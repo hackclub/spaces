@@ -11,7 +11,7 @@ import {
   spaceConfigs
 } from "../../utils/spaces.js";
 import { getUser } from "../../utils/user.js";
-import { readyTemplateTypes } from "../../utils/templates.js";
+import { readyTemplateTypes, templateVersions } from "../../utils/templates.js";
 import { 
   getUserPrimaryMembership,
   shareSpaceWithClub,
@@ -123,8 +123,11 @@ router.get("/types", async (req, res) => {
   try {
     const user = await getUser(req.authToken);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
-    const readyTypes = await readyTemplateTypes(spaceConfigs).catch(() => new Set());
-    res.json({ types: availableSpaceTypes(user, readyTypes) });
+    const [readyTypes, versions] = await Promise.all([
+      readyTemplateTypes(spaceConfigs).catch(() => new Set()),
+      templateVersions(spaceConfigs).catch(() => new Map())
+    ]);
+    res.json({ types: availableSpaceTypes(user, readyTypes, versions) });
   } catch (err) {
     sendError(res, err);
   }

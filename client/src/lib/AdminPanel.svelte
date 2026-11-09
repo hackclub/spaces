@@ -7,6 +7,7 @@
   import AdminLogs from './AdminLogs.svelte';
   import AdminRoles from './AdminRoles.svelte';
   import AdminHackatime from './AdminHackatime.svelte';
+  import AdminSpaceTypes from './AdminSpaceTypes.svelte';
   import { userData } from '../stores/user.svelte';
   import { createConfirm } from './confirm.js';
 
@@ -21,9 +22,6 @@
     inactiveDays: 90
   };
   let sandboxStats = null;
-  let templates = null;
-  let rebuildingTemplates = false;
-  let templateMessage = '';
   let users = [];
   let spaces = [];
   let loadingAnalytics = true;
@@ -44,12 +42,13 @@
 
   const can = (permission) => Boolean(me?.is_superadmin || me?.permissions?.includes(permission));
   const canModerate = can('moderation.lock') || can('moderation.files') || can('moderation.full_access');
-  const TAB_LABELS = { analytics: 'Analytics', users: 'Users', spaces: 'Spaces', usage: 'Usage', logs: 'Logs', roles: 'Roles' };
+  const TAB_LABELS = { analytics: 'Analytics', users: 'Users', spaces: 'Spaces', usage: 'Usage', logs: 'Logs', types: 'Space types', roles: 'Roles' };
   const TABS = [
-    (can('stats.view') || can('sandbox.view') || can('templates.manage')) && 'analytics',
+    (can('stats.view') || can('sandbox.view')) && 'analytics',
     can('users.view') && 'users',
     can('spaces.view') && 'spaces',
     (can('usage.view') || can('hackatime.view')) && 'usage',
+    can('templates.manage') && 'types',
     can('logs.view') && 'logs',
     me?.is_superadmin && 'roles'
   ].filter(Boolean);
@@ -307,7 +306,6 @@
   function loadData() {
     if (can('stats.view')) loadAnalytics();
     if (can('sandbox.view')) loadSandboxStats();
-    if (can('templates.manage')) loadTemplates();
     if (can('users.view')) loadUsers();
     if (can('spaces.view')) loadSpaces();
   }
@@ -344,46 +342,6 @@
       sandboxStats = null;
     } finally {
       loadingSandboxStats = false;
-    }
-  }
-
-  async function loadTemplates() {
-    try {
-      const response = await fetch(`${API_BASE}/admin/templates`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-      });
-      const data = await response.json();
-      templates = response.ok ? data.data : null;
-    } catch (err) {
-      console.error('Failed to load templates:', err);
-      templates = null;
-    }
-  }
-
-  async function rebuildTemplates() {
-    rebuildingTemplates = true;
-    templateMessage = '';
-    try {
-      const response = await fetch(`${API_BASE}/admin/templates/rebuild`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include'
-      });
-      const data = await response.json();
-      if (data.data?.templates) templates = data.data.templates;
-      const failed = (data.data?.results || []).filter((result) => !result.ok);
-      templateMessage = response.ok && !failed.length
-        ? 'All templates rebuilt.'
-        : failed.length
-          ? `Couldn't rebuild ${failed.map((result) => result.type).join(', ')}: ${failed[0].error}`
-          : data.message || 'Failed to rebuild templates';
-    } catch (err) {
-      templateMessage = 'Failed to rebuild templates';
-    } finally {
-      rebuildingTemplates = false;
-      loadSandboxStats();
     }
   }
 
@@ -680,46 +638,6 @@
       <p class="stat-sub">Couldn't load sandbox stats from Vercel.</p>
     {/if}
     {/if}
-
-    {#if can('templates.manage')}
-      <h2 class="section-heading">Templates</h2>
-      <p class="stat-sub">
-        New Blender, KiCad, FreeCAD and Godot spaces start from these, so they skip installing and downloading the app.
-        They rebuild by themselves once a week, or within a day when a space type's image changes.
-      </p>
-      {#if templates}
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Image</th>
-                <th>Status</th>
-                <th>Built</th>
-                <th>Size</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each templates as template}
-                <tr>
-                  <td>{template.label}</td>
-                  <td class="sandbox-name">{template.source}</td>
-                  <td>{template.current ? 'Ready' : template.builtAt ? 'Outdated, using the slow path' : 'Not built, using the slow path'}</td>
-                  <td>{template.builtAt ? new Date(template.builtAt).toLocaleString() : '—'}</td>
-                  <td>{template.sizeBytes ? formatBytes(template.sizeBytes) : '—'}</td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-      {:else}
-        <p class="stat-sub">Couldn't load templates.</p>
-      {/if}
-      <button class="show-more-btn" on:click={rebuildTemplates} disabled={rebuildingTemplates}>
-        {rebuildingTemplates ? 'Rebuilding, this takes a few minutes...' : 'Rebuild templates now'}
-      </button>
-      {#if templateMessage}<p class="stat-sub">{templateMessage}</p>{/if}
-    {/if}
   {/if}
 
   {#if activeTab === 'users'}
@@ -970,6 +888,10 @@
     {#if can('hackatime.view')}
       <AdminHackatime canImport={Boolean(me?.is_superadmin)} />
     {/if}
+  {/if}
+
+  {#if activeTab === 'types' && can('templates.manage')}
+    <AdminSpaceTypes />
   {/if}
 
   {#if activeTab === 'logs' && can('logs.view')}

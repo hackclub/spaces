@@ -22,6 +22,15 @@ export const readyTemplateTypes = async (configs) => {
   return new Set(templates.filter((template) => configs[template.type] && isCurrent(template, configs[template.type])).map((template) => template.type));
 };
 
+export const appVersion = (version) => (version ? String(version).replace(/-ls\d+$/, '') : null);
+
+export const templateVersions = async (configs) => {
+  const templates = await pg('space_templates');
+  return new Map(templates
+    .filter((template) => configs[template.type] && isCurrent(template, configs[template.type]) && template.version)
+    .map((template) => [template.type, appVersion(template.version)]));
+};
+
 export const listTemplates = async (configs) => {
   const templates = await pg('space_templates');
   const byType = Object.fromEntries(templates.map((template) => [template.type, template]));
@@ -36,13 +45,47 @@ export const listTemplates = async (configs) => {
   }));
 };
 
+export const listSpaceTypes = async (configs) => {
+  const templates = await pg('space_templates');
+  const byType = Object.fromEntries(templates.map((template) => [template.type, template]));
+
+  return Object.entries(configs).map(([type, config]) => {
+    const template = byType[type];
+    const gui = config.kind === 'gui';
+    const current = gui && isCurrent(template, config);
+    return {
+      type,
+      title: config.title,
+      category: config.category ?? 'Other',
+      kind: config.kind,
+      beta: Boolean(config.beta),
+      source: gui ? templateSource(config) : null,
+      versions: (config.versions ?? []).map((version) => ({
+        name: version.name,
+        current: version.current ?? (version.fromTemplate && current ? template.version : null),
+        note: version.note ?? null,
+        fromTemplate: Boolean(version.fromTemplate),
+        latestUrl: version.latestUrl
+      })),
+      template: gui
+        ? {
+          current,
+          builtAt: template?.built_at ?? null,
+          sizeBytes: template?.size_bytes ? Number(template.size_bytes) : null,
+          version: template?.version ?? null
+        }
+        : null
+    };
+  });
+};
+
 export const buildTemplate = async (type, config) => {
   const source = templateSource(config);
-  const { snapshotId, sizeBytes } = await buildTemplateSnapshot(type, config);
+  const { snapshotId, sizeBytes, version } = await buildTemplateSnapshot(type, config);
   const previous = await pg('space_templates').where('type', type).first();
 
   await pg('space_templates')
-    .insert({ type, source, snapshot_id: snapshotId, size_bytes: sizeBytes, built_at: new Date() })
+    .insert({ type, source, snapshot_id: snapshotId, size_bytes: sizeBytes, version: version ?? null, built_at: new Date() })
     .onConflict('type')
     .merge();
 
@@ -55,10 +98,12 @@ export const buildTemplate = async (type, config) => {
   return { type, source, snapshotId, sizeBytes };
 };
 
-export const rebuildTemplates = async (configs, { force = false } = {}) => {
+export const rebuildTemplates = async (configs, { force = false, only = null } = {}) => {
   const templates = await pg('space_templates');
   const byType = Object.fromEntries(templates.map((template) => [template.type, template]));
-  const due = guiTypes(configs).filter(([type, config]) => force || !isFresh(byType[type], config));
+  const due = guiTypes(configs)
+    .filter(([type]) => !only || type === only)
+    .filter(([type, config]) => force || !isFresh(byType[type], config));
 
   const results = await Promise.allSettled(due.map(([type, config]) => buildTemplate(type, config)));
 

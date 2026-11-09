@@ -830,6 +830,7 @@
           <div class="type-summary" aria-live="polite">
             <div class="type-summary-head">
               <h4 class="type-summary-title">{selectedType.label}</h4>
+              {#if selectedType.version}<span class="type-version">v{selectedType.version.replace(/^v/, "")}</span>{/if}
               {#if selectedType.beta}<span class="beta-badge">Beta</span>{/if}
             </div>
             <p class="type-summary-text">{selectedType.details && selectedType.details !== selectedType.label && selectedType.details !== selectedType.description ? selectedType.details : selectedType.description}</p>

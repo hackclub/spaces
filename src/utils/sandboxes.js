@@ -261,6 +261,19 @@ const STOP_DOCKER = [
   "sync"
 ].join("; ");
 
+const imageVersion = async (sandbox, image) => {
+  try {
+    const result = await run(sandbox, 'docker image inspect --format "{{json .Config.Labels}}" "$IMAGE"', { sudo: true, env: { IMAGE: image } });
+    const labels = JSON.parse((await result.stdout()).trim() || "{}") ?? {};
+    const version = labels["org.opencontainers.image.version"]
+      || labels.build_version?.match(/version:-\s*(\S+)/)?.[1];
+    return version ? String(version).slice(0, 100) : null;
+  } catch (err) {
+    console.error(`Failed to read the version of ${image}:`, err.message);
+    return null;
+  }
+};
+
 export const buildTemplateSnapshot = async (type, { image, build, vcpus }) => {
   const sandbox = await Sandbox.create({
     ...credentials(),
@@ -274,10 +287,11 @@ export const buildTemplateSnapshot = async (type, { image, build, vcpus }) => {
   });
 
   try {
-    await setupGuiApp(sandbox, { image, build });
+    const runImage = await setupGuiApp(sandbox, { image, build });
+    const version = await imageVersion(sandbox, runImage);
     await run(sandbox, STOP_DOCKER, { sudo: true, timeoutMs: 2 * MINUTE });
     const snapshot = await sandbox.snapshot({ expiration: 0 });
-    return { snapshotId: snapshot.snapshotId, sizeBytes: snapshot.sizeBytes };
+    return { snapshotId: snapshot.snapshotId, sizeBytes: snapshot.sizeBytes, version };
   } finally {
     await sandbox.delete().catch((err) => {
       console.error(`Failed to clean up template sandbox for ${type}:`, err.message);

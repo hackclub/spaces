@@ -3,7 +3,7 @@ import pg from '../../utils/db.js';
 import { requirePermission, requireSuperadmin } from '../../middlewares/admin.middleware.js';
 import { getUserRoles, canManageUser, STAFF_ONLY_MESSAGE } from '../../utils/permissions.js';
 import { deleteSpace, stopContainer, spaceConfigs } from '../../utils/spaces.js';
-import { listTemplates, rebuildTemplates } from '../../utils/templates.js';
+import { listTemplates, rebuildTemplates, listSpaceTypes } from '../../utils/templates.js';
 import { getHackatimeReport, hackatimeConfigured, startHetznerImport, continueHetznerImport, hetznerImportProgress, retryFailedHetznerImports } from '../../utils/hackatime.js';
 import { getSandboxStats } from '../../utils/sandboxes.js';
 import { getUsage } from '../../utils/space-runs.js';
@@ -466,15 +466,28 @@ router.post('/templates', requirePermission('templates.manage'), async (req, res
   }
 });
 
+router.post('/space-types', requirePermission('templates.manage'), async (req, res) => {
+  try {
+    res.status(200).json({ success: true, data: await listSpaceTypes(spaceConfigs) });
+  } catch (error) {
+    console.error('Error listing space types:', error);
+    res.status(500).json({ success: false, message: 'Failed to load space types' });
+  }
+});
+
 router.post('/templates/rebuild', requirePermission('templates.manage'), async (req, res) => {
   try {
-    const results = await rebuildTemplates(spaceConfigs, { force: true });
+    const only = typeof req.body?.type === 'string' ? req.body.type : null;
+    if (only && spaceConfigs[only]?.kind !== 'gui') {
+      return res.status(400).json({ success: false, message: 'Only desktop app types have templates' });
+    }
+    const results = await rebuildTemplates(spaceConfigs, { force: true, only });
     await logAdminAction(req.user, 'rebuild_templates', {
       details: { templates: results.map(({ type, ok, error }) => (ok ? { type, ok } : { type, ok, error })) }
     });
     res.status(200).json({
       success: results.every((result) => result.ok),
-      data: { results, templates: await listTemplates(spaceConfigs) }
+      data: { results, templates: await listTemplates(spaceConfigs), types: await listSpaceTypes(spaceConfigs) }
     });
   } catch (error) {
     console.error('Error rebuilding templates:', error);
