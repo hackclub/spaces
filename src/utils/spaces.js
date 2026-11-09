@@ -80,6 +80,7 @@ const WAKATIME_CLI_VERSION = "v2.28.4";
 const GODOT_WAKATIME_VERSION = "2.0.1";
 const GODOT_WAKATIME_COMMIT = "87bfaba53afd6a3c05765a4d6ceb04e204e9be4d";
 const CUPID_COMMIT = "95aa4597984c8dd3b0f25277b9ef2f451c00d27d";
+const BLENDER_WAKATIME_COMMIT = "cbbdf8f31f2640b7d6766ec54c4207a4c984273f";
 
 const linuxserverVersions = (name, repo) => [
   { name, fromTemplate: true, note: "linuxserver image, updated when its template rebuilds", latestUrl: `https://github.com/linuxserver/${repo}/releases` }
@@ -166,6 +167,13 @@ const GODOT_UPLOAD_MOVER = [
 
 const base64 = (text) => Buffer.from(`${text}\n`).toString("base64");
 
+const BLENDER_WAKATIME_INSTALL = [
+  "#!/bin/bash",
+  "BLENDER=$(command -v blender || ls /opt/blender*/blender 2>/dev/null | head -n 1)",
+  "[ -n \"$BLENDER\" ] || exit 0",
+  "s6-setuidgid abc env HOME=/config \"$BLENDER\" --command extension install-file -r user_default -e /opt/super-wakatime/super_wakatime.zip > /tmp/super-wakatime-install.log 2>&1 || true"
+].join("\n");
+
 export const spaceConfigs = {
   "code-server": {
     kind: "editor",
@@ -189,6 +197,33 @@ export const spaceConfigs = {
     summary: "3D modeling and animation",
     about: "Blender is a free and open-source 3D creation suite for modeling, sculpting, animation, rendering and video editing.",
     description: "Blender 3D"
+  },
+  "blender-hackatime": {
+    kind: "gui",
+    category: "CAD design",
+    image: "linuxserver/blender",
+    label: "Blender",
+    title: "Blender with Hackatime",
+    summary: "3D modeling and animation, tracked on Hackatime",
+    about: "Blender is a free and open-source 3D creation suite for modeling, sculpting, animation, rendering and video editing. This space comes with Blender Super-Wakatime, so the time you spend in Blender is tracked on Hackatime.",
+    description: "Blender 3D with Hackatime",
+    beta: true,
+    hackatime: true,
+    versions: [
+      ...linuxserverVersions("Blender", "docker-blender"),
+      { name: "Blender Super-Wakatime", current: BLENDER_WAKATIME_COMMIT.slice(0, 7), latestUrl: "https://github.com/wally-hc/blender-super-wakatime/commits" },
+      { name: "wakatime-cli", current: WAKATIME_CLI_VERSION, latestUrl: "https://github.com/wakatime/wakatime-cli/releases/latest" }
+    ],
+    build: {
+      tag: `spaces-blender-hackatime:${BLENDER_WAKATIME_COMMIT.slice(0, 7)}-1`,
+      dockerfile: [
+        "FROM linuxserver/blender",
+        `ARG WAKATIME_CLI_VERSION=${WAKATIME_CLI_VERSION}`,
+        `ARG BLENDER_WAKATIME_COMMIT=${BLENDER_WAKATIME_COMMIT}`,
+        "RUN mkdir -p /opt/wakatime /opt/super-wakatime && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/wakatime.zip \"https://github.com/wakatime/wakatime-cli/releases/download/${WAKATIME_CLI_VERSION}/wakatime-cli-linux-amd64.zip\" && python3 -m zipfile -e /tmp/wakatime.zip /opt/wakatime && chmod 755 /opt/wakatime/wakatime-cli-linux-amd64 && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/super-wakatime.tar.gz \"https://codeload.github.com/wally-hc/blender-super-wakatime/tar.gz/${BLENDER_WAKATIME_COMMIT}\" && tar -xzf /tmp/super-wakatime.tar.gz -C /tmp && mkdir -p /tmp/super-wakatime-build && BLENDER=$(command -v blender || ls /opt/blender*/blender | head -n 1) && \"$BLENDER\" --command extension build --source-dir /tmp/blender-super-wakatime-${BLENDER_WAKATIME_COMMIT}/super_wakatime --output-dir /tmp/super-wakatime-build && mv /tmp/super-wakatime-build/*.zip /opt/super-wakatime/super_wakatime.zip && chmod -R a+rX /opt/super-wakatime /opt/wakatime && rm -rf /tmp/wakatime.zip /tmp/super-wakatime.tar.gz /tmp/blender-super-wakatime-* /tmp/super-wakatime-build",
+        `RUN mkdir -p /custom-cont-init.d && echo ${base64(BLENDER_WAKATIME_INSTALL)} | base64 -d > /custom-cont-init.d/90-super-wakatime && chmod 755 /custom-cont-init.d/90-super-wakatime`
+      ].join("\n")
+    }
   },
   "kicad": {
     kind: "gui",

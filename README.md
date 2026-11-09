@@ -177,6 +177,7 @@ Creating a space needs a verified Hack Club account or a club membership. Each u
 |---|---|---|
 | `code-server` | VS Code | code-server in the sandbox |
 | `blender` | Blender 3D | `linuxserver/blender` in Docker |
+| `blender-hackatime` | Blender 3D with Hackatime (beta) | `linuxserver/blender` with [Blender Super-Wakatime](https://github.com/wally-hc/blender-super-wakatime) and wakatime-cli, in Docker; a startup script installs and enables the add-on |
 | `kicad` | KiCad PCB Design | `linuxserver/kicad` in Docker |
 | `freecad` | CAD software | `linuxserver/freecad` in Docker |
 | `godot` | Godot Engine | a Godot desktop image built on `linuxserver/baseimage-selkies`, in Docker |

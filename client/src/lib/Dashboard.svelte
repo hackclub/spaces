@@ -33,7 +33,7 @@
   let startDone = {};
   const holdFinishedBar = () => new Promise((resolve) => setTimeout(resolve, 800));
 
-  const GUI_TYPES = ["kicad", "blender", "freecad", "godot"];
+  const GUI_TYPES = ["kicad", "blender", "blender-hackatime", "freecad", "godot"];
   const WEB_TYPES = ["love2d"];
   $: kindOf = (type) => {
     const value = (type || "").toLowerCase();
