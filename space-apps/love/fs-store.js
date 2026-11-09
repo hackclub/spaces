@@ -1,4 +1,5 @@
 import { classifyBytes } from './file-types.js';
+import { editorPosition, markHeartbeat } from './spaces-activity.js';
 
 export function normalizePath(p) {
   return String(p).replace(/\\/g, '/').split('/').filter((s) => s && s !== '.').join('/');
@@ -102,7 +103,9 @@ export async function readFile(projectId, path) {
 }
 
 export async function writeFiles(projectId, files) {
-  await call('PUT', projectUrl(projectId, '/files'), { files: encodeFiles(files) });
+  const cursor = editorPosition();
+  await call('PUT', projectUrl(projectId, '/files'), { files: encodeFiles(files), cursor });
+  markHeartbeat(cursor);
 }
 
 export function writeFile(projectId, path, data) {

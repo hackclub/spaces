@@ -21,7 +21,8 @@ const WAKATIME_CLI = process.env.WAKATIME_CLI || "";
 const WAKATIME_CONFIG = process.env.WAKATIME_CONFIG || path.join(os.homedir(), ".wakatime.cfg");
 const PLUGIN = "hackclub-spaces/1.0 cupid/1.0";
 const MAX_BODY_BYTES = 64 * 1024 * 1024;
-const HEARTBEAT_INTERVAL_MS = 30 * 1000;
+const MIN_HEARTBEAT_INTERVAL_MS = 30 * 1000;
+const DUPLICATE_WRITE_MS = 10 * 60 * 1000;
 const FAILED_LOGIN_LIMIT = 20;
 const FAILED_LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
@@ -289,17 +290,34 @@ const touch = (project) => {
 
 let currentProject = null;
 const lastHeartbeat = { entity: null, at: 0 };
+const lastWrites = new Map();
 
-const heartbeat = (project, rel, isWrite) => {
+const positiveInt = (value) => (Number.isInteger(value) && value > 0 && value < 1e9 ? value : null);
+
+const positionFor = (project, rel, cursor) => {
+  if (!cursor || cursor.project !== project.id || cleanPath(cursor.path) !== rel) return {};
+  return { lineno: positiveInt(cursor.lineno), cursorpos: positiveInt(cursor.cursorpos), lines: positiveInt(cursor.lines) };
+};
+
+const isDuplicateWrite = (entity, now, position) => {
+  const previous = lastWrites.get(entity);
+  lastWrites.set(entity, { at: now, lineno: position.lineno, cursorpos: position.cursorpos });
+  return Boolean(previous) && previous.at + DUPLICATE_WRITE_MS > now && previous.lineno === position.lineno && previous.cursorpos === position.cursorpos;
+};
+
+const heartbeat = (project, rel, isWrite, position = {}) => {
   if (!WAKATIME_CLI || !WAKATIME_CONFIG || !fs.existsSync(WAKATIME_CONFIG) || !rel) return;
   const entity = path.join(projectRoot(project), ...rel.split("/"));
   const now = Date.now();
-  if (entity === lastHeartbeat.entity && now - lastHeartbeat.at < HEARTBEAT_INTERVAL_MS) return;
+  if (isWrite ? isDuplicateWrite(entity, now, position) : entity === lastHeartbeat.entity && now - lastHeartbeat.at < MIN_HEARTBEAT_INTERVAL_MS) return;
   lastHeartbeat.entity = entity;
   lastHeartbeat.at = now;
-  const args = ["--entity", entity, "--project", project.name, "--plugin", PLUGIN, "--config", WAKATIME_CONFIG];
+  const args = ["--entity", entity, "--entity-type", "file", "--category", "coding", "--project", project.name, "--plugin", PLUGIN, "--config", WAKATIME_CONFIG];
+  if (position.lineno) args.push("--lineno", String(position.lineno));
+  if (position.cursorpos) args.push("--cursorpos", String(position.cursorpos));
+  if (position.lines) args.push("--lines-in-file", String(position.lines));
   if (isWrite) args.push("--write");
-  const child = spawn(WAKATIME_CLI, args, { stdio: "ignore", detached: true });
+  const child = spawn(WAKATIME_CLI, args, { stdio: "ignore", detached: true, windowsHide: true });
   child.on("error", (err) => console.error("Failed to send a Hackatime heartbeat:", err.message));
   child.unref();
 };
@@ -399,19 +417,21 @@ const readEntry = async (id, value) => {
   return fsp.readFile(full);
 };
 
-const writeFiles = (id, files) => exclusive(async () => {
+const writeFiles = (id, files, cursor) => exclusive(async () => {
   const project = await findProject(id);
-  let written = null;
+  const written = [];
   for (const [value, data] of Object.entries(files || {})) {
     const { rel, full } = resolveEntry(project, value);
     const { bytes, text } = decodeData(data);
     await writeAtomic(project, full, bytes);
-    if (text) written = rel;
+    if (text) written.push(rel);
   }
   touch(project);
   currentProject = project;
   await saveProjects();
-  if (written) heartbeat(project, written, true);
+  const focused = written.find((rel) => positionFor(project, rel, cursor).lineno);
+  const target = focused ?? written[written.length - 1];
+  if (target) heartbeat(project, target, true, positionFor(project, target, cursor));
 });
 
 const createDir = (id, value) => exclusive(async () => {
@@ -456,14 +476,16 @@ const renameEntry = (id, fromValue, toValue) => exclusive(async () => {
   return moved;
 });
 
-const recordActivity = async () => {
-  const project = currentProject;
+const recordActivity = async (cursor) => {
+  const fromEditor = typeof cursor?.project === "string" ? (await loadProjects()).find((item) => item.id === cursor.project) : null;
+  const project = fromEditor ?? currentProject;
   if (!project) return;
-  const candidates = [project.active, "main.lua"].filter(Boolean);
+  currentProject = project;
+  const candidates = [fromEditor ? cursor.path : null, project.active, "main.lua"].filter((value) => typeof value === "string");
   for (const candidate of candidates) {
     const rel = cleanPath(candidate);
     if (rel && fs.existsSync(path.join(projectRoot(project), ...rel.split("/")))) {
-      heartbeat(project, rel, false);
+      heartbeat(project, rel, false, positionFor(project, rel, cursor));
       return;
     }
   }
@@ -474,7 +496,7 @@ const handleApi = async (req, res, url) => {
   const method = req.method;
 
   if (parts[0] === "activity" && parts.length === 1 && method === "POST") {
-    await recordActivity();
+    await recordActivity(await readBody(req));
     return sendJson(res, 200, { ok: true });
   }
 
@@ -512,7 +534,8 @@ const handleApi = async (req, res, url) => {
       return res.end(bytes);
     }
     if (action === "files" && method === "PUT") {
-      await writeFiles(id, (await readBody(req)).files);
+      const body = await readBody(req);
+      await writeFiles(id, body.files, body.cursor);
       return sendJson(res, 200, { ok: true });
     }
     if (action === "dirs" && method === "POST") {
