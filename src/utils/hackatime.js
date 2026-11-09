@@ -1,5 +1,6 @@
 import pg from './db.js';
 import { hackatimeMachineFor } from './sandboxes.js';
+import { spaceConfigs } from './spaces.js';
 
 const HACKATIME_URL = process.env.HACKATIME_URL || 'https://hackatime.hackclub.com';
 const PAGE_SIZE = 5000;
@@ -240,41 +241,113 @@ export const retryFailedHetznerImports = () => pg('hackatime_imports')
   .where('status', 'failed')
   .update({ status: 'pending', error: null, updated_at: pg.fn.now() });
 
+const UNKNOWN_TYPE = 'unknown';
+
 const ACTIVITY_SQL = `
   with activity as (
     select a.*,
       coalesce(a.space_id, m.space_id) as effective_space_id,
-      coalesce(a.user_id, m.user_id, s.user_id) as effective_user_id
+      coalesce(a.user_id, m.user_id, s.user_id) as effective_user_id,
+      coalesce(s.type, '${UNKNOWN_TYPE}') as space_type
     from hackatime_activity a
     left join hackatime_legacy_machines m on m.machine = a.machine
     left join spaces s on s.id = coalesce(a.space_id, m.space_id)
-    where a.hour >= ?
+    where a.hour >= ? and (?::text is null or coalesce(s.type, '${UNKNOWN_TYPE}') = ?)
   )
 `;
 
-export const getHackatimeReport = async ({ days = 30 } = {}) => {
-  const since = days ? new Date(Math.floor((Date.now() - days * DAY_MS) / DAY_MS) * DAY_MS) : new Date(0);
+const typeLabel = (type) => (type === UNKNOWN_TYPE ? 'Deleted or unmatched spaces' : spaceConfigs[type]?.title ?? type);
 
-  const [totals, daily, users, spaces, tracked, progress] = await Promise.all([
+const tracksHackatime = (config) => config.kind === 'editor' || Boolean(config.hackatime);
+
+export const hackatimeReportTypes = () => [...Object.keys(spaceConfigs), UNKNOWN_TYPE];
+
+const summarizeTypes = async (since) => {
+  const [activity, combined, spaceCounts] = await Promise.all([
+    pg.raw(`${ACTIVITY_SQL}
+      select space_type, source, sum(seconds)::bigint as seconds, min(first_at) as first_at, max(last_at) as last_at
+      from activity group by 1, 2`, [since, null, null]),
+    pg.raw(`${ACTIVITY_SQL}
+      select space_type,
+        count(distinct coalesce(effective_user_id::text, 'h' || hackatime_user_id::text)) as people,
+        count(distinct coalesce(effective_space_id::text, machine)) as spaces,
+        count(distinct date_trunc('day', hour)) as active_days
+      from activity group by 1`, [since, null, null]),
+    pg('spaces').where('creating', false).select('type').count('* as count').groupBy('type')
+  ]);
+
+  const byType = new Map();
+  const entry = (type) => {
+    if (!byType.has(type)) {
+      const config = spaceConfigs[type];
+      byType.set(type, {
+        type,
+        label: typeLabel(type),
+        tracksHackatime: config ? tracksHackatime(config) : null,
+        seconds: 0,
+        bySource: {},
+        people: 0,
+        spaces: 0,
+        activeDays: 0,
+        totalSpaces: 0,
+        firstAt: null,
+        lastAt: null
+      });
+    }
+    return byType.get(type);
+  };
+
+  for (const type of Object.keys(spaceConfigs)) entry(type);
+  for (const row of activity.rows) {
+    const item = entry(row.space_type);
+    const seconds = Number(row.seconds);
+    item.seconds += seconds;
+    item.bySource[row.source] = (item.bySource[row.source] ?? 0) + seconds;
+    if (!item.firstAt || row.first_at < item.firstAt) item.firstAt = row.first_at;
+    if (!item.lastAt || row.last_at > item.lastAt) item.lastAt = row.last_at;
+  }
+  for (const row of combined.rows) {
+    const item = entry(row.space_type);
+    item.people = Number(row.people);
+    item.spaces = Number(row.spaces);
+    item.activeDays = Number(row.active_days);
+  }
+  for (const row of spaceCounts) {
+    if (byType.has(row.type)) byType.get(row.type).totalSpaces = Number(row.count);
+  }
+
+  const total = [...byType.values()].reduce((sum, item) => sum + item.seconds, 0);
+  return [...byType.values()]
+    .filter((item) => item.type !== UNKNOWN_TYPE || item.seconds > 0)
+    .map((item) => ({ ...item, share: total ? item.seconds / total : 0 }))
+    .sort((a, b) => b.seconds - a.seconds || a.label.localeCompare(b.label));
+};
+
+export const getHackatimeReport = async ({ days = 30, type = null } = {}) => {
+  const since = days ? new Date(Math.floor((Date.now() - days * DAY_MS) / DAY_MS) * DAY_MS) : new Date(0);
+  const params = [since, type, type];
+
+  const [totals, daily, users, spaces, tracked, progress, byType] = await Promise.all([
     pg.raw(`${ACTIVITY_SQL}
       select source, sum(seconds)::bigint as seconds, min(first_at) as first_at, max(last_at) as last_at
-      from activity group by source`, [since]),
+      from activity group by source`, params),
     pg.raw(`${ACTIVITY_SQL}
       select to_char(date_trunc('day', hour), 'YYYY-MM-DD') as day, sum(seconds)::bigint as seconds
-      from activity group by 1 order by 1`, [since]),
+      from activity group by 1 order by 1`, params),
     pg.raw(`${ACTIVITY_SQL}
       select activity.effective_user_id as user_id, activity.hackatime_user_id, u.username, u.email,
         sum(seconds)::bigint as seconds, min(first_at) as first_at, max(last_at) as last_at
       from activity left join users u on u.id = activity.effective_user_id
-      group by 1, 2, 3, 4 order by seconds desc`, [since]),
+      group by 1, 2, 3, 4 order by seconds desc`, params),
     pg.raw(`${ACTIVITY_SQL}
       select activity.effective_space_id as space_id, activity.effective_user_id as user_id, activity.hackatime_user_id,
-        activity.machine, activity.source, s.name, s.type,
+        activity.machine, activity.source, s.name, activity.space_type as type,
         sum(seconds)::bigint as seconds, min(first_at) as first_at, max(last_at) as last_at
       from activity left join spaces s on s.id = activity.effective_space_id
-      group by 1, 2, 3, 4, 5, 6, 7 order by seconds desc`, [since]),
+      group by 1, 2, 3, 4, 5, 6, 7 order by seconds desc`, params),
     pg('hackatime_activity').where('source', 'spaces').min('hour as since').first(),
-    hetznerImportProgress()
+    hetznerImportProgress(),
+    summarizeTypes(since)
   ]);
 
   const dailyByDay = new Map(daily.rows.map((row) => [row.day, Number(row.seconds)]));
@@ -294,6 +367,7 @@ export const getHackatimeReport = async ({ days = 30 } = {}) => {
       spaceId: row.space_id,
       name: row.name,
       type: row.type,
+      typeLabel: typeLabel(row.type),
       machine: row.machine,
       source: row.source,
       seconds: Number(row.seconds),
@@ -307,6 +381,9 @@ export const getHackatimeReport = async ({ days = 30 } = {}) => {
   return {
     configured: hackatimeConfigured(),
     days,
+    type,
+    typeLabel: type ? typeLabel(type) : null,
+    byType,
     since,
     trackingSince: tracked?.since ?? null,
     totalSeconds: Object.values(bySource).reduce((sum, seconds) => sum + seconds, 0),

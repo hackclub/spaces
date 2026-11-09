@@ -42,12 +42,13 @@
 
   const can = (permission) => Boolean(me?.is_superadmin || me?.permissions?.includes(permission));
   const canModerate = can('moderation.lock') || can('moderation.files') || can('moderation.full_access');
-  const TAB_LABELS = { analytics: 'Analytics', users: 'Users', spaces: 'Spaces', usage: 'Usage', logs: 'Logs', types: 'Space types', roles: 'Roles' };
+  const TAB_LABELS = { analytics: 'Analytics', users: 'Users', spaces: 'Spaces', usage: 'Usage', hackatime: 'Hackatime', logs: 'Logs', types: 'Space types', roles: 'Roles' };
   const TABS = [
     (can('stats.view') || can('sandbox.view')) && 'analytics',
     can('users.view') && 'users',
     can('spaces.view') && 'spaces',
-    (can('usage.view') || can('hackatime.view')) && 'usage',
+    can('usage.view') && 'usage',
+    can('hackatime.view') && 'hackatime',
     can('templates.manage') && 'types',
     can('logs.view') && 'logs',
     me?.is_superadmin && 'roles'
@@ -826,8 +827,7 @@
       {/if}
     {/if}
   {/if}
-  {#if activeTab === 'usage'}
-    {#if can('usage.view')}
+  {#if activeTab === 'usage' && can('usage.view')}
     <div class="spaces-controls">
       <select bind:value={usageDays} class="sort-select">
         <option value={1}>Last 24 hours</option>
@@ -884,10 +884,10 @@
     {:else}
       <p class="stat-sub">Couldn't load usage.</p>
     {/if}
-    {/if}
-    {#if can('hackatime.view')}
-      <AdminHackatime canImport={Boolean(me?.is_superadmin)} />
-    {/if}
+  {/if}
+
+  {#if activeTab === 'hackatime' && can('hackatime.view')}
+    <AdminHackatime canImport={Boolean(me?.is_superadmin)} />
   {/if}
 
   {#if activeTab === 'types' && can('templates.manage')}

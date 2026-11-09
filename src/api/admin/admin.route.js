@@ -4,7 +4,7 @@ import { requirePermission, requireSuperadmin } from '../../middlewares/admin.mi
 import { getUserRoles, canManageUser, STAFF_ONLY_MESSAGE } from '../../utils/permissions.js';
 import { deleteSpace, stopContainer, spaceConfigs } from '../../utils/spaces.js';
 import { listTemplates, rebuildTemplates, listSpaceTypes } from '../../utils/templates.js';
-import { getHackatimeReport, hackatimeConfigured, startHetznerImport, continueHetznerImport, hetznerImportProgress, retryFailedHetznerImports } from '../../utils/hackatime.js';
+import { getHackatimeReport, hackatimeReportTypes, hackatimeConfigured, startHetznerImport, continueHetznerImport, hetznerImportProgress, retryFailedHetznerImports } from '../../utils/hackatime.js';
 import { getSandboxStats } from '../../utils/sandboxes.js';
 import { getUsage } from '../../utils/space-runs.js';
 import { getStats } from '../../utils/stats.js';
@@ -428,7 +428,8 @@ router.post('/users/:userId/delete', requirePermission('users.delete'), async (r
 router.post('/hackatime', requirePermission('hackatime.view'), async (req, res) => {
   try {
     const days = req.body?.days === null ? null : [7, 30, 90].includes(Number(req.body?.days)) ? Number(req.body.days) : 30;
-    res.status(200).json({ success: true, data: await getHackatimeReport({ days }) });
+    const type = hackatimeReportTypes().includes(req.body?.type) ? req.body.type : null;
+    res.status(200).json({ success: true, data: await getHackatimeReport({ days, type }) });
   } catch (error) {
     console.error('Error building the Hackatime report:', error);
     res.status(500).json({ success: false, message: 'Failed to load Hackatime time' });
