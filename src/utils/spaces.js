@@ -168,7 +168,7 @@ export const spaceConfigs = {
     kind: "editor",
     category: "Code",
     versions: [
-      { name: "code-server", note: "newest release, installed when a space is created", latestUrl: "https://github.com/coder/code-server/releases/latest" },
+      { name: "code-server", githubRelease: "coder/code-server", note: "newest release, installed when a space is created", latestUrl: "https://github.com/coder/code-server/releases/latest" },
       { name: "Sandbox image", current: "vercel/sandbox/universal", note: "Vercel's default image", latestUrl: "https://vercel.com/docs/vercel-sandbox" }
     ],
     title: "VS Code Server",

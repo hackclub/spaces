@@ -22,13 +22,46 @@ export const readyTemplateTypes = async (configs) => {
   return new Set(templates.filter((template) => configs[template.type] && isCurrent(template, configs[template.type])).map((template) => template.type));
 };
 
+const RELEASE_CACHE_MS = 60 * 60 * 1000;
+const RELEASE_RETRY_MS = 5 * 60 * 1000;
+const releaseCache = new Map();
+
+export const latestGithubRelease = async (repo) => {
+  const cached = releaseCache.get(repo);
+  if (cached && Date.now() < cached.until) return cached.version;
+
+  try {
+    const response = await fetch(`https://github.com/${repo}/releases/latest`, { redirect: 'manual', signal: AbortSignal.timeout(5000) });
+    const tag = response.headers.get('location')?.match(/\/releases\/tag\/([^/?#]+)$/)?.[1];
+    if (!tag) throw new Error(`no release tag in the answer (${response.status})`);
+    const version = decodeURIComponent(tag).replace(/^v/, '');
+    releaseCache.set(repo, { version, until: Date.now() + RELEASE_CACHE_MS });
+    return version;
+  } catch (err) {
+    console.error(`Failed to look up the latest ${repo} release:`, err.message);
+    releaseCache.set(repo, { version: cached?.version ?? null, until: Date.now() + RELEASE_RETRY_MS });
+    return cached?.version ?? null;
+  }
+};
+
+const releaseVersions = async (configs) => {
+  const entries = await Promise.all(Object.entries(configs)
+    .map(([type, config]) => [type, config.versions?.[0]?.githubRelease])
+    .filter(([, repo]) => repo)
+    .map(async ([type, repo]) => [type, await latestGithubRelease(repo)]));
+  return entries.filter(([, version]) => version);
+};
+
 export const appVersion = (version) => (version ? String(version).replace(/-ls\d+$/, '') : null);
 
 export const templateVersions = async (configs) => {
-  const templates = await pg('space_templates');
-  return new Map(templates
-    .filter((template) => configs[template.type] && isCurrent(template, configs[template.type]) && template.version)
-    .map((template) => [template.type, appVersion(template.version)]));
+  const [templates, releases] = await Promise.all([pg('space_templates'), releaseVersions(configs)]);
+  return new Map([
+    ...templates
+      .filter((template) => configs[template.type] && isCurrent(template, configs[template.type]) && template.version)
+      .map((template) => [template.type, appVersion(template.version)]),
+    ...releases
+  ]);
 };
 
 export const listTemplates = async (configs) => {
@@ -46,8 +79,9 @@ export const listTemplates = async (configs) => {
 };
 
 export const listSpaceTypes = async (configs) => {
-  const templates = await pg('space_templates');
+  const [templates, releases] = await Promise.all([pg('space_templates'), releaseVersions(configs)]);
   const byType = Object.fromEntries(templates.map((template) => [template.type, template]));
+  const releaseByType = new Map(releases);
 
   return Object.entries(configs).map(([type, config]) => {
     const template = byType[type];
@@ -62,7 +96,9 @@ export const listSpaceTypes = async (configs) => {
       source: gui ? templateSource(config) : null,
       versions: (config.versions ?? []).map((version) => ({
         name: version.name,
-        current: version.current ?? (version.fromTemplate && current ? template.version : null),
+        current: version.current
+          ?? (version.githubRelease ? releaseByType.get(type) ?? null : null)
+          ?? (version.fromTemplate && current ? template.version : null),
         note: version.note ?? null,
         fromTemplate: Boolean(version.fromTemplate),
         latestUrl: version.latestUrl
