@@ -310,7 +310,7 @@ export const startSpaceApp = (sandbox, space, password) => {
     return startGuiApp(sandbox, { image: config.image, password, build: config.build, env: config.env, resetFiles: config.resetFiles });
   }
   if (config?.kind === "web") {
-    return startLoveApp(sandbox, { password, dataPath: toSandboxPath(space.workspace_dir), wakatimeVersion: WAKATIME_CLI_VERSION });
+    return startLoveApp(sandbox, { password, dataPath: toSandboxPath(space.workspace_dir), firstProjectName: space.name, wakatimeVersion: WAKATIME_CLI_VERSION });
   }
   return startCodeServer(sandbox, { password, workspacePath: toSandboxPath(space.workspace_dir) });
 };
@@ -523,8 +523,8 @@ export const createContainer = async (password, type, authorization, name, repo 
   const isEditor = config.kind === "editor";
   password = crypto.randomBytes(16).toString('hex');
   const githubRepo = isEditor ? parseGithubRepo(repo) : null;
-  const spaceName = isEditor ? sanitizeSpaceName(name) || sanitizeSpaceName(githubRepo?.name) : null;
-  if (isEditor && !spaceName) {
+  const spaceName = isGui ? null : sanitizeSpaceName(name) || sanitizeSpaceName(githubRepo?.name);
+  if (!isGui && !spaceName) {
     const error = new Error("Give your space a name, using letters, numbers, dashes, underscores or dots.");
     error.statusCode = 400;
     throw error;
@@ -537,7 +537,7 @@ export const createContainer = async (password, type, authorization, name, repo 
     placeholder: {
       container_id: sandboxName,
       type: typeLower,
-      name: isEditor ? spaceName : config.label,
+      name: spaceName ?? config.label,
       description: config.description,
       image: isGui ? config.image : SANDBOX_IMAGE,
       port: isGui ? GUI_PORT : CODE_SERVER_PORT,
@@ -569,7 +569,7 @@ export const createContainer = async (password, type, authorization, name, repo 
       });
     }
 
-    const access_url = await startSpaceApp(sandbox, { type: typeLower, workspace_dir: workspaceDir }, password);
+    const access_url = await startSpaceApp(sandbox, { type: typeLower, workspace_dir: workspaceDir, name: spaceName }, password);
 
     const [newSpace] = await pg('spaces')
       .where('id', reservedId)

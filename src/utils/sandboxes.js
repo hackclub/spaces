@@ -286,7 +286,7 @@ const installLoveApp = async (sandbox, wakatimeVersion) => {
   }
 };
 
-export const startLoveApp = async (sandbox, { password, dataPath, wakatimeVersion }) => {
+export const startLoveApp = async (sandbox, { password, dataPath, firstProjectName, wakatimeVersion }) => {
   await installLoveApp(sandbox, wakatimeVersion);
   await run(sandbox, 'mkdir -p "$DATA"', { env: { DATA: dataPath } });
   await run(sandbox, "pkill -f '[/]opt/spaces-love/app/server.mjs' || true");
@@ -300,7 +300,8 @@ export const startLoveApp = async (sandbox, { password, dataPath, wakatimeVersio
       CUPID_DIR: `${LOVE_APP_DIR}/cupid`,
       DATA_DIR: dataPath,
       WAKATIME_CLI: `${LOVE_APP_DIR}/wakatime-cli`,
-      WAKATIME_CONFIG: HOME_WAKATIME_CONFIG
+      WAKATIME_CONFIG: HOME_WAKATIME_CONFIG,
+      FIRST_PROJECT_NAME: firstProjectName || ""
     },
     detached: true
   });

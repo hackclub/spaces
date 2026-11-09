@@ -376,12 +376,14 @@
     error = "";
 
     const body = { type: newSpaceType };
-    if (kindOf(newSpaceType) === "editor") {
+    if (!isGuiType(newSpaceType)) {
       if (!newSpaceName.trim()) {
         error = "Give your space a name.";
         return;
       }
       body.name = newSpaceName.trim();
+    }
+    if (kindOf(newSpaceType) === "editor") {
       if (newSpaceRepo.trim()) body.repo = newSpaceRepo.trim();
     }
 
@@ -852,7 +854,7 @@
               <p class="type-summary-note">Time you spend in this space is tracked on Hackatime.</p>
             {/if}
 
-            {#if kindOf(newSpaceType) === "editor"}
+            {#if !isGuiType(newSpaceType)}
               <div class="form-group">
                 <label class="form-label" for="spaceName">Name <span class="required-mark" aria-hidden="true">*</span></label>
                 <input
@@ -868,7 +870,9 @@
                 />
                 <p class="form-hint" id="spaceNameHint">Letters, numbers, dashes, underscores and dots.</p>
               </div>
+            {/if}
 
+            {#if kindOf(newSpaceType) === "editor"}
               <div class="form-group">
                 <label class="form-label" for="spaceRepo">Start from a GitHub repo <span class="optional-mark">(optional)</span></label>
                 <input

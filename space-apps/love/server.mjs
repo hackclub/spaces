@@ -15,6 +15,8 @@ const APP_DIR = path.dirname(fileURLToPath(import.meta.url));
 const CUPID_DIR = path.resolve(process.env.CUPID_DIR || path.join(APP_DIR, "..", "cupid"));
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(process.cwd(), "projects"));
 const META_FILE = path.join(DATA_DIR, ".cupid-projects.json");
+const FIRST_PROJECT_MARKER = path.join(DATA_DIR, ".cupid-first-project");
+const FIRST_PROJECT_NAME = String(process.env.FIRST_PROJECT_NAME || "").trim().slice(0, 100);
 const WAKATIME_CLI = process.env.WAKATIME_CLI || "";
 const WAKATIME_CONFIG = process.env.WAKATIME_CONFIG || path.join(os.homedir(), ".wakatime.cfg");
 const PLUGIN = "hackclub-spaces/1.0 cupid/1.0";
@@ -330,8 +332,14 @@ const sendJson = (res, status, data) => {
   res.end(JSON.stringify(data));
 };
 
+const firstProjectName = async (requested) => {
+  if (!FIRST_PROJECT_NAME || (await loadProjects()).length || fs.existsSync(FIRST_PROJECT_MARKER)) return requested;
+  await fsp.writeFile(FIRST_PROJECT_MARKER, "");
+  return FIRST_PROJECT_NAME;
+};
+
 const createProject = (body) => exclusive(async () => {
-  const name = String(body.name || "My Game").slice(0, 100);
+  const name = await firstProjectName(String(body.name || "My Game").slice(0, 100));
   const dir = await uniqueDir(name);
   const now = Date.now();
   const project = { id: newId(), name, dir, created: now, updated: now, tabs: [], active: null };

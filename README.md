@@ -136,7 +136,7 @@ Creating a space needs a verified Hack Club account or a club membership. Each u
     "name": "my-project"
   }
   ```
-  `name` is required for VS Code spaces and ignored for the others. It names the project folder, which Hackatime uses as the project name. Spaces become `-`, and anything other than letters, numbers, `-`, `_` and `.` is removed. A name with nothing left after that is refused. Blender, KiCad and FreeCAD spaces are named after the app. Any space can be renamed later; that only changes the name on the dashboard, not the folder.
+  `name` is required for VS Code and LÖVE spaces and ignored for the others. In VS Code spaces it names the project folder, which Hackatime uses as the project name. In LÖVE spaces it names the first project Cupid creates; Hackatime tracks each project under its own name. Spaces become `-`, and anything other than letters, numbers, `-`, `_` and `.` is removed. A name with nothing left after that is refused. Desktop spaces are named after the app. Any space can be renamed later; that only changes the name on the dashboard, not the folder or project.
 - **Response**:
   ```json
   {
