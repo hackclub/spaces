@@ -1,6 +1,6 @@
 import express from 'express';
 import pg from '../../utils/db.js';
-import { requirePermission } from '../../middlewares/admin.middleware.js';
+import { requirePermission, requireSuperadmin } from '../../middlewares/admin.middleware.js';
 import { logAdminAction } from '../../utils/admin-log.js';
 import { canManageUser, STAFF_ONLY_MESSAGE } from '../../utils/permissions.js';
 import path from 'path';
@@ -97,6 +97,29 @@ router.post('/spaces/:spaceId/unlock', requirePermission('moderation.lock'), asy
   } catch (error) {
     console.error('Error unlocking space:', error);
     res.status(500).json({ success: false, message: 'Failed to unlock the space' });
+  }
+});
+
+router.post('/spaces/:spaceId/hackatime-stats', requireSuperadmin, async (req, res) => {
+  try {
+    const found = await findSpace(req, res);
+    if (!found) return;
+    if (typeof req.body?.excluded !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'Say whether to exclude the space' });
+    }
+
+    const excluded = req.body.excluded;
+    await pg('spaces').where('id', found.space.id).update({ hackatime_excluded: excluded });
+    await logAdminAction(req.user, excluded ? 'space.hackatime_exclude' : 'space.hackatime_include', {
+      targetUser: found.owner,
+      targetSpaceId: found.space.id,
+      details: { name: found.space.name, type: found.space.type }
+    });
+
+    res.status(200).json({ success: true, message: excluded ? "This space's time is left out of the Hackatime stats." : "This space's time counts in the Hackatime stats again." });
+  } catch (error) {
+    console.error('Error changing the Hackatime exclusion:', error);
+    res.status(500).json({ success: false, message: 'Failed to change the Hackatime stats setting' });
   }
 });
 

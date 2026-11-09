@@ -66,6 +66,13 @@
     }
   }
 
+  async function setHackatimeExcluded(excluded) {
+    if (await moderate('hackatime', 'hackatime-stats', { excluded })) {
+      space = { ...space, hackatime_excluded: excluded };
+      dispatch('changed');
+    }
+  }
+
   async function lock() {
     if (!lockReason.trim()) {
       error = 'Give a reason. The owner sees it on their dashboard.';
@@ -269,6 +276,19 @@
           <input type="text" placeholder="Reason (the owner sees this)" bind:value={lockReason} maxlength="1000" />
           <button class="lock-btn" disabled={busy !== ''} on:click={lock}>{busy === 'lock' ? 'Locking...' : 'Lock space'}</button>
         </div>
+      {/if}
+    </section>
+    {/if}
+
+    {#if me?.is_superadmin}
+    <section>
+      <h3>Hackatime stats</h3>
+      {#if space.hackatime_excluded}
+        <p class="note">This space's time is left out of the Hackatime tab. Hackatime itself still has it.</p>
+        <button class="btn" disabled={busy !== ''} on:click={() => setHackatimeExcluded(false)}>{busy === 'hackatime' ? 'Saving...' : 'Count it again'}</button>
+      {:else}
+        <p class="note">Leave this space's time out of the Hackatime tab, for test spaces. Hackatime itself still keeps it.</p>
+        <button class="btn" disabled={busy !== ''} on:click={() => setHackatimeExcluded(true)}>{busy === 'hackatime' ? 'Saving...' : 'Leave out of stats'}</button>
       {/if}
     </section>
     {/if}

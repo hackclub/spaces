@@ -16,6 +16,8 @@
     'space.delete': 'Deleted space',
     'space.lock': 'Locked space',
     'space.unlock': 'Unlocked space',
+    'space.hackatime_exclude': 'Left space out of Hackatime stats',
+    'space.hackatime_include': 'Counted space in Hackatime stats again',
     'space.browse': 'Browsed files',
     'space.read': 'Opened file',
     'space.download': 'Downloaded file',

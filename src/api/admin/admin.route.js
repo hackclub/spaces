@@ -154,7 +154,7 @@ router.post('/users', requirePermission('users.view'), async (req, res) => {
 router.post('/spaces', requirePermission('spaces.view'), async (req, res) => {
   try {
     const spaces = await pg('spaces')
-      .select('spaces.id', 'spaces.type', 'spaces.container_id', 'spaces.running', 'spaces.started_at', 'spaces.last_opened_at', 'spaces.created_at', 'spaces.name', 'spaces.is_favorite', 'spaces.locked_at', 'spaces.locked_reason', 'spaces.user_id', 'users.username', 'users.email')
+      .select('spaces.id', 'spaces.type', 'spaces.container_id', 'spaces.running', 'spaces.started_at', 'spaces.last_opened_at', 'spaces.created_at', 'spaces.name', 'spaces.is_favorite', 'spaces.locked_at', 'spaces.locked_reason', 'spaces.hackatime_excluded', 'spaces.user_id', 'users.username', 'users.email')
       .join('users', 'spaces.user_id', 'users.id')
       .where('spaces.creating', false)
       .orderBy('spaces.id', 'desc');

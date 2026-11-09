@@ -145,6 +145,9 @@
     </div>
 
     <p class="note">Time from Nov 1, 2026 until spaces started tagging their Hackatime heartbeats can't be told apart from other machines, so it isn't counted.</p>
+    {#if report.excludedSpaces}
+      <p class="note">{report.excludedSpaces} {report.excludedSpaces === 1 ? 'space is' : 'spaces are'} left out of these numbers. Change that in the space's moderation window.</p>
+    {/if}
 
     <h3 class="section">By space type</h3>
     <div class="table-wrap">

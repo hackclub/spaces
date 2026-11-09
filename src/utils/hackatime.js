@@ -252,7 +252,7 @@ const ACTIVITY_SQL = `
     from hackatime_activity a
     left join hackatime_legacy_machines m on m.machine = a.machine
     left join spaces s on s.id = coalesce(a.space_id, m.space_id)
-    where a.hour >= ? and (?::text is null or coalesce(s.type, '${UNKNOWN_TYPE}') = ?)
+    where a.hour >= ? and (?::text is null or coalesce(s.type, '${UNKNOWN_TYPE}') = ?) and not coalesce(s.hackatime_excluded, false)
   )
 `;
 
@@ -273,7 +273,7 @@ const summarizeTypes = async (since) => {
         count(distinct coalesce(effective_space_id::text, machine)) as spaces,
         count(distinct date_trunc('day', hour)) as active_days
       from activity group by 1`, [since, null, null]),
-    pg('spaces').where('creating', false).select('type').count('* as count').groupBy('type')
+    pg('spaces').where({ creating: false, hackatime_excluded: false }).select('type').count('* as count').groupBy('type')
   ]);
 
   const byType = new Map();
@@ -327,7 +327,7 @@ export const getHackatimeReport = async ({ days = 30, type = null } = {}) => {
   const since = days ? new Date(Math.floor((Date.now() - days * DAY_MS) / DAY_MS) * DAY_MS) : new Date(0);
   const params = [since, type, type];
 
-  const [totals, daily, users, spaces, tracked, progress, byType] = await Promise.all([
+  const [totals, daily, users, spaces, tracked, progress, byType, excluded] = await Promise.all([
     pg.raw(`${ACTIVITY_SQL}
       select source, sum(seconds)::bigint as seconds, min(first_at) as first_at, max(last_at) as last_at
       from activity group by source`, params),
@@ -347,7 +347,8 @@ export const getHackatimeReport = async ({ days = 30, type = null } = {}) => {
       group by 1, 2, 3, 4, 5, 6, 7 order by seconds desc`, params),
     pg('hackatime_activity').where('source', 'spaces').min('hour as since').first(),
     hetznerImportProgress(),
-    summarizeTypes(since)
+    summarizeTypes(since),
+    pg('spaces').where('hackatime_excluded', true).count('* as count').first()
   ]);
 
   const dailyByDay = new Map(daily.rows.map((row) => [row.day, Number(row.seconds)]));
@@ -401,6 +402,7 @@ export const getHackatimeReport = async ({ days = 30, type = null } = {}) => {
       lastAt: row.last_at,
       spaces: spacesByUser.get(`${row.user_id ?? ''}|${row.hackatime_user_id}`) ?? []
     })),
-    hetznerImport: progress
+    hetznerImport: progress,
+    excludedSpaces: Number(excluded?.count ?? 0)
   };
 };
