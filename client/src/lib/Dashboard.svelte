@@ -162,7 +162,7 @@
     .filter((group) => group.types.length);
   $: showTypeGroups = typeCategory === "All" && typeCategories.length > 1;
 
-  $: createEstimate = kindOf(newSpaceType) === "web" ? 20 : !isGuiType(newSpaceType) ? 15 : isReadyType(newSpaceType) ? 10 : 60;
+  $: createEstimate = kindOf(newSpaceType) === "web" ? 5 : !isGuiType(newSpaceType) ? 15 : isReadyType(newSpaceType) ? 10 : 60;
   let revealedPasswords = new Set();
 
   function togglePasswordReveal(spaceId) {
@@ -902,7 +902,7 @@
 
             {#if loading}
               <ProgressNotice
-                expectedSeconds={isGuiType(newSpaceType) ? (isReadyType(newSpaceType) ? 15 : 90) : 25}
+                expectedSeconds={isGuiType(newSpaceType) ? (isReadyType(newSpaceType) ? 15 : 90) : kindOf(newSpaceType) === "web" ? 8 : 25}
                 steps={createSteps(newSpaceType)}
                 done={createDone}
                 note={`~${createEstimate} seconds`}
@@ -1183,7 +1183,7 @@
 
               {#if actionLoading[space.id] === "starting"}
                 <ProgressNotice
-                  expectedSeconds={isGuiType(space.type) ? 30 : 15}
+                  expectedSeconds={isGuiType(space.type) ? 30 : kindOf(space.type) === "web" ? 8 : 15}
                   steps={["Starting your machine...", isGuiType(space.type) ? "Starting the desktop..." : kindOf(space.type) === "web" ? "Starting the editor..." : "Starting VS Code..."]}
                   done={Boolean(startDone[space.id])}
                   note="Your space picks up right where you left it. This usually takes a few seconds."
