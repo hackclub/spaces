@@ -8,7 +8,7 @@
   let rebuilding = '';
   let message = '';
 
-  const KIND_LABELS = { editor: 'Code editor', gui: 'Desktop app' };
+  const KIND_LABELS = { editor: 'Code editor', gui: 'Desktop app', web: 'Web app' };
 
   function formatBytes(bytes) {
     if (!bytes) return '—';

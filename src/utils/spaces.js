@@ -20,12 +20,14 @@ import {
   startCodeServer,
   setupGuiApp,
   startGuiApp,
+  startLoveApp,
   ensureHackatime,
   writeHackatimeConfig,
   hackatimeMachineFor
 } from "./sandboxes.js";
 
 const DEFAULT_WORKSPACE_DIR = "/config/workspace";
+const PROJECTS_DIR = "/config/projects";
 
 const sanitizeWorkspaceDir = (homeDir) => {
   if (!homeDir || typeof homeDir !== "string" || !homeDir.trim()) {
@@ -77,6 +79,7 @@ const GODOT_VERSION = "4.7.2";
 const WAKATIME_CLI_VERSION = "v2.28.4";
 const GODOT_WAKATIME_VERSION = "2.0.1";
 const GODOT_WAKATIME_COMMIT = "87bfaba53afd6a3c05765a4d6ceb04e204e9be4d";
+const CUPID_COMMIT = "95aa4597984c8dd3b0f25277b9ef2f451c00d27d";
 
 const linuxserverVersions = (name, repo) => [
   { name, fromTemplate: true, note: "linuxserver image, updated when its template rebuilds", latestUrl: `https://github.com/linuxserver/${repo}/releases` }
@@ -257,6 +260,22 @@ export const spaceConfigs = {
     summary: "CAD software",
     about: "FreeCAD is a free and open-source parametric 3D CAD modeler for designing real-world objects and mechanical parts, with tools for architecture and finite element analysis.",
     description: "FreeCAD is a general-purpose parametric 3D computer-aided design (CAD) modeler and a building information modeling (BIM) software application with finite element method (FEM) support."
+  },
+  "love2d": {
+    kind: "web",
+    category: "Game engines",
+    label: "LÖVE",
+    title: "LÖVE",
+    summary: "2D games in Lua",
+    about: "LÖVE is a free and open-source framework for making 2D games in Lua. This space has Cupid, the LÖVE playground's editor: write your game and run it right next to your code, with the LÖVE docs and examples built in. Your projects are saved in the space.",
+    description: "LÖVE 2D",
+    beta: true,
+    hackatime: true,
+    versions: [
+      { name: "LÖVE", current: "12.0 dev", note: "in development, runs in the browser, built into Cupid", latestUrl: "https://github.com/love2d/love/releases" },
+      { name: "Cupid", current: CUPID_COMMIT.slice(0, 7), note: "the playground's editor, updated by copying its build into client/public/love", latestUrl: "https://github.com/mostlime12195/cupid/commits" },
+      { name: "wakatime-cli", current: WAKATIME_CLI_VERSION, latestUrl: "https://github.com/wakatime/wakatime-cli/releases/latest" }
+    ]
   }
 };
 
@@ -290,8 +309,14 @@ export const startSpaceApp = (sandbox, space, password) => {
   if (config?.kind === "gui") {
     return startGuiApp(sandbox, { image: config.image, password, build: config.build, env: config.env, resetFiles: config.resetFiles });
   }
+  if (config?.kind === "web") {
+    return startLoveApp(sandbox, { password, dataPath: toSandboxPath(space.workspace_dir), wakatimeVersion: WAKATIME_CLI_VERSION });
+  }
   return startCodeServer(sandbox, { password, workspacePath: toSandboxPath(space.workspace_dir) });
 };
+
+const writeSpaceHackatime = (sandbox, config, apiKey, spaceId) =>
+  writeHackatimeConfig(sandbox, apiKey, hackatimeMachineFor(spaceId), { inHome: config.kind !== "gui" });
 
 export const changeSpacePassword = async (spaceId, newPassword, authorization) => {
   if (!spaceId) {
@@ -495,15 +520,16 @@ export const createContainer = async (password, type, authorization, name, repo 
   }
 
   const isGui = config.kind === "gui";
+  const isEditor = config.kind === "editor";
   password = crypto.randomBytes(16).toString('hex');
-  const githubRepo = isGui ? null : parseGithubRepo(repo);
-  const spaceName = isGui ? null : sanitizeSpaceName(name) || sanitizeSpaceName(githubRepo?.name);
-  if (!isGui && !spaceName) {
+  const githubRepo = isEditor ? parseGithubRepo(repo) : null;
+  const spaceName = isEditor ? sanitizeSpaceName(name) || sanitizeSpaceName(githubRepo?.name) : null;
+  if (isEditor && !spaceName) {
     const error = new Error("Give your space a name, using letters, numbers, dashes, underscores or dots.");
     error.statusCode = 400;
     throw error;
   }
-  const workspaceDir = isGui ? DEFAULT_WORKSPACE_DIR : `/config/${spaceName}`;
+  const workspaceDir = isEditor ? `/config/${spaceName}` : isGui ? DEFAULT_WORKSPACE_DIR : PROJECTS_DIR;
   const sandboxName = sandboxNameFor(crypto.randomUUID());
 
   await removeStalePlaceholders(user);
@@ -511,7 +537,7 @@ export const createContainer = async (password, type, authorization, name, repo 
     placeholder: {
       container_id: sandboxName,
       type: typeLower,
-      name: isGui ? config.label : spaceName,
+      name: isEditor ? spaceName : config.label,
       description: config.description,
       image: isGui ? config.image : SANDBOX_IMAGE,
       port: isGui ? GUI_PORT : CODE_SERVER_PORT,
@@ -529,10 +555,11 @@ export const createContainer = async (password, type, authorization, name, repo 
 
     if (isGui) {
       await setupGuiApp(sandbox, { image: config.image, build: config.build });
-      if (config.hackatime) {
-        await writeHackatimeConfig(sandbox, user.hackatime_api_key, hackatimeMachineFor(reservedId));
-      }
-    } else {
+    }
+    if (config.hackatime) {
+      await writeSpaceHackatime(sandbox, config, user.hackatime_api_key, reservedId);
+    }
+    if (isEditor) {
       await setupCodeServer(sandbox, {
         workspacePath: toSandboxPath(workspaceDir),
         hackatimeApiKey: user.hackatime_api_key,
@@ -646,13 +673,14 @@ export const startContainer = async (spaceId, authorization) => {
 
     const password = space.password || crypto.randomBytes(16).toString('hex');
 
-    if (configFor(space.type)?.hackatime) {
-      await writeHackatimeConfig(sandbox, user.hackatime_api_key, hackatimeMachineFor(space.id));
+    const config = configFor(space.type);
+    if (config?.hackatime) {
+      await writeSpaceHackatime(sandbox, config, user.hackatime_api_key, space.id);
     }
 
     const access_url = await startSpaceApp(sandbox, space, password);
 
-    if (configFor(space.type)?.kind !== "gui" && user.hackatime_api_key) {
+    if (config?.kind === "editor" && user.hackatime_api_key) {
       await ensureHackatime(sandbox, user.hackatime_api_key, hackatimeMachineFor(space.id));
     }
 

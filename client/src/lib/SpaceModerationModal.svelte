@@ -165,7 +165,7 @@
   }
 
   function openTab(tab, login) {
-    if (login.type !== 'code-server') {
+    if (login.login_username) {
       tab.location.href = login.access_url;
       return;
     }

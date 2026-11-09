@@ -238,19 +238,84 @@ export const setupGuiApp = async (sandbox, { image, build }) => {
 };
 
 const HACKATIME_API_URL = "https://hackatime.hackclub.com/api/hackatime/v1";
+const HOME_WAKATIME_CONFIG = "/vercel/.wakatime.cfg";
 
-export const writeHackatimeConfig = async (sandbox, apiKey, machine = "") => {
+export const writeHackatimeConfig = async (sandbox, apiKey, machine = "", { inHome = false } = {}) => {
   const key = sanitizeHackatimeKey(apiKey);
   const write = 'rm -f "$FILE" && printf "[settings]\\napi_url = %s\\n" "$URL" > "$FILE" && { [ -z "$KEY" ] || printf "api_key = %s\\n" "$KEY" >> "$FILE"; } && printf "heartbeat_rate_limit_seconds = 30\\n" >> "$FILE"';
+  const owner = inHome ? "" : 'chown -h 1000:1000 "$FILE" && ';
 
   try {
-    await run(sandbox, `{ [ ! -L "$FILE" ] || rm -f "$FILE"; } && ${key ? write : `{ [ -e "$FILE" ] || { ${write}; }; }`} && ${TAG_HACKATIME_HOSTNAME} && chown -h 1000:1000 "$FILE" && chmod 600 "$FILE"`, {
-      sudo: true,
-      env: { FILE: `${GUI_CONFIG_PATH}/.wakatime.cfg`, URL: HACKATIME_API_URL, KEY: key, MACHINE: machine }
+    await run(sandbox, `{ [ ! -L "$FILE" ] || rm -f "$FILE"; } && ${key ? write : `{ [ -e "$FILE" ] || { ${write}; }; }`} && ${TAG_HACKATIME_HOSTNAME} && ${owner}chmod 600 "$FILE"`, {
+      sudo: !inHome,
+      env: { FILE: inHome ? HOME_WAKATIME_CONFIG : `${GUI_CONFIG_PATH}/.wakatime.cfg`, URL: HACKATIME_API_URL, KEY: key, MACHINE: machine }
     });
   } catch (err) {
     console.error("Failed to set up Hackatime:", err.message);
   }
+};
+
+const LOVE_APP_DIR = "/opt/spaces-love";
+const LOVE_APP_SOURCE = `https://codeload.github.com/hackclub/spaces/tar.gz/${process.env.VERCEL_GIT_COMMIT_SHA || "main"}`;
+
+const INSTALL_LOVE_APP = [
+  'set -e',
+  '[ "$(cat "$DIR/SOURCE" 2>/dev/null)" = "$SOURCE" ] && exit 0',
+  'tmp=$(mktemp -d)',
+  'trap \'rm -rf "$tmp"\' EXIT',
+  'curl -fsSL --retry 3 --retry-all-errors "$SOURCE" | tar -xz -C "$tmp" --strip-components=1 --wildcards "*/client/public/love/*" "*/space-apps/love/*"',
+  'curl -fsSL --retry 3 --retry-all-errors -o "$tmp/wakatime.zip" "https://github.com/wakatime/wakatime-cli/releases/download/$WAKATIME_VERSION/wakatime-cli-linux-amd64.zip"',
+  'mkdir -p "$tmp/wakatime" && { unzip -q -o "$tmp/wakatime.zip" -d "$tmp/wakatime" 2>/dev/null || python3 -m zipfile -e "$tmp/wakatime.zip" "$tmp/wakatime"; }',
+  'rm -rf "$DIR.new" && mkdir -p "$DIR.new"',
+  'mv "$tmp/client/public/love" "$DIR.new/cupid" && mv "$tmp/space-apps/love" "$DIR.new/app" && mv "$tmp/wakatime/wakatime-cli-linux-amd64" "$DIR.new/wakatime-cli"',
+  'chmod -R a+rX "$DIR.new" && chmod 755 "$DIR.new/wakatime-cli" && printf "%s" "$SOURCE" > "$DIR.new/SOURCE"',
+  'rm -rf "$DIR" && mv "$DIR.new" "$DIR"'
+].join("\n");
+
+const installLoveApp = async (sandbox, wakatimeVersion) => {
+  try {
+    await run(sandbox, INSTALL_LOVE_APP, {
+      sudo: true,
+      env: { DIR: LOVE_APP_DIR, SOURCE: LOVE_APP_SOURCE, WAKATIME_VERSION: wakatimeVersion },
+      timeoutMs: 5 * MINUTE
+    });
+  } catch (err) {
+    const installed = await sandbox.runCommand({ cmd: "test", args: ["-f", `${LOVE_APP_DIR}/app/server.mjs`] }).then((result) => result.exitCode === 0).catch(() => false);
+    if (!installed) throw err;
+    console.error("Failed to update the LÖVE editor, using the installed one:", err.message);
+  }
+};
+
+export const startLoveApp = async (sandbox, { password, dataPath, wakatimeVersion }) => {
+  await installLoveApp(sandbox, wakatimeVersion);
+  await run(sandbox, 'mkdir -p "$DATA"', { env: { DATA: dataPath } });
+  await run(sandbox, "pkill -f '[/]opt/spaces-love/app/server.mjs' || true");
+
+  await sandbox.runCommand({
+    cmd: "node",
+    args: [`${LOVE_APP_DIR}/app/server.mjs`],
+    env: {
+      PORT: String(CODE_SERVER_PORT),
+      SPACE_PASSWORD: password,
+      CUPID_DIR: `${LOVE_APP_DIR}/cupid`,
+      DATA_DIR: dataPath,
+      WAKATIME_CLI: `${LOVE_APP_DIR}/wakatime-cli`,
+      WAKATIME_CONFIG: HOME_WAKATIME_CONFIG
+    },
+    detached: true
+  });
+
+  await run(
+    sandbox,
+    [
+      `for i in $(seq 1 120); do curl -fs -o /dev/null http://127.0.0.1:${CODE_SERVER_PORT}/healthz && break; sleep 0.5; done`,
+      `[ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${CODE_SERVER_PORT}/api/projects)" = 401 ] || { echo "the editor answered without a password"; exit 2; }`,
+      `[ "$(curl -s -o /dev/null -w '%{http_code}' --data-urlencode "password=$SPACE_PASSWORD" http://127.0.0.1:${CODE_SERVER_PORT}/login)" = 302 ] || { echo "the editor rejected the space password"; exit 3; }`
+    ].join("; "),
+    { env: { SPACE_PASSWORD: password }, timeoutMs: 2 * MINUTE }
+  );
+
+  return sandbox.domain(CODE_SERVER_PORT);
 };
 
 const STOP_DOCKER = [

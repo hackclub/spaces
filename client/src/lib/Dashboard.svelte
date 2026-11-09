@@ -33,18 +33,23 @@
   let startDone = {};
   const holdFinishedBar = () => new Promise((resolve) => setTimeout(resolve, 800));
 
-  const GUI_TYPES = ["kicad", "blender", "freecad"];
-  $: isGuiType = (type) => {
-    const known = spaceTypes.find((spaceType) => spaceType.value === (type || "").toLowerCase());
-    return known ? known.kind === "gui" : GUI_TYPES.includes((type || "").toLowerCase());
+  const GUI_TYPES = ["kicad", "blender", "freecad", "godot"];
+  const WEB_TYPES = ["love2d"];
+  $: kindOf = (type) => {
+    const value = (type || "").toLowerCase();
+    const known = spaceTypes.find((spaceType) => spaceType.value === value);
+    return known?.kind ?? (GUI_TYPES.includes(value) ? "gui" : WEB_TYPES.includes(value) ? "web" : "editor");
   };
+  $: isGuiType = (type) => kindOf(type) === "gui";
   $: isReadyType = (type) => Boolean(spaceTypes.find((spaceType) => spaceType.value === (type || "").toLowerCase())?.ready);
   $: createSteps = (type) =>
-    !isGuiType(type)
+    kindOf(type) === "editor"
       ? ["Creating your machine...", "Installing VS Code...", "Starting VS Code..."]
-      : isReadyType(type)
-        ? ["Creating your machine...", "Starting the desktop..."]
-        : ["Creating your machine...", "Downloading the app, this is the slow part...", "Starting the desktop..."];
+      : kindOf(type) === "web"
+        ? ["Creating your machine...", "Installing the editor...", "Starting the editor..."]
+        : isReadyType(type)
+          ? ["Creating your machine...", "Starting the desktop..."]
+          : ["Creating your machine...", "Downloading the app, this is the slow part...", "Starting the desktop..."];
   let typeSearch = "";
   let typeCategory = "All";
   let clubData = null;
@@ -157,7 +162,7 @@
     .filter((group) => group.types.length);
   $: showTypeGroups = typeCategory === "All" && typeCategories.length > 1;
 
-  $: createEstimate = !isGuiType(newSpaceType) ? 15 : isReadyType(newSpaceType) ? 10 : 60;
+  $: createEstimate = kindOf(newSpaceType) === "web" ? 20 : !isGuiType(newSpaceType) ? 15 : isReadyType(newSpaceType) ? 10 : 60;
   let revealedPasswords = new Set();
 
   function togglePasswordReveal(spaceId) {
@@ -279,7 +284,7 @@
   function openSpace(event, space) {
     recordOpen(space);
 
-    if (space.type !== "code-server" || !space.password || !space.access_url) {
+    if (isGuiType(space.type) || !space.password || !space.access_url) {
       return;
     }
 
@@ -371,7 +376,7 @@
     error = "";
 
     const body = { type: newSpaceType };
-    if (!isGuiType(newSpaceType)) {
+    if (kindOf(newSpaceType) === "editor") {
       if (!newSpaceName.trim()) {
         error = "Give your space a name.";
         return;
@@ -847,7 +852,7 @@
               <p class="type-summary-note">Time you spend in this space is tracked on Hackatime.</p>
             {/if}
 
-            {#if !isGuiType(newSpaceType)}
+            {#if kindOf(newSpaceType) === "editor"}
               <div class="form-group">
                 <label class="form-label" for="spaceName">Name <span class="required-mark" aria-hidden="true">*</span></label>
                 <input
@@ -1175,7 +1180,7 @@
               {#if actionLoading[space.id] === "starting"}
                 <ProgressNotice
                   expectedSeconds={isGuiType(space.type) ? 30 : 15}
-                  steps={["Starting your machine...", isGuiType(space.type) ? "Starting the desktop..." : "Starting VS Code..."]}
+                  steps={["Starting your machine...", isGuiType(space.type) ? "Starting the desktop..." : kindOf(space.type) === "web" ? "Starting the editor..." : "Starting VS Code..."]}
                   done={Boolean(startDone[space.id])}
                   note="Your space picks up right where you left it. This usually takes a few seconds."
                 />
