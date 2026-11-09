@@ -163,6 +163,58 @@ const GODOT_UPLOAD_MOVER = [
 
 const base64 = (text) => Buffer.from(`${text}\n`).toString("base64");
 
+// JetBrains IDEs run on the webtop desktop. Each image is built once from a
+// pinned release: the IDE is checked against JetBrains' SHA-256, and the
+// WakaTime plugin build that matches it goes in the IDE's own plugins folder,
+// so Hackatime works from the first start (hackatime: true writes the key).
+// To update an IDE, change its version and build here; the tag follows.
+const WAKATIME_JETBRAINS_PLUGIN = "com.wakatime.intellij.plugin";
+const JETBRAINS_BASE_IMAGE = "linuxserver/webtop:debian-xfce";
+
+const jetbrainsSpace = ({ name, launcher, url, build, summary, packages = [], extra = [] }) => {
+  const dir = `/opt/jetbrains/${launcher}`;
+  const desktopEntry = [
+    "[Desktop Entry]",
+    "Type=Application",
+    `Name=${name}`,
+    `Exec=${dir}/bin/${launcher}`,
+    `Icon=${dir}/bin/${launcher}.svg`,
+    "Terminal=false"
+  ].join("\n");
+
+  return {
+    kind: "gui",
+    image: JETBRAINS_BASE_IMAGE,
+    label: name,
+    title: name,
+    summary,
+    description: name,
+    beta: true,
+    vcpus: 4,
+    hackatime: true,
+    build: {
+      tag: `spaces-${launcher}:${build}-1`,
+      dockerfile: [
+        `FROM ${JETBRAINS_BASE_IMAGE}`,
+        `ARG IDE_URL=${url}`,
+        `ARG IDE_BUILD=${build}`,
+        // Slim Debian images lack man1, and OpenJDK's install fails without it.
+        `RUN mkdir -p /usr/share/man/man1 && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl unzip git ${packages.join(" ")} && rm -rf /var/lib/apt/lists/*`,
+        ...extra,
+        `RUN mkdir -p ${dir} && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/ide.tar.gz "$IDE_URL" && echo "$(curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 "$IDE_URL.sha256" | cut -d" " -f1)  /tmp/ide.tar.gz" | sha256sum -c - && tar -xzf /tmp/ide.tar.gz -C ${dir} --strip-components=1 && rm /tmp/ide.tar.gz`,
+        `RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/wakatime.zip "https://plugins.jetbrains.com/pluginManager?action=download&id=${WAKATIME_JETBRAINS_PLUGIN}&build=$IDE_BUILD" && unzip -q /tmp/wakatime.zip -d ${dir}/plugins && rm /tmp/wakatime.zip`,
+        `RUN echo ${base64(desktopEntry)} | base64 -d > /usr/share/applications/${launcher}.desktop && cp /usr/share/applications/${launcher}.desktop /etc/xdg/autostart/${launcher}.desktop`
+      ].join("\n")
+    }
+  };
+};
+
+// RustRover finds Rust through rustup, installed for every user in the image.
+const RUSTUP = [
+  "ENV RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo PATH=/opt/rust/cargo/bin:$PATH",
+  'RUN curl --proto "=https" --tlsv1.2 -fsSL --retry 5 https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile default && chmod -R a+rwX /opt/rust && printf "%s\\n" "export RUSTUP_HOME=/opt/rust/rustup CARGO_HOME=/opt/rust/cargo" "export PATH=/opt/rust/cargo/bin:\\$PATH" > /etc/profile.d/rust.sh'
+];
+
 export const spaceConfigs = {
   "code-server": {
     kind: "editor",
@@ -247,6 +299,40 @@ export const spaceConfigs = {
     },
     resetFiles: [".config/openbox/autostart", ".config/openbox/menu.xml", ".config/openbox/menu.xml.bak"]
   },
+  "intellij": jetbrainsSpace({
+    name: "IntelliJ IDEA",
+    launcher: "idea",
+    url: "https://download.jetbrains.com/idea/idea-2026.3.tar.gz",
+    build: "IU-263.7307.200",
+    summary: "JetBrains IDE for Java and Kotlin",
+    packages: ["default-jdk", "maven"]
+  }),
+  "webstorm": jetbrainsSpace({
+    name: "WebStorm",
+    launcher: "webstorm",
+    url: "https://download.jetbrains.com/webstorm/WebStorm-2026.3.tar.gz",
+    build: "WS-263.7307.202",
+    summary: "JetBrains IDE for JavaScript and TypeScript",
+    // The image's NodeSource repo has Node with npm built in; Debian's npm conflicts with it.
+    packages: ["nodejs"]
+  }),
+  "rubymine": jetbrainsSpace({
+    name: "RubyMine",
+    launcher: "rubymine",
+    url: "https://download.jetbrains.com/ruby/RubyMine-2026.3.tar.gz",
+    build: "RM-263.7307.205",
+    summary: "JetBrains IDE for Ruby and Rails",
+    packages: ["ruby-full", "build-essential", "libyaml-dev", "libssl-dev", "zlib1g-dev"]
+  }),
+  "rustrover": jetbrainsSpace({
+    name: "RustRover",
+    launcher: "rustrover",
+    url: "https://download.jetbrains.com/rustrover/RustRover-2026.3.tar.gz",
+    build: "RR-263.7307.214",
+    summary: "JetBrains IDE for Rust",
+    packages: ["build-essential", "pkg-config", "libssl-dev"],
+    extra: RUSTUP
+  }),
   "freecad": {
     kind: "gui",
     category: "CAD design",
