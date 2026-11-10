@@ -84,6 +84,49 @@
     }
   }
 
+  async function post(path, body) {
+    const response = await fetch(`${API_BASE}/admin/hackatime/${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(body)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Something went wrong');
+    return data.data;
+  }
+
+  async function recalculate() {
+    importing = true;
+    importMessage = '';
+    try {
+      let afterId = 0;
+      let failed = 0;
+      let result;
+      do {
+        result = await post('recalculate', { afterId });
+        afterId = result.afterId;
+        failed += result.failed;
+        importMessage = `Recounting spaces, ${result.remaining} left${failed ? `, ${failed} failed` : ''}`;
+      } while (result.remaining > 0);
+      if (report?.hetznerImport.started) {
+        let restart = true;
+        let progress;
+        do {
+          progress = (await post('recalculate', { phase: 'hetzner', restart })).progress;
+          restart = false;
+          importMessage = `Recounting old server time: ${describeImport(progress)}`;
+        } while (progress.pending > 0);
+      }
+      importMessage = failed ? `Recounted, but ${failed} spaces failed. Try again later.` : "Recounted every space with Hackatime's rule.";
+      await load();
+    } catch (err) {
+      importMessage = err.message;
+    } finally {
+      importing = false;
+    }
+  }
+
   function pickType(value) {
     type = type === value ? '' : value;
   }
@@ -204,6 +247,7 @@
         {#if report.hetznerImport.failed && !importing}
           <button class="btn" on:click={() => runImport(true)}>Retry failed</button>
         {/if}
+        <button class="btn" on:click={recalculate} disabled={importing || !report.configured} title="Recounts every space's time from Hackatime, counting each gap between heartbeats up to 2 minutes like Hackatime does">Recalculate time</button>
         <span class="note">
           {importMessage || (report.hetznerImport.started
             ? describeImport(report.hetznerImport)

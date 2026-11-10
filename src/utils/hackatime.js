@@ -62,9 +62,9 @@ export const bucketize = (times) => {
     bucket.heartbeats += 1;
     bucket.first = Math.min(bucket.first, time);
     bucket.last = Math.max(bucket.last, time);
-    const next = sorted[index + 1];
-    if (next !== undefined && next - time <= GAP_SECONDS) {
-      bucket.seconds += next - time;
+    const previous = sorted[index - 1];
+    if (previous !== undefined) {
+      bucket.seconds += Math.min(time - previous, GAP_SECONDS);
     }
     buckets.set(hour, bucket);
   });
@@ -118,6 +118,50 @@ export const resolveHackatimeUserId = async (user) => {
   return String(id);
 };
 
+const syncSpace = async (space, fromHour) => {
+  const hackatimeUserId = await resolveHackatimeUserId({ id: space.user_id, hackatime_api_key: space.hackatime_api_key, hackatime_user_id: space.hackatime_user_id });
+  if (!hackatimeUserId) return null;
+  const machine = hackatimeMachineFor(space.id);
+  const heartbeats = await fetchHeartbeats({ hackatimeUserId, machine, start: fromHour - GAP_SECONDS * 1000, end: Date.now() });
+  return saveBuckets({
+    source: 'spaces',
+    machine,
+    hackatimeUserId,
+    spaceId: space.id,
+    userId: space.user_id,
+    buckets: bucketize(heartbeats.map((heartbeat) => heartbeat.time)),
+    fromHour
+  });
+};
+
+export const recalculateSpacesActivity = async ({ afterId = 0, budgetMs = SYNC_BUDGET_MS } = {}) => {
+  const deadline = Date.now() + budgetMs;
+  const spaces = await pg('hackatime_activity as a')
+    .join('spaces as s', 's.id', 'a.space_id')
+    .join('users as u', 'u.id', 's.user_id')
+    .where('a.source', 'spaces')
+    .where('a.space_id', '>', afterId)
+    .groupBy('s.id', 's.user_id', 'u.hackatime_api_key', 'u.hackatime_user_id')
+    .orderBy('s.id')
+    .select('s.id', 's.user_id', 'u.hackatime_api_key', 'u.hackatime_user_id')
+    .min('a.hour as first_hour');
+
+  let lastId = afterId;
+  let failed = 0;
+  for (const space of spaces) {
+    if (Date.now() > deadline) break;
+    try {
+      await syncSpace(space, new Date(space.first_hour).getTime());
+    } catch (err) {
+      failed += 1;
+      console.error(`Failed to recalculate Hackatime time for space ${space.id}:`, err.message);
+    }
+    lastId = space.id;
+  }
+
+  return { afterId: lastId, remaining: spaces.filter((space) => space.id > lastId).length, failed };
+};
+
 export const syncSpacesActivity = async ({ lookbackMs = 3 * HOUR_MS, budgetMs = SYNC_BUDGET_MS } = {}) => {
   if (!hackatimeConfigured()) return { skipped: 'HACKATIME_ADMIN_KEY is not set' };
 
@@ -142,22 +186,9 @@ export const syncSpacesActivity = async ({ lookbackMs = 3 * HOUR_MS, budgetMs = 
       continue;
     }
     try {
-      const hackatimeUserId = await resolveHackatimeUserId({ id: space.user_id, hackatime_api_key: space.hackatime_api_key, hackatime_user_id: space.hackatime_user_id });
-      if (!hackatimeUserId) {
-        summary.noKey += 1;
-        continue;
-      }
-      const machine = hackatimeMachineFor(space.id);
-      const heartbeats = await fetchHeartbeats({ hackatimeUserId, machine, start: fromHour - GAP_SECONDS * 1000, end: Date.now() });
-      summary.hours += await saveBuckets({
-        source: 'spaces',
-        machine,
-        hackatimeUserId,
-        spaceId: space.id,
-        userId: space.user_id,
-        buckets: bucketize(heartbeats.map((heartbeat) => heartbeat.time)),
-        fromHour
-      });
+      const hours = await syncSpace(space, fromHour);
+      if (hours === null) summary.noKey += 1;
+      else summary.hours += hours;
     } catch (err) {
       summary.failed += 1;
       console.error(`Failed to sync Hackatime time for space ${space.id}:`, err.message);
@@ -236,6 +267,10 @@ export const continueHetznerImport = async ({ budgetMs = IMPORT_BUDGET_MS } = {}
 
   return hetznerImportProgress();
 };
+
+export const restartHetznerImport = () => pg('hackatime_imports')
+  .whereIn('status', ['done', 'failed'])
+  .update({ status: 'pending', error: null, updated_at: pg.fn.now() });
 
 export const retryFailedHetznerImports = () => pg('hackatime_imports')
   .where('status', 'failed')

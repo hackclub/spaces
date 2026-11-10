@@ -4,7 +4,7 @@ import { requirePermission, requireSuperadmin } from '../../middlewares/admin.mi
 import { getUserRoles, canManageUser, STAFF_ONLY_MESSAGE } from '../../utils/permissions.js';
 import { deleteSpace, stopContainer, spaceConfigs } from '../../utils/spaces.js';
 import { listTemplates, rebuildTemplates, listSpaceTypes } from '../../utils/templates.js';
-import { getHackatimeReport, hackatimeReportTypes, hackatimeConfigured, startHetznerImport, continueHetznerImport, hetznerImportProgress, retryFailedHetznerImports } from '../../utils/hackatime.js';
+import { getHackatimeReport, hackatimeReportTypes, hackatimeConfigured, startHetznerImport, continueHetznerImport, hetznerImportProgress, retryFailedHetznerImports, recalculateSpacesActivity, restartHetznerImport } from '../../utils/hackatime.js';
 import { getSandboxStats } from '../../utils/sandboxes.js';
 import { getUsage } from '../../utils/space-runs.js';
 import { getStats } from '../../utils/stats.js';
@@ -455,6 +455,26 @@ router.post('/hackatime/import', requireSuperadmin, async (req, res) => {
   } catch (error) {
     console.error('Error importing old-server Hackatime time:', error);
     res.status(500).json({ success: false, message: error.message || 'Failed to import' });
+  }
+});
+
+router.post('/hackatime/recalculate', requireSuperadmin, async (req, res) => {
+  try {
+    if (!hackatimeConfigured()) {
+      return res.status(400).json({ success: false, message: 'Add HACKATIME_ADMIN_KEY in Vercel first' });
+    }
+
+    if (req.body?.phase === 'hetzner') {
+      if (req.body?.restart === true) await restartHetznerImport();
+      return res.status(200).json({ success: true, data: { phase: 'hetzner', progress: await continueHetznerImport() } });
+    }
+
+    const afterId = Number.parseInt(req.body?.afterId, 10) || 0;
+    if (afterId === 0) await logAdminAction(req.user, 'hackatime.recalculate', {});
+    res.status(200).json({ success: true, data: { phase: 'spaces', ...(await recalculateSpacesActivity({ afterId })) } });
+  } catch (error) {
+    console.error('Error recalculating Hackatime time:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to recalculate' });
   }
 });
 
