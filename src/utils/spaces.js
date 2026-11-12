@@ -172,13 +172,7 @@ const BLENDER_HACKATIME_INSTALL = [
   "#!/bin/bash",
   "BLENDER=$(command -v blender || ls /opt/blender*/blender 2>/dev/null | head -n 1)",
   "[ -n \"$BLENDER\" ] || exit 0",
-  "LOG=/tmp/blender-hackatime-install.log",
-  "for old in /config/.config/blender/*/extensions/user_default/super_wakatime; do",
-  "  [ -d \"$old\" ] || continue",
-  "  s6-setuidgid abc env HOME=/config \"$BLENDER\" --command extension remove user_default.super_wakatime >> \"$LOG\" 2>&1",
-  "  rm -rf \"$old\"",
-  "done",
-  "s6-setuidgid abc env HOME=/config \"$BLENDER\" --command extension install-file -r user_default -e /opt/blender-hackatime/blender_hackatime.zip >> \"$LOG\" 2>&1 || true"
+  "s6-setuidgid abc env HOME=/config \"$BLENDER\" --command extension install-file -r user_default -e /opt/blender-hackatime/blender_hackatime.zip > /tmp/blender-hackatime-install.log 2>&1 || true"
 ].join("\n");
 
 export const spaceConfigs = {
@@ -198,23 +192,11 @@ export const spaceConfigs = {
     kind: "gui",
     category: "CAD design",
     image: "linuxserver/blender",
-    versions: linuxserverVersions("Blender", "docker-blender"),
     label: "Blender",
-    title: "Blender 3D",
+    title: "Blender",
     summary: "3D modeling and animation",
-    about: "Blender is a free and open-source 3D creation suite for modeling, sculpting, animation, rendering and video editing.",
-    description: "Blender 3D"
-  },
-  "blender-hackatime": {
-    kind: "gui",
-    category: "CAD design",
-    image: "linuxserver/blender",
-    label: "Blender",
-    title: "Blender with Hackatime",
-    summary: "3D modeling and animation, tracked on Hackatime",
     about: "Blender is a free and open-source 3D creation suite for modeling, sculpting, animation, rendering and video editing. This space comes with Blender Hackatime, so the time you spend in Blender is tracked on Hackatime.",
-    description: "Blender 3D with Hackatime",
-    beta: true,
+    description: "Blender 3D",
     hackatime: true,
     versions: [
       ...linuxserverVersions("Blender", "docker-blender"),
@@ -222,7 +204,7 @@ export const spaceConfigs = {
       { name: "wakatime-cli", current: WAKATIME_CLI_VERSION, latestUrl: "https://github.com/wakatime/wakatime-cli/releases/latest" }
     ],
     build: {
-      tag: `spaces-blender-hackatime:${BLENDER_HACKATIME_VERSION}-1`,
+      tag: `spaces-blender-hackatime:${BLENDER_HACKATIME_VERSION}-2`,
       dockerfile: [
         "FROM linuxserver/blender",
         `ARG WAKATIME_CLI_VERSION=${WAKATIME_CLI_VERSION}`,
@@ -310,13 +292,12 @@ export const spaceConfigs = {
     label: "LÖVE",
     title: "LÖVE",
     summary: "2D games in Lua",
-    about: "LÖVE is a free and open-source framework for making 2D games in Lua. This space has Cupid, the LÖVE playground's editor: write your game and run it right next to your code, with the LÖVE docs and examples built in. Your projects are saved in the space.",
+    about: "LÖVE is a free and open-source framework for making 2D games in Lua. This space has Cupid, an editor made for LÖVE: write your game and run it right next to your code, with the LÖVE docs and examples built in. Your projects are saved in the space.",
     description: "LÖVE 2D",
-    beta: true,
     hackatime: true,
     versions: [
       { name: "LÖVE", current: "12.0 dev", note: "in development, runs in the browser, built into Cupid", latestUrl: "https://github.com/love2d/love/releases" },
-      { name: "Cupid", current: CUPID_COMMIT.slice(0, 7), note: "the playground's editor, updated by copying its build into client/public/love", latestUrl: "https://github.com/mostlime12195/cupid/commits" },
+      { name: "Cupid", current: CUPID_COMMIT.slice(0, 7), note: "the editor, updated by copying its build into client/public/love", latestUrl: "https://github.com/mostlime12195/cupid/commits" },
       { name: "wakatime-cli", current: WAKATIME_CLI_VERSION, latestUrl: "https://github.com/wakatime/wakatime-cli/releases/latest" }
     ]
   }

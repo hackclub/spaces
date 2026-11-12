@@ -1138,3 +1138,40 @@
   font-weight: bold;
   font-size: 24px;
 }
+.legacy-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  background: var(--white);
+  border: 2px solid var(--orange);
+  border-radius: 8px;
+}
+
+.legacy-text {
+  font-size: 14px;
+  color: var(--slate);
+  line-height: 1.5;
+}
+
+.legacy-text strong {
+  color: var(--orange);
+}
+
+.legacy-download {
+  padding: 10px 20px;
+  background: var(--red);
+  border: none;
+  border-radius: 99999px;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.legacy-download:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

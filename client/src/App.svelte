@@ -4,7 +4,6 @@
     import Auth from "./lib/Auth.svelte";
     import ClubMemberAuth from "./lib/ClubMemberAuth.svelte";
     import Dashboard from "./lib/Dashboard.svelte";
-    import Playground from "./lib/Playground.svelte";
     import AdminPanel from "./lib/AdminPanel.svelte";
     import ThemeSwitcher from "./lib/ThemeSwitcher.svelte";
     import Settings from "./lib/Settings.svelte";
@@ -30,7 +29,6 @@
     let showClubs = false;
     let showAuth = false;
     let showClubMemberAuth = false;
-    $: currentView = url === "/playground" || url.startsWith("/playground?") ? "playground" : "spaces";
 
     onMount(async () => {
         applyTheme(get(currentTheme));
@@ -128,24 +126,13 @@
                     >
                 </div>
             {/if}
-            {#if currentView === "playground"}
-                <Playground
-                    username={userData.user.username}
-                    on:signout={handleSignOut}
-                    on:settings={() => (showSettings = true)}
-                    on:clubs={() => (showClubs = true)}
-                    on:switchview={(e) => navigate(e.detail.view === "playground" ? "/playground" : "/")}
-                />
-            {:else}
-                <Dashboard
-                    bind:spaces
-                    username={userData.user.username}
-                    on:signout={handleSignOut}
-                    on:settings={() => (showSettings = true)}
-                    on:clubs={() => (showClubs = true)}
-                    on:switchview={(e) => navigate(e.detail.view === "playground" ? "/playground" : "/")}
-                />
-            {/if}
+            <Dashboard
+                bind:spaces
+                username={userData.user.username}
+                on:signout={handleSignOut}
+                on:settings={() => (showSettings = true)}
+                on:clubs={() => (showClubs = true)}
+            />
         {/if}
     {:else if showClubMemberAuth}
         <ClubMemberAuth

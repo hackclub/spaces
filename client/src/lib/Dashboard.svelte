@@ -9,6 +9,7 @@
   import ProgressNotice from "./ProgressNotice.svelte";
   import { userData } from "../stores/user.svelte";
   import { createConfirm } from "./confirm.js";
+  import { findLegacyGodotProjects, downloadLegacyGodotProjects } from "./godot-legacy.js";
 
   const confirmer = createConfirm();
   const { armed } = confirmer;
@@ -33,7 +34,7 @@
   let startDone = {};
   const holdFinishedBar = () => new Promise((resolve) => setTimeout(resolve, 800));
 
-  const GUI_TYPES = ["kicad", "blender", "blender-hackatime", "freecad", "godot"];
+  const GUI_TYPES = ["kicad", "blender", "freecad", "godot"];
   const WEB_TYPES = ["love2d"];
   $: kindOf = (type) => {
     const value = (type || "").toLowerCase();
@@ -62,11 +63,15 @@
 
   let showSafariNotSupported = false;
   let acknowlegeSafariNotSupported = false;
+  let legacyGodotProjects = [];
+  let legacyDownloading = false;
+  let legacyMessage = "";
 
   onMount(() => {
     loadClubData();
     loadSpaces();
     loadSpaceTypes();
+    findLegacyGodotProjects().then((projects) => (legacyGodotProjects = projects));
 
     showSafariNotSupported = /^((?!chrome|android).)*safari/i.test(
       navigator.userAgent,
@@ -110,7 +115,7 @@
 
   let spaceTypes = [
     { value: "code-server", label: "VS Code Server", description: "Web-based code editor", kind: "editor", category: "Code", tracksHackatime: true },
-    { value: "blender", label: "Blender 3D", description: "3D modeling and animation", kind: "gui", category: "CAD design" },
+    { value: "blender", label: "Blender", description: "3D modeling and animation", kind: "gui", category: "CAD design" },
     { value: "kicad", label: "KiCad", description: "PCB design software", kind: "gui", category: "PCB design" },
     { value: "freecad", label: "FreeCAD", description: "CAD software", kind: "gui", category: "CAD design" },
   ];
@@ -676,8 +681,17 @@
     dispatch("clubs");
   }
 
-  function handleSwitchToPlayground() {
-    dispatch("switchview", { view: "playground" });
+  async function downloadLegacyProjects() {
+    legacyDownloading = true;
+    legacyMessage = "";
+    try {
+      const count = await downloadLegacyGodotProjects();
+      legacyMessage = `Downloaded ${count} file${count === 1 ? "" : "s"}.`;
+    } catch (err) {
+      legacyMessage = err.message || "Couldn't download your projects.";
+    } finally {
+      legacyDownloading = false;
+    }
   }
 </script>
 
@@ -705,12 +719,6 @@
       </div>
     </div>
     <div class="header-actions">
-      <div class="view-switcher">
-        <button class="view-tab active">Spaces</button>
-        <button class="view-tab" on:click={handleSwitchToPlayground}
-          >Playground</button
-        >
-      </div>
       <button class="clubs-button" on:click={handleClubs}>My Club</button>
       <button class="settings-button" on:click={handleSettings}>Settings</button
       >
@@ -719,6 +727,19 @@
   </header>
 
   <div class="dashboard-content">
+    {#if legacyGodotProjects.length}
+      <div class="legacy-notice">
+        <span class="legacy-text">
+          <strong>Your Godot projects:</strong> the Godot playground has been removed. {legacyGodotProjects.length === 1 ? "The project" : `The ${legacyGodotProjects.length} projects`}
+          you made in it ({legacyGodotProjects.join(", ")}) {legacyGodotProjects.length === 1 ? "is" : "are"} still saved in this browser.
+          Download them as a zip to keep working on them in a Godot space or on your computer.
+        </span>
+        <button class="legacy-download" on:click={downloadLegacyProjects} disabled={legacyDownloading}>
+          {legacyDownloading ? "Preparing..." : "Download my Godot projects"}
+        </button>
+        {#if legacyMessage}<span class="legacy-text">{legacyMessage}</span>{/if}
+      </div>
+    {/if}
     <div class="actions-bar">
       <div class="left-actions">
         <div class="view-switcher">

@@ -11,7 +11,6 @@
       "root": "client",
       "framework": "vite",
       "rewrites": [
-        { "source": "/love/", "destination": "/love/index.html" },
         { "source": "/((?!love/).*)", "destination": "/index.html" }
       ]
     }
@@ -22,15 +21,18 @@
     { "path": "/api/v1/cron/hackatime", "schedule": "20 * * * *" }
   ],
   "redirects": [
-    { "source": "/godot", "destination": "https://spaces.hackclub.com/playground", "permanent": false },
-    { "source": "/godot/:path((?!service\\.worker\\.js$).*)", "destination": "https://spaces.hackclub.com/playground", "permanent": false },
+    { "source": "/godot", "destination": "https://spaces.hackclub.com/", "permanent": false },
+    { "source": "/godot/:path((?!service\\.worker\\.js$).*)", "destination": "https://spaces.hackclub.com/", "permanent": false },
+    { "source": "/playground", "destination": "/", "permanent": false },
     {
       "source": "/love/:path*",
       "missing": [{ "type": "host", "value": "spaces-playground.hackclub.dev" }],
       "destination": "https://spaces-playground.hackclub.dev/love/:path*",
       "permanent": false
     },
-    { "source": "/love", "destination": "https://spaces-playground.hackclub.dev/love/", "permanent": false },
+    { "source": "/love", "destination": "https://spaces-playground.hackclub.dev/love/export.html", "permanent": false },
+    { "source": "/love/", "destination": "/love/export.html", "permanent": false },
+    { "source": "/love/index.html", "destination": "/love/export.html", "permanent": false },
     {
       "source": "/((?!love/|_vercel/).*)",
       "has": [{ "type": "host", "value": "spaces-playground.hackclub.dev" }],

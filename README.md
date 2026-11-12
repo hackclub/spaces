@@ -11,7 +11,7 @@ Spaces is a web app that creates secure cloud based development environments, ac
   - A session lasts at most 3 hours. A Vercel cron job calls `/api/v1/cron/auto-stop` every 5 minutes to stop spaces that have run longer and to fix the database for spaces that already stopped.
 - **VS Code spaces** run [code-server](https://github.com/coder/code-server) directly in the sandbox, on Vercel's default `universal` image. code-server is installed on first start, and the user's files live in `/vercel/sandbox/<space name>`. New spaces get [in-space.md](in-space.md) as their `README.md`, which lists the tools the image includes and how to install more with `sudo apt`. Spaces copied from the old server get it as `WELCOME.md`, so their own README is left alone.
 - **Blender, KiCad and FreeCAD spaces** run Docker inside the sandbox, with the [linuxserver.io](https://www.linuxserver.io/) image for each app. The app's files live in `/vercel/sandbox/config`. The browser logs in with HTTP basic auth: username `abc`, with the space's password.
-- **LÖVE spaces** run [Cupid](https://github.com/mostlime12195/cupid), the playground's editor, behind a small Node server in [space-apps/love/](space-apps/love/). On start, the sandbox downloads the deployed commit's `client/public/love` and `space-apps/love` from GitHub into `/opt/spaces-love`. Projects are saved in `/vercel/sandbox/projects`, one folder per project. Heartbeats follow the VS Code WakaTime extension's rules: one on every save, on switching files, and at most every 2 minutes while someone types or clicks in the editor, each with the cursor line and column, the file's line count and `category: coding`. The browser logs in with the space's password at `/login`, like code-server.
+- **LÖVE spaces** run [Cupid](https://github.com/mostlime12195/cupid), an editor made for LÖVE, behind a small Node server in [space-apps/love/](space-apps/love/). On start, the sandbox downloads the deployed commit's `client/public/love` and `space-apps/love` from GitHub into `/opt/spaces-love`. Projects are saved in `/vercel/sandbox/projects`, one folder per project. Heartbeats follow the VS Code WakaTime extension's rules: one on every save, on switching files, and at most every 2 minutes while someone types or clicks in the editor, each with the cursor line and column, the file's line count and `category: coding`. The browser logs in with the space's password at `/login`, like code-server.
 - **Database:** PostgreSQL, hosted on Hack Club's Orchard. Migrations run with knex on every deploy.
 - **Login:** email codes (sent through an Airtable automation on the "Spaces Emails" table), Hack Club Auth (OAuth at auth.hackclub.com), or email and password for club members. Club membership and leader status come from the Clubs API.
 
@@ -176,8 +176,7 @@ Creating a space needs a verified Hack Club account or a club membership. Each u
 | Type | Description | Runs |
 |---|---|---|
 | `code-server` | VS Code | code-server in the sandbox |
-| `blender` | Blender 3D | `linuxserver/blender` in Docker |
-| `blender-hackatime` | Blender 3D with Hackatime (beta) | `linuxserver/blender` with the [Blender Hackatime](https://github.com/wally-hc/blender-hackatime) release zip and wakatime-cli, in Docker; a startup script installs and enables the add-on and removes the old `super_wakatime` one |
+| `blender` | Blender | `linuxserver/blender` with the [Blender Hackatime](https://github.com/wally-hc/blender-hackatime) release zip and wakatime-cli, in Docker; a startup script installs and enables the add-on |
 | `kicad` | KiCad PCB Design | `linuxserver/kicad` in Docker |
 | `freecad` | CAD software | `linuxserver/freecad` in Docker |
 | `godot` | Godot Engine | a Godot desktop image built on `linuxserver/baseimage-selkies`, in Docker |
@@ -226,12 +225,6 @@ Superadmins only. Every route is a POST and is written to the audit log. Owners 
 | `/spaces/:spaceId/file` | Read a file. Body: `{ "path", "download" }`. Without `download`, returns text files up to 1 MB as JSON; with `"download": true`, sends the file itself, up to 4 MB (Vercel's response limit). |
 | `/spaces/:spaceId/full-access` | Get the space's login to open it as its owner. Body: `{ "reason" }` (required). Joins the running session if the owner is using it; otherwise starts only the space's app, without marking the space as running. |
 | `/spaces/:spaceId/release` | Stop a space that was woken up for moderation, unless its owner is using it |
-
-### Playground API (`/api/v1/playground`)
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/visit` | Record that the logged-in user opened the Playground (`{ "tool": null }`) or launched a tool (`"godot"` or `"love2d"`). Counted in the admin stats. |
 
 ### Other
 

@@ -4,7 +4,6 @@ import users from './users/users.route.js';
 import admin from './admin/admin.route.js';
 import moderation from './admin/moderation.route.js';
 import roles from './admin/roles.route.js';
-import playground from './playground/playground.route.js';
 import oauth from './oauth/oauth.route.js';
 import clubs from './clubs/clubs.route.js';
 import cron from './cron/cron.route.js';
@@ -26,7 +25,6 @@ router.get('/up', (req, res) => {
 
 router.use('/spaces/', spaces);
 router.use('/users/', users);
-router.use('/playground/', playground);
 router.use('/admin/moderation/', moderation);
 router.use('/admin/roles/', roles);
 router.use('/admin/', admin);

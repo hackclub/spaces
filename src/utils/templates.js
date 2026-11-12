@@ -134,8 +134,20 @@ export const buildTemplate = async (type, config) => {
   return { type, source, snapshotId, sizeBytes };
 };
 
+const removeUnusedTemplates = async (configs, templates) => {
+  for (const template of templates.filter((item) => configs[item.type]?.kind !== 'gui')) {
+    try {
+      await deleteSnapshot(template.snapshot_id);
+      await pg('space_templates').where('type', template.type).delete();
+    } catch (err) {
+      console.error(`Failed to remove the unused ${template.type} template:`, err.message);
+    }
+  }
+};
+
 export const rebuildTemplates = async (configs, { force = false, only = null } = {}) => {
   const templates = await pg('space_templates');
+  if (!only) await removeUnusedTemplates(configs, templates);
   const byType = Object.fromEntries(templates.map((template) => [template.type, template]));
   const due = guiTypes(configs)
     .filter(([type]) => !only || type === only)
