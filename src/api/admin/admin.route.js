@@ -1,7 +1,7 @@
 import express from 'express';
 import pg from '../../utils/db.js';
-import { requirePermission, requireSuperadmin } from '../../middlewares/admin.middleware.js';
-import { getUserRoles, canManageUser, STAFF_ONLY_MESSAGE, STAFF_PERMISSION_KEYS, isStaffPermissionList } from '../../utils/permissions.js';
+import { requirePermission, requireSuperadmin, requireRoleGranting } from '../../middlewares/admin.middleware.js';
+import { getUserRoles, canManageUser, STAFF_ONLY_MESSAGE, STAFF_PERMISSION_KEYS, isStaffRole } from '../../utils/permissions.js';
 import { deleteSpace, stopContainer, spaceConfigs } from '../../utils/spaces.js';
 import { listTemplates, rebuildTemplates, listSpaceTypes } from '../../utils/templates.js';
 import { getHackatimeReport, hackatimeReportTypes, hackatimeConfigured, startHetznerImport, continueHetznerImport, hetznerImportProgress, retryFailedHetznerImports, recalculateSpacesActivity, restartHetznerImport } from '../../utils/hackatime.js';
@@ -125,7 +125,7 @@ router.post('/users', requirePermission('users.view'), async (req, res) => {
         'users.max_running',
         'users.beta_access',
         'users.is_superadmin',
-        pg.raw(`coalesce((select json_agg(json_build_object('id', r.id, 'name', r.name, 'staff', r.permissions && ?::text[]) order by r.name) from user_roles ur join roles r on r.id = ur.role_id where ur.user_id = users.id), '[]'::json) as roles`, [STAFF_PERMISSION_KEYS]),
+        pg.raw(`coalesce((select json_agg(json_build_object('id', r.id, 'name', r.name, 'staff', (r.permissions && ?::text[]) or cardinality(r.grants) > 0) order by r.name) from user_roles ur join roles r on r.id = ur.role_id where ur.user_id = users.id), '[]'::json) as roles`, [STAFF_PERMISSION_KEYS]),
         'users.hackclub_verification_status',
         pg.raw('users.hackclub_id is not null as hackclub_linked'),
         pg.raw('users.password_hash is not null as has_password'),
@@ -253,11 +253,57 @@ router.post('/users/:userId/roles', requireSuperadmin, async (req, res) => {
       details: { added: added.map((role) => role.name), removed: removed.map((role) => role.name) }
     });
 
-    const roles = (await getUserRoles(target.id)).map(({ id, name, permissions }) => ({ id, name, staff: isStaffPermissionList(permissions) }));
+    const roles = (await getUserRoles(target.id)).map((role) => ({ id: role.id, name: role.name, staff: isStaffRole(role) }));
     res.status(200).json({ success: true, message: 'Roles saved', data: { roles } });
   } catch (error) {
     console.error('Error updating roles:', error);
     res.status(500).json({ success: false, message: 'Failed to update roles' });
+  }
+});
+
+router.post('/users/:userId/grant-role', requireRoleGranting, async (req, res) => {
+  try {
+    const roleId = req.body?.roleId;
+    const granted = req.body?.granted;
+    if (!Number.isInteger(roleId) || typeof granted !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'Pick a role to give or remove' });
+    }
+
+    const role = await pg('roles').where('id', roleId).first();
+    if (!role) {
+      return res.status(404).json({ success: false, message: 'That role no longer exists' });
+    }
+    if (!req.user.is_superadmin && (!req.grants.includes(role.id) || isStaffRole(role))) {
+      return res.status(403).json({ success: false, message: "You can't give or remove that role" });
+    }
+
+    const target = await findTarget(req, res);
+    if (!target) return;
+    if (!req.user.is_superadmin && target.id === req.user.id) {
+      return res.status(403).json({ success: false, message: "You can't change your own roles" });
+    }
+
+    const has = Boolean(await pg('user_roles').where({ user_id: target.id, role_id: role.id }).first());
+    if (has === granted) {
+      return res.status(400).json({ success: false, message: granted ? `They already have ${role.name}` : `They don't have ${role.name}` });
+    }
+
+    if (granted) {
+      await pg('user_roles').insert({ user_id: target.id, role_id: role.id }).onConflict(['user_id', 'role_id']).ignore();
+    } else {
+      await pg('user_roles').where({ user_id: target.id, role_id: role.id }).delete();
+    }
+
+    await logAdminAction(req.user, 'user.roles', {
+      targetUser: target,
+      details: granted ? { added: [role.name], removed: [] } : { added: [], removed: [role.name] }
+    });
+
+    const roles = (await getUserRoles(target.id)).map((item) => ({ id: item.id, name: item.name, staff: isStaffRole(item) }));
+    res.status(200).json({ success: true, message: granted ? `Gave ${target.username} ${role.name}` : `Removed ${role.name} from ${target.username}`, data: { roles } });
+  } catch (error) {
+    console.error('Error giving a role:', error);
+    res.status(500).json({ success: false, message: 'Failed to change the role' });
   }
 });
 

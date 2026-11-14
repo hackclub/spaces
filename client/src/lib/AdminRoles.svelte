@@ -23,10 +23,15 @@
   let error = '';
 
   $: categories = [...new Set(permissions.map((permission) => permission.category))];
+  $: perkKeys = new Set(permissions.filter((permission) => permission.perk).map((permission) => permission.key));
+  $: isStaffRole = (role) => role.permissions.some((key) => !perkKeys.has(key)) || (role.grants ?? []).length > 0;
+  $: givable = draft ? roles.filter((role) => role.id !== draft.id && !isStaffRole(role)) : [];
+  $: givenBy = draft && !isNew ? roles.filter((role) => (role.grants ?? []).includes(draft.id)) : [];
+  $: grantsChanged = draft && selected && (draft.grants.length !== (selected.grants ?? []).length || draft.grants.some((id) => !(selected.grants ?? []).includes(id)));
   $: selected = roles.find((role) => role.id === selectedId) ?? null;
   $: isNew = draft && draft.id === null;
   $: changed = draft && (isNew || !selected || draft.name !== selected.name || (draft.description ?? '') !== (selected.description ?? '')
-    || draft.permissions.length !== selected.permissions.length || draft.permissions.some((key) => !selected.permissions.includes(key)));
+    || draft.permissions.length !== selected.permissions.length || draft.permissions.some((key) => !selected.permissions.includes(key)) || grantsChanged);
   $: memberIds = new Set(members.map((member) => member.id));
   $: candidates = memberSearch.trim()
     ? users
@@ -73,7 +78,7 @@
 
   function pick(role) {
     selectedId = role.id;
-    draft = { id: role.id, name: role.name, description: role.description ?? '', permissions: [...role.permissions] };
+    draft = { id: role.id, name: role.name, description: role.description ?? '', permissions: [...role.permissions], grants: [...(role.grants ?? [])] };
     members = [];
     memberSearch = '';
     message = '';
@@ -84,7 +89,7 @@
 
   function startNew() {
     selectedId = null;
-    draft = { id: null, name: '', description: '', permissions: [] };
+    draft = { id: null, name: '', description: '', permissions: [], grants: [] };
     members = [];
     message = '';
     error = '';
@@ -94,6 +99,10 @@
     draft.permissions = draft.permissions.includes(key)
       ? draft.permissions.filter((existing) => existing !== key)
       : [...draft.permissions, key];
+  }
+
+  function toggleGrant(id) {
+    draft.grants = draft.grants.includes(id) ? draft.grants.filter((existing) => existing !== id) : [...draft.grants, id];
   }
 
   function toggleCategory(category) {
@@ -118,7 +127,7 @@
   }
 
   const save = () => run('save', async () => {
-    const body = { name: draft.name, description: draft.description, permissions: draft.permissions };
+    const body = { name: draft.name, description: draft.description, permissions: draft.permissions, grants: draft.grants };
     const result = isNew ? await api('/create', body) : await api(`/${draft.id}/update`, body);
     await loadRoles();
     const role = roles.find((existing) => existing.id === result.data.id);
@@ -162,7 +171,7 @@
       {#each roles as role (role.id)}
         <button class="role-row" class:active={role.id === selectedId} on:click={() => pick(role)}>
           <span class="role-name">{role.name}</span>
-          <span class="role-meta">{role.permissions.length} permission{role.permissions.length === 1 ? '' : 's'} · {role.memberCount} {role.memberCount === 1 ? 'person' : 'people'}</span>
+          <span class="role-meta">{role.permissions.length} permission{role.permissions.length === 1 ? '' : 's'}{(role.grants ?? []).length ? ` · gives ${role.grants.length} role${role.grants.length === 1 ? '' : 's'}` : ''} · {role.memberCount} {role.memberCount === 1 ? 'person' : 'people'}</span>
           {#if role.description}<span class="role-meta">{role.description}</span>{/if}
         </button>
       {/each}
@@ -195,6 +204,25 @@
             {/each}
           </fieldset>
         {/each}
+
+        <h3>Roles they can give</h3>
+        {#if givenBy.length}
+          <p class="note">{givenBy.map((role) => role.name).join(', ')} can give this role, so it can't give roles itself.</p>
+        {:else}
+          <p class="note">People with this role can give these roles to others, or take them away, from the Users tab. They can't change their own roles. They also need "See the users list, including emails" to find people. Only roles without staff permissions can be picked.</p>
+          {#if givable.length}
+            <fieldset>
+              {#each givable as role (role.id)}
+                <label class="permission">
+                  <input type="checkbox" checked={draft.grants.includes(role.id)} on:change={() => toggleGrant(role.id)} />
+                  <span>{role.name}{#if role.description} <code>{role.description}</code>{/if}</span>
+                </label>
+              {/each}
+            </fieldset>
+          {:else}
+            <p class="note">There are no roles without staff permissions yet.</p>
+          {/if}
+        {/if}
 
         <div class="row">
           <button class="btn primary" disabled={busy !== '' || !changed || !draft.name.trim()} on:click={save}>

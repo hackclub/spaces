@@ -2,7 +2,7 @@ import express from 'express';
 import pg from '../../utils/db.js';
 import { requireSuperadmin } from '../../middlewares/admin.middleware.js';
 import { logAdminAction } from '../../utils/admin-log.js';
-import { PERMISSIONS, cleanPermissions } from '../../utils/permissions.js';
+import { PERMISSIONS, cleanPermissions, isStaffRole } from '../../utils/permissions.js';
 
 const router = express.Router();
 
@@ -13,7 +13,7 @@ const MAX_DESCRIPTION_LENGTH = 200;
 
 const listRoles = () => pg('roles')
   .leftJoin('user_roles', 'user_roles.role_id', 'roles.id')
-  .select('roles.id', 'roles.name', 'roles.description', 'roles.permissions', pg.raw('count(user_roles.user_id)::int as "memberCount"'))
+  .select('roles.id', 'roles.name', 'roles.description', 'roles.permissions', 'roles.grants', pg.raw('count(user_roles.user_id)::int as "memberCount"'))
   .groupBy('roles.id')
   .orderBy('roles.name');
 
@@ -56,6 +56,34 @@ const readFields = async (req, res, { roleId = null, partial = false } = {}) => 
     fields.permissions = cleanPermissions(req.body?.permissions);
   }
 
+  if (!partial || req.body?.grants !== undefined) {
+    const wanted = Array.isArray(req.body?.grants) ? [...new Set(req.body.grants)] : [];
+    if (!wanted.every(Number.isInteger) || (roleId !== null && wanted.includes(roleId))) {
+      res.status(400).json({ success: false, message: 'Pick the roles this role can give from the list' });
+      return null;
+    }
+    const found = wanted.length ? await pg('roles').whereIn('id', wanted).select('id', 'name', 'permissions', 'grants') : [];
+    if (found.length !== wanted.length) {
+      res.status(400).json({ success: false, message: 'One of those roles no longer exists' });
+      return null;
+    }
+    const staff = found.find(isStaffRole);
+    if (staff) {
+      res.status(400).json({ success: false, message: `${staff.name} has staff permissions, so only superadmins can give it` });
+      return null;
+    }
+    fields.grants = wanted.sort((a, b) => a - b);
+  }
+
+  if (roleId !== null && (fields.permissions !== undefined || fields.grants !== undefined)) {
+    const existing = await pg('roles').where('id', roleId).select('permissions', 'grants').first();
+    const givenBy = await pg('roles').whereRaw('? = any(grants)', [roleId]).select('name').first();
+    if (givenBy && isStaffRole({ permissions: fields.permissions ?? existing?.permissions, grants: fields.grants ?? existing?.grants })) {
+      res.status(400).json({ success: false, message: `${givenBy.name} can give this role, so it can't have staff permissions or give roles itself. Take it off ${givenBy.name} first.` });
+      return null;
+    }
+  }
+
   return fields;
 };
 
@@ -73,8 +101,8 @@ router.post('/create', async (req, res) => {
     const fields = await readFields(req, res);
     if (!fields) return;
 
-    const [role] = await pg('roles').insert(fields).returning(['id', 'name', 'description', 'permissions']);
-    await logAdminAction(req.user, 'role.create', { details: { name: role.name, permissions: role.permissions } });
+    const [role] = await pg('roles').insert(fields).returning(['id', 'name', 'description', 'permissions', 'grants']);
+    await logAdminAction(req.user, 'role.create', { details: { name: role.name, permissions: role.permissions, grants: role.grants } });
 
     res.status(200).json({ success: true, message: 'Role created', data: { ...role, memberCount: 0 } });
   } catch (error) {
@@ -93,7 +121,7 @@ router.post('/:roleId/update', async (req, res) => {
     const [updated] = await pg('roles')
       .where('id', role.id)
       .update({ ...fields, updated_at: pg.fn.now() })
-      .returning(['id', 'name', 'description', 'permissions']);
+      .returning(['id', 'name', 'description', 'permissions', 'grants']);
 
     const before = role.permissions || [];
     const after = updated.permissions || [];
@@ -102,7 +130,8 @@ router.post('/:roleId/update', async (req, res) => {
         name: updated.name,
         ...(role.name !== updated.name ? { renamed_from: role.name } : {}),
         added: after.filter((key) => !before.includes(key)),
-        removed: before.filter((key) => !after.includes(key))
+        removed: before.filter((key) => !after.includes(key)),
+        ...((role.grants || []).join() !== (updated.grants || []).join() ? { grants: { from: role.grants, to: updated.grants } } : {})
       }
     });
 
@@ -123,7 +152,10 @@ router.post('/:roleId/delete', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Remove everyone from this role before deleting it' });
     }
 
-    await pg('roles').where('id', role.id).delete();
+    await pg.transaction(async (trx) => {
+      await trx('roles').where('id', role.id).delete();
+      await trx('roles').whereRaw('? = any(grants)', [role.id]).update({ grants: pg.raw('array_remove(grants, ?)', [role.id]) });
+    });
     await logAdminAction(req.user, 'role.delete', { details: { name: role.name, permissions: role.permissions } });
 
     res.status(200).json({ success: true, message: 'Role deleted' });

@@ -26,6 +26,7 @@
   $: canManage = me?.is_superadmin || !isStaff;
   $: currentRoleIds = (user.roles ?? []).map((role) => role.id);
   $: rolesChanged = chosenRoles.size !== currentRoleIds.length || currentRoleIds.some((id) => !chosenRoles.has(id));
+  $: grantable = me?.is_superadmin ? [] : (me?.grantable_roles ?? []);
   $: hasActions = can('users.sign_out') || (can('users.stop_spaces') && user.runningCount > 0) || (can('spaces.view') && user.spaceCount > 0);
 
   onMount(async () => {
@@ -168,6 +169,24 @@
           {:else}
             <button class="btn" disabled={busy !== ''} on:click={() => act('superadmin', 'superadmin', { is_superadmin: true }, `Make ${user.username} a superadmin? They'll get every permission, including managing roles and other superadmins.`)}>Make superadmin</button>
           {/if}
+        </section>
+      {/if}
+
+      {#if grantable.length && !isSelf}
+        <section>
+          <h3>Roles you can give</h3>
+          {#each grantable as role (role.id)}
+            {@const has = (user.roles ?? []).some((existing) => existing.id === role.id)}
+            <div class="row grant">
+              <span class="grant-name">
+                <strong>{role.name}</strong>
+                {#if role.description}<span class="role-desc">{role.description}</span>{/if}
+              </span>
+              <button class="btn" disabled={busy !== ''} on:click={() => act(`grant-${role.id}`, 'grant-role', { roleId: role.id, granted: !has })}>
+                {busy === `grant-${role.id}` ? 'Saving...' : has ? 'Remove' : 'Give'}
+              </button>
+            </div>
+          {/each}
         </section>
       {/if}
 
@@ -378,6 +397,16 @@
   .role-desc {
     display: block;
     color: #666;
+  }
+
+  .grant {
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 4px 0;
+  }
+
+  .grant-name {
+    min-width: 0;
   }
 
   .danger {

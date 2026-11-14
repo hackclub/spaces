@@ -5,7 +5,7 @@ import { sendCodeIpLimiter, sendCodeGlobalLimiter, authLimiter, accountIpLimiter
 import { validateEmail, validateUsername, normalizeEmail } from '../../utils/validation.js';
 import { extractAuth } from '../../middlewares/auth.middleware.js';
 import { getUser } from '../../utils/user.js';
-import { resolveAccess, isStaffPermissionList } from '../../utils/permissions.js';
+import { resolveAccess, isStaffPermissionList, grantableRoles } from '../../utils/permissions.js';
 import { createSession, deleteSession, setSessionCookie } from '../../utils/sessions.js';
 
 const router = express.Router();
@@ -32,9 +32,10 @@ router.get("/me", async (req, res) => {
       data: {
         username: user.username,
         email: user.email,
-        is_admin: isStaffPermissionList(permissions) || Boolean(access.viewingAs),
+        is_admin: isStaffPermissionList(permissions) || access.grants.length > 0 || Boolean(access.viewingAs),
         is_superadmin: Boolean(access.user.is_superadmin),
         permissions,
+        grantable_roles: await grantableRoles(access.grants),
         viewing_as: access.viewingAs,
         hackatime_api_key: user.hackatime_api_key,
         hackclub_id: user.hackclub_id,

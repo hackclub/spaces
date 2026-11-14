@@ -31,8 +31,12 @@ export const cleanPermissions = (permissions) => [...new Set((Array.isArray(perm
 export const getUserRoles = (userId) => pg('user_roles')
   .join('roles', 'roles.id', 'user_roles.role_id')
   .where('user_roles.user_id', userId)
-  .select('roles.id', 'roles.name', 'roles.permissions')
+  .select('roles.id', 'roles.name', 'roles.permissions', 'roles.grants')
   .orderBy('roles.name');
+
+export const isStaffRole = (role) => isStaffPermissionList(role?.permissions) || (role?.grants || []).length > 0;
+
+const grantsFrom = (roles) => [...new Set(roles.flatMap((role) => role.grants || []))];
 
 export const getPermissions = async (user) => {
   if (!user) return new Set();
@@ -47,15 +51,17 @@ export const resolveAccess = async (user, req) => {
   const roleIds = user?.is_superadmin
     ? String(req.cookies?.[VIEW_AS_COOKIE] ?? '').split(',').map(Number).filter((id) => Number.isInteger(id) && id > 0)
     : [];
-  const roles = roleIds.length ? await pg('roles').whereIn('id', roleIds).select('id', 'name', 'permissions').orderBy('name') : [];
+  const roles = roleIds.length ? await pg('roles').whereIn('id', roleIds).select('id', 'name', 'permissions', 'grants').orderBy('name') : [];
 
   if (!roles.length) {
-    return { user, permissions: await getPermissions(user), viewingAs: null };
+    const own = user && !user.is_superadmin ? await getUserRoles(user.id) : [];
+    return { user, permissions: await getPermissions(user), grants: grantsFrom(own), viewingAs: null };
   }
 
   return {
     user: { ...user, is_superadmin: false },
     permissions: new Set(roles.flatMap((role) => role.permissions || []).filter((key) => PERMISSION_KEYS.has(key))),
+    grants: grantsFrom(roles),
     viewingAs: roles.map(({ id, name }) => ({ id, name }))
   };
 };
@@ -63,8 +69,14 @@ export const resolveAccess = async (user, req) => {
 export const hasPermission = async (user, permission) => (await getPermissions(user)).has(permission);
 
 export const isStaff = async (user) => Boolean(user.is_superadmin)
-  || (await getUserRoles(user.id)).some((role) => isStaffPermissionList(role.permissions));
+  || (await getUserRoles(user.id)).some(isStaffRole);
 
 export const canManageUser = async (actor, target) => !target || Boolean(actor.is_superadmin) || !(await isStaff(target));
+
+export const grantableRoles = async (grants) => (grants.length
+  ? (await pg('roles').whereIn('id', grants).select('id', 'name', 'description', 'permissions', 'grants').orderBy('name'))
+    .filter((role) => !isStaffRole(role))
+    .map(({ id, name, description }) => ({ id, name, description }))
+  : []);
 
 export const STAFF_ONLY_MESSAGE = 'Only superadmins can manage people with roles';
