@@ -8,6 +8,7 @@
   import AdminRoles from './AdminRoles.svelte';
   import AdminHackatime from './AdminHackatime.svelte';
   import AdminSpaceTypes from './AdminSpaceTypes.svelte';
+  import AdminGiveRoles from './AdminGiveRoles.svelte';
   import { userData } from '../stores/user.svelte';
   import { createConfirm } from './confirm.js';
 
@@ -42,7 +43,7 @@
 
   const can = (permission) => Boolean(me?.is_superadmin || me?.permissions?.includes(permission));
   const canModerate = can('moderation.lock') || can('moderation.files') || can('moderation.full_access');
-  const TAB_LABELS = { analytics: 'Analytics', users: 'Users', spaces: 'Spaces', usage: 'Usage', hackatime: 'Hackatime', logs: 'Logs', types: 'Space types', roles: 'Roles' };
+  const TAB_LABELS = { analytics: 'Analytics', users: 'Users', spaces: 'Spaces', usage: 'Usage', hackatime: 'Hackatime', logs: 'Logs', types: 'Space types', roles: 'Roles', give: 'Give roles' };
   const TABS = [
     (can('stats.view') || can('sandbox.view')) && 'analytics',
     can('users.view') && 'users',
@@ -51,7 +52,8 @@
     can('hackatime.view') && 'hackatime',
     can('templates.manage') && 'types',
     can('logs.view') && 'logs',
-    me?.is_superadmin && 'roles'
+    me?.is_superadmin && 'roles',
+    (me?.is_superadmin || (me?.grantable_roles ?? []).length > 0) && 'give'
   ].filter(Boolean);
   const USAGE_PERIODS = [1, 7, 30];
   const STATS_PERIODS = [7, 30, 90];
@@ -886,6 +888,10 @@
 
   {#if activeTab === 'logs' && can('logs.view')}
     <AdminLogs />
+  {/if}
+
+  {#if activeTab === 'give'}
+    <AdminGiveRoles />
   {/if}
 
   {#if activeTab === 'roles' && me?.is_superadmin}

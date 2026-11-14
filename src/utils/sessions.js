@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import pg from './db.js';
+import { applyRoleInvites } from './role-invites.js';
 
 export const SESSION_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
@@ -28,6 +29,7 @@ export const createSession = async (userId, method) => {
   });
 
   await recordLogin(userId, method);
+  await applyRoleInvites(userId);
 
   return token;
 };

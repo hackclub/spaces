@@ -307,6 +307,105 @@ router.post('/users/:userId/grant-role', requireRoleGranting, async (req, res) =
   }
 });
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const canGiveRole = (req, role) => req.user.is_superadmin || (req.grants.includes(role.id) && !isStaffRole(role));
+
+const givableRoles = async (req) => {
+  const roles = await pg('roles').select('id', 'name', 'description', 'permissions', 'grants').orderBy('name');
+  return roles.filter((role) => canGiveRole(req, role)).map(({ id, name, description }) => ({ id, name, description }));
+};
+
+const listInvites = (roleIds) => pg('role_invites')
+  .join('roles', 'roles.id', 'role_invites.role_id')
+  .leftJoin('users', 'users.id', 'role_invites.granted_by')
+  .whereIn('role_invites.role_id', roleIds)
+  .select('role_invites.id', 'role_invites.email', 'role_invites.created_at', 'roles.id as role_id', 'roles.name as role_name', 'users.username as granted_by')
+  .orderBy('role_invites.created_at', 'desc');
+
+router.post('/role-invites', requireRoleGranting, async (req, res) => {
+  try {
+    const roles = await givableRoles(req);
+    res.status(200).json({ success: true, data: { roles, invites: await listInvites(roles.map((role) => role.id)) } });
+  } catch (error) {
+    console.error('Error listing roles waiting for people:', error);
+    res.status(500).json({ success: false, message: 'Failed to load roles' });
+  }
+});
+
+router.post('/role-invites/set', requireRoleGranting, async (req, res) => {
+  try {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const roleId = req.body?.roleId;
+    const granted = req.body?.granted;
+    if (!EMAIL_PATTERN.test(email) || email.length > 254) {
+      return res.status(400).json({ success: false, message: 'Enter a valid email' });
+    }
+    if (!Number.isInteger(roleId) || typeof granted !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'Pick a role' });
+    }
+
+    const role = await pg('roles').where('id', roleId).first();
+    if (!role) {
+      return res.status(404).json({ success: false, message: 'That role no longer exists' });
+    }
+    if (!canGiveRole(req, role)) {
+      return res.status(403).json({ success: false, message: "You can't give or remove that role" });
+    }
+
+    const target = await pg('users').whereRaw('lower(email) = ?', [email]).first();
+
+    if (!target) {
+      const waiting = await pg('role_invites').where({ email, role_id: role.id }).first();
+      if (granted) {
+        if (waiting) return res.status(400).json({ success: false, message: `${email} is already waiting for ${role.name}` });
+        await pg('role_invites').insert({ email, role_id: role.id, granted_by: req.user.id });
+      } else {
+        if (!waiting) return res.status(400).json({ success: false, message: `${email} isn't waiting for ${role.name}` });
+        await pg('role_invites').where('id', waiting.id).delete();
+      }
+      await logAdminAction(req.user, 'user.roles', {
+        targetUser: { id: null, email },
+        details: granted ? { added: [role.name], removed: [], waiting_for_login: true } : { added: [], removed: [role.name], waiting_for_login: true }
+      });
+      return res.status(200).json({
+        success: true,
+        message: granted ? `Nobody uses ${email} yet. They'll get ${role.name} when they first log in.` : `${email} won't get ${role.name} when they log in.`,
+        data: { invites: await listInvites((await givableRoles(req)).map((item) => item.id)) }
+      });
+    }
+
+    if (!req.user.is_superadmin && target.id === req.user.id) {
+      return res.status(403).json({ success: false, message: "You can't change your own roles" });
+    }
+    if (!(await canManageUser(req.user, target))) {
+      return res.status(403).json({ success: false, message: STAFF_ONLY_MESSAGE });
+    }
+
+    const has = Boolean(await pg('user_roles').where({ user_id: target.id, role_id: role.id }).first());
+    if (has === granted) {
+      return res.status(400).json({ success: false, message: granted ? `${email} already has ${role.name}` : `${email} doesn't have ${role.name}` });
+    }
+    if (granted) {
+      await pg('user_roles').insert({ user_id: target.id, role_id: role.id }).onConflict(['user_id', 'role_id']).ignore();
+    } else {
+      await pg('user_roles').where({ user_id: target.id, role_id: role.id }).delete();
+    }
+    await logAdminAction(req.user, 'user.roles', {
+      targetUser: target,
+      details: granted ? { added: [role.name], removed: [] } : { added: [], removed: [role.name] }
+    });
+    res.status(200).json({
+      success: true,
+      message: granted ? `Gave ${email} ${role.name}` : `Removed ${role.name} from ${email}`,
+      data: { invites: await listInvites((await givableRoles(req)).map((item) => item.id)) }
+    });
+  } catch (error) {
+    console.error('Error giving a role by email:', error);
+    res.status(500).json({ success: false, message: 'Failed to change the role' });
+  }
+});
+
 router.post('/users/:userId/superadmin', requireSuperadmin, async (req, res) => {
   try {
     const target = await findTarget(req, res);
