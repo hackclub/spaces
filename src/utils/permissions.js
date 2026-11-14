@@ -12,7 +12,7 @@ export const PERMISSIONS = [
   { key: 'spaces.delete', category: 'User management', label: 'Delete spaces' },
   { key: 'users.delete', category: 'User management', label: 'Delete accounts and all their spaces' },
   { key: 'beta.manage', category: 'Access', label: 'Give or remove beta access' },
-  { key: 'spaces.skip_verification', category: 'Access', label: 'Create spaces without Hack Club verification' },
+  { key: 'spaces.skip_verification', category: 'Access', label: 'Create spaces without Hack Club verification', perk: true },
   { key: 'moderation.lock', category: 'Moderation', label: 'Lock and unlock spaces' },
   { key: 'moderation.files', category: 'Moderation', label: "Browse and download a space's files" },
   { key: 'moderation.full_access', category: 'Moderation', label: 'Open any space' },
@@ -22,6 +22,8 @@ export const PERMISSIONS = [
 ];
 
 export const PERMISSION_KEYS = new Set(PERMISSIONS.map((permission) => permission.key));
+export const STAFF_PERMISSION_KEYS = PERMISSIONS.filter((permission) => !permission.perk).map((permission) => permission.key);
+export const isStaffPermissionList = (permissions) => (permissions || []).some((key) => STAFF_PERMISSION_KEYS.includes(key));
 
 export const cleanPermissions = (permissions) => [...new Set((Array.isArray(permissions) ? permissions : []).filter((key) => PERMISSION_KEYS.has(key)))]
   .sort((a, b) => PERMISSIONS.findIndex((p) => p.key === a) - PERMISSIONS.findIndex((p) => p.key === b));
@@ -61,7 +63,7 @@ export const resolveAccess = async (user, req) => {
 export const hasPermission = async (user, permission) => (await getPermissions(user)).has(permission);
 
 export const isStaff = async (user) => Boolean(user.is_superadmin)
-  || Boolean(await pg('user_roles').where('user_id', user.id).first());
+  || (await getUserRoles(user.id)).some((role) => isStaffPermissionList(role.permissions));
 
 export const canManageUser = async (actor, target) => !target || Boolean(actor.is_superadmin) || !(await isStaff(target));
 

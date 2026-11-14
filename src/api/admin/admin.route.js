@@ -1,7 +1,7 @@
 import express from 'express';
 import pg from '../../utils/db.js';
 import { requirePermission, requireSuperadmin } from '../../middlewares/admin.middleware.js';
-import { getUserRoles, canManageUser, STAFF_ONLY_MESSAGE } from '../../utils/permissions.js';
+import { getUserRoles, canManageUser, STAFF_ONLY_MESSAGE, STAFF_PERMISSION_KEYS, isStaffPermissionList } from '../../utils/permissions.js';
 import { deleteSpace, stopContainer, spaceConfigs } from '../../utils/spaces.js';
 import { listTemplates, rebuildTemplates, listSpaceTypes } from '../../utils/templates.js';
 import { getHackatimeReport, hackatimeReportTypes, hackatimeConfigured, startHetznerImport, continueHetznerImport, hetznerImportProgress, retryFailedHetznerImports, recalculateSpacesActivity, restartHetznerImport } from '../../utils/hackatime.js';
@@ -125,7 +125,7 @@ router.post('/users', requirePermission('users.view'), async (req, res) => {
         'users.max_running',
         'users.beta_access',
         'users.is_superadmin',
-        pg.raw(`coalesce((select json_agg(json_build_object('id', r.id, 'name', r.name) order by r.name) from user_roles ur join roles r on r.id = ur.role_id where ur.user_id = users.id), '[]'::json) as roles`),
+        pg.raw(`coalesce((select json_agg(json_build_object('id', r.id, 'name', r.name, 'staff', r.permissions && ?::text[]) order by r.name) from user_roles ur join roles r on r.id = ur.role_id where ur.user_id = users.id), '[]'::json) as roles`, [STAFF_PERMISSION_KEYS]),
         'users.hackclub_verification_status',
         pg.raw('users.hackclub_id is not null as hackclub_linked'),
         pg.raw('users.password_hash is not null as has_password'),
@@ -253,7 +253,7 @@ router.post('/users/:userId/roles', requireSuperadmin, async (req, res) => {
       details: { added: added.map((role) => role.name), removed: removed.map((role) => role.name) }
     });
 
-    const roles = (await getUserRoles(target.id)).map(({ id, name }) => ({ id, name }));
+    const roles = (await getUserRoles(target.id)).map(({ id, name, permissions }) => ({ id, name, staff: isStaffPermissionList(permissions) }));
     res.status(200).json({ success: true, message: 'Roles saved', data: { roles } });
   } catch (error) {
     console.error('Error updating roles:', error);

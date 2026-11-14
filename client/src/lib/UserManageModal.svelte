@@ -22,7 +22,7 @@
   let chosenRoles = new Set((user.roles ?? []).map((role) => role.id));
 
   $: isSelf = me?.email === user.email;
-  $: isStaff = user.is_superadmin || (user.roles ?? []).length > 0;
+  $: isStaff = user.is_superadmin || (user.roles ?? []).some((role) => role.staff);
   $: canManage = me?.is_superadmin || !isStaff;
   $: currentRoleIds = (user.roles ?? []).map((role) => role.id);
   $: rolesChanged = chosenRoles.size !== currentRoleIds.length || currentRoleIds.some((id) => !chosenRoles.has(id));
