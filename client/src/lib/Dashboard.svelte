@@ -61,8 +61,6 @@
   let copyFeedback = {};
   let viewMode = "grid";
 
-  let showSafariNotSupported = false;
-  let acknowlegeSafariNotSupported = false;
   let legacyGodotProjects = [];
   let legacyDownloading = false;
   let legacyMessage = "";
@@ -72,10 +70,6 @@
     loadSpaces();
     loadSpaceTypes();
     findLegacyGodotProjects().then((projects) => (legacyGodotProjects = projects));
-
-    showSafariNotSupported = /^((?!chrome|android).)*safari/i.test(
-      navigator.userAgent,
-    );
   });
 
   async function loadClubData() {
@@ -289,7 +283,7 @@
   function openSpace(event, space) {
     recordOpen(space);
 
-    if (isGuiType(space.type) || !space.password || !space.access_url) {
+    if (space.login_username || !space.password || !space.access_url) {
       return;
     }
 
@@ -694,18 +688,6 @@
     }
   }
 </script>
-
-{#if showSafariNotSupported == true && acknowlegeSafariNotSupported == false}
-  <div class="safari-not-supported">
-    <p>Safari is not a supported browser</p>
-    <button
-      on:click={() => {
-        acknowlegeSafariNotSupported = true;
-      }}
-      class="btn-primary">Ignore</button
-    >
-  </div>
-{/if}
 
 <div class="dashboard">
   <header class="dashboard-header">

@@ -211,11 +211,12 @@ const START_DOCKER = [
   "exit 1"
 ].join("; ");
 
-const guiAccessUrl = (domain, password) => {
-  const url = new URL(domain);
-  url.username = GUI_USERNAME;
-  url.password = password;
-  return url.toString();
+export const hasLoginInUrl = (accessUrl) => {
+  try {
+    return Boolean(new URL(accessUrl).username);
+  } catch {
+    return false;
+  }
 };
 
 export const setupGuiApp = async (sandbox, { image, build }) => {
@@ -257,6 +258,34 @@ export const writeHackatimeConfig = async (sandbox, apiKey, machine = "", { inHo
 
 const LOVE_APP_DIR = "/opt/spaces-love";
 const LOVE_APP_SOURCE = `https://codeload.github.com/hackclub/spaces/tar.gz/${process.env.VERCEL_GIT_COMMIT_SHA || "main"}`;
+const DESKTOP_APP_DIR = "/opt/spaces-desktop";
+const DESKTOP_TARGET_PORT = 3001;
+
+const INSTALL_DESKTOP_APP = [
+  'set -e',
+  '[ "$(cat "$DIR/SOURCE" 2>/dev/null)" = "$SOURCE" ] && exit 0',
+  'tmp=$(mktemp -d)',
+  'trap \'rm -rf "$tmp"\' EXIT',
+  'curl -fsSL --retry 3 --retry-all-errors "$SOURCE" | tar -xz -C "$tmp" --strip-components=1 --wildcards "*/space-apps/desktop/*"',
+  'rm -rf "$DIR.new" && mkdir -p "$DIR.new"',
+  'mv "$tmp/space-apps/desktop" "$DIR.new/app"',
+  'chmod -R a+rX "$DIR.new" && printf "%s" "$SOURCE" > "$DIR.new/SOURCE"',
+  'rm -rf "$DIR" && mv "$DIR.new" "$DIR"'
+].join("\n");
+
+const installDesktopApp = async (sandbox) => {
+  try {
+    await run(sandbox, INSTALL_DESKTOP_APP, {
+      sudo: true,
+      env: { DIR: DESKTOP_APP_DIR, SOURCE: LOVE_APP_SOURCE },
+      timeoutMs: 5 * MINUTE
+    });
+  } catch (err) {
+    const installed = await sandbox.runCommand({ cmd: "test", args: ["-f", `${DESKTOP_APP_DIR}/app/server.mjs`] }).then((result) => result.exitCode === 0).catch(() => false);
+    if (!installed) throw err;
+    console.error("Failed to update the desktop login, using the installed one:", err.message);
+  }
+};
 
 const INSTALL_LOVE_APP = [
   'set -e',
@@ -377,7 +406,7 @@ export const deleteSnapshot = async (snapshotId) => {
 };
 
 export const startGuiApp = async (sandbox, { image, password, build, env = {}, resetFiles = [] }) => {
-  const runImage = await setupGuiApp(sandbox, { image, build });
+  const [runImage] = await Promise.all([setupGuiApp(sandbox, { image, build }), installDesktopApp(sandbox)]);
   const extraEnv = Object.keys(env).map((name) => `-e ${name}="$${name}"`).join(" ");
 
   await run(
@@ -385,7 +414,7 @@ export const startGuiApp = async (sandbox, { image, password, build, env = {}, r
     [
       `docker rm -f ${GUI_CONTAINER} >/dev/null 2>&1 || true`,
       ...resetFiles.map((file) => `dir=$(realpath -m "$(dirname "$CONFIG"/${JSON.stringify(file)})"); case "$dir/" in "$(realpath -m "$CONFIG")"/*) rm -f "$dir"/${JSON.stringify(file.split("/").pop())} ;; esac`),
-      `docker run -d --name ${GUI_CONTAINER} -p ${GUI_PORT}:3000 -e PUID=1000 -e PGID=1000 -e PASSWORD="$SPACE_PASSWORD" -e SELKIES_FILE_TRANSFERS=upload,download -e SELKIES_UI_SIDEBAR_SHOW_FILES=True --shm-size=1g ${extraEnv} -v "$CONFIG":/config "$IMAGE" >/dev/null`
+      `docker run -d --name ${GUI_CONTAINER} -p 127.0.0.1:${DESKTOP_TARGET_PORT}:3000 -e PUID=1000 -e PGID=1000 -e PASSWORD="$SPACE_PASSWORD" -e SELKIES_FILE_TRANSFERS=upload,download -e SELKIES_UI_SIDEBAR_SHOW_FILES=True --shm-size=1g ${extraEnv} -v "$CONFIG":/config "$IMAGE" >/dev/null`
     ].join("; "),
     { sudo: true, env: { ...env, SPACE_PASSWORD: password, CONFIG: GUI_CONFIG_PATH, IMAGE: runImage }, timeoutMs: 2 * MINUTE }
   );
@@ -394,9 +423,9 @@ export const startGuiApp = async (sandbox, { image, password, build, env = {}, r
     await run(
       sandbox,
       [
-        `for i in $(seq 1 120); do code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${GUI_PORT}/); [ "$code" != 000 ] && break; sleep 0.5; done`,
+        `for i in $(seq 1 120); do code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${DESKTOP_TARGET_PORT}/); [ "$code" != 000 ] && break; sleep 0.5; done`,
         `[ "$code" = 401 ] || { echo "desktop answered $code without a password"; exit 2; }`,
-        `[ "$(curl -s -o /dev/null -w '%{http_code}' -u "${GUI_USERNAME}:$SPACE_PASSWORD" http://127.0.0.1:${GUI_PORT}/)" = 200 ] || { echo "desktop rejected the space password"; exit 3; }`
+        `[ "$(curl -s -o /dev/null -w '%{http_code}' -u "${GUI_USERNAME}:$SPACE_PASSWORD" http://127.0.0.1:${DESKTOP_TARGET_PORT}/)" = 200 ] || { echo "desktop rejected the space password"; exit 3; }`
       ].join("; "),
       { env: { SPACE_PASSWORD: password }, timeoutMs: 2 * MINUTE }
     );
@@ -405,5 +434,28 @@ export const startGuiApp = async (sandbox, { image, password, build, env = {}, r
     throw err;
   }
 
-  return guiAccessUrl(sandbox.domain(GUI_PORT), password);
+  await run(sandbox, "pkill -f '[/]opt/spaces-desktop/app/server.mjs' || true");
+  await sandbox.runCommand({
+    cmd: "node",
+    args: [`${DESKTOP_APP_DIR}/app/server.mjs`],
+    env: {
+      PORT: String(GUI_PORT),
+      TARGET_PORT: String(DESKTOP_TARGET_PORT),
+      SPACE_PASSWORD: password,
+      DESKTOP_USERNAME: GUI_USERNAME
+    },
+    detached: true
+  });
+
+  await run(
+    sandbox,
+    [
+      `for i in $(seq 1 60); do curl -fs -o /dev/null http://127.0.0.1:${GUI_PORT}/healthz && break; sleep 0.5; done`,
+      `[ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${GUI_PORT}/)" = 302 ] || { echo "the desktop login answered without a password"; exit 2; }`,
+      `[ "$(curl -s -o /dev/null -w '%{http_code}' --data-urlencode "password=$SPACE_PASSWORD" http://127.0.0.1:${GUI_PORT}/login)" = 302 ] || { echo "the desktop login rejected the space password"; exit 3; }`
+    ].join("; "),
+    { env: { SPACE_PASSWORD: password }, timeoutMs: 2 * MINUTE }
+  );
+
+  return sandbox.domain(GUI_PORT);
 };

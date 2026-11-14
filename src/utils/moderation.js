@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import path from 'path';
 import pg from './db.js';
-import { findSandbox, SANDBOX_ROOT, GUI_USERNAME } from './sandboxes.js';
+import { findSandbox, SANDBOX_ROOT, GUI_USERNAME, hasLoginInUrl } from './sandboxes.js';
 import { startSpaceApp, spaceConfigs } from './spaces.js';
 import { recordRunStop } from './space-runs.js';
 
@@ -120,7 +120,7 @@ export const openForModeration = async (space) => {
     type: space.type,
     access_url: accessUrl,
     password,
-    login_username: gui ? GUI_USERNAME : null
+    login_username: gui && hasLoginInUrl(accessUrl) ? GUI_USERNAME : null
   });
 
   if (space.running && space.access_url && space.password) {

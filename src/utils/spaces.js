@@ -11,6 +11,7 @@ import {
   GUI_PORT,
   GUI_VCPUS,
   GUI_USERNAME,
+  hasLoginInUrl,
   SANDBOX_IMAGE,
   SANDBOX_ROOT,
   sandboxNameFor,
@@ -888,7 +889,7 @@ export const getUserSpaces = async (authorization) => {
       return {
         ...space,
         folder: space.type === "code-server" ? spaceNameFor(workspace_dir) : null,
-        login_username: configFor(space.type)?.kind === "gui" ? GUI_USERNAME : null,
+        login_username: configFor(space.type)?.kind === "gui" && hasLoginInUrl(space.access_url) ? GUI_USERNAME : null,
         status: space.running ? 'running' : 'stopped'
       };
     });
