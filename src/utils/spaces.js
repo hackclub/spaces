@@ -152,10 +152,10 @@ const GODOT_PLUGINS = [
 const GODOT_UPLOADS_PLUGIN_CFG = [
   "[plugin]",
   "",
-  "name=\"Spaces uploads\"",
-  "description=\"Shows files uploaded to your Hack Club space in the FileSystem dock.\"",
+  "name=\"Hack Club Spaces\"",
+  "description=\"Shows files uploaded to your space in the FileSystem dock and adds a Terminal button.\"",
   "author=\"Hack Club\"",
-  "version=\"1.0\"",
+  "version=\"1.1\"",
   "script=\"plugin.gd\""
 ].join("\n");
 
@@ -164,8 +164,10 @@ const GODOT_UPLOADS_PLUGIN = [
   "extends EditorPlugin",
   "",
   "const SIGNAL_FILE := \"/tmp/godot-rescan\"",
+  "const TERMINAL := \"/opt/godot/terminal\"",
   "",
   "var timer: Timer",
+  "var terminal_button: Button",
   "",
   "",
   "func _enter_tree() -> void:",
@@ -174,11 +176,25 @@ const GODOT_UPLOADS_PLUGIN = [
   "\ttimer.timeout.connect(_check)",
   "\tadd_child(timer)",
   "\ttimer.start()",
+  "\tif FileAccess.file_exists(TERMINAL):",
+  "\t\tterminal_button = Button.new()",
+  "\t\tterminal_button.text = \"Terminal\"",
+  "\t\tterminal_button.tooltip_text = \"Open a terminal in this project's folder\"",
+  "\t\tterminal_button.flat = true",
+  "\t\tterminal_button.pressed.connect(_open_terminal)",
+  "\t\tadd_control_to_container(CONTAINER_TOOLBAR, terminal_button)",
   "",
   "",
   "func _exit_tree() -> void:",
   "\tif is_instance_valid(timer):",
   "\t\ttimer.queue_free()",
+  "\tif is_instance_valid(terminal_button):",
+  "\t\tremove_control_from_container(CONTAINER_TOOLBAR, terminal_button)",
+  "\t\tterminal_button.queue_free()",
+  "",
+  "",
+  "func _open_terminal() -> void:",
+  "\tOS.create_process(TERMINAL, [ProjectSettings.globalize_path(\"res://\")])",
   "",
   "",
   "func _check() -> void:",
@@ -189,6 +205,14 @@ const GODOT_UPLOADS_PLUGIN = [
   "\t\treturn",
   "\tDirAccess.remove_absolute(SIGNAL_FILE)",
   "\tfilesystem.scan()"
+].join("\n");
+
+const GODOT_TERMINAL = [
+  "#!/bin/sh",
+  "dir=${1:-$HOME}",
+  "[ -d \"$dir\" ] || dir=$HOME",
+  "pkill -x xterm",
+  "exec xterm -title Terminal -fa Monospace -fs 12 -geometry 110x32 -bg '#1d1f21' -fg '#e0e0e0' -e tmux new-session -A -s main -c \"$dir\""
 ].join("\n");
 
 const GODOT_UPLOAD_MOVER = [
@@ -295,19 +319,21 @@ export const spaceConfigs = {
       { name: "Desktop base", current: "baseimage-selkies:debiantrixie", latestUrl: "https://github.com/linuxserver/docker-baseimage-selkies/releases" }
     ],
     build: {
-      tag: "spaces-godot:4.7.2-7",
+      tag: "spaces-godot:4.7.2-8",
       dockerfile: [
         "FROM ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
         `ARG GODOT_VERSION=${GODOT_VERSION}-stable`,
         `ARG WAKATIME_CLI_VERSION=${WAKATIME_CLI_VERSION}`,
         `ARG GODOT_WAKATIME_COMMIT=${GODOT_WAKATIME_COMMIT}`,
-        "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl unzip libxcursor1 libxinerama1 libxrandr2 libxi6 libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri libfontconfig1 libasound2t64 libpulse0 && { curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/godot.zip \"https://downloads.godotengine.org/?version=${GODOT_VERSION%-*}&flavor=${GODOT_VERSION#*-}&slug=linux.x86_64.zip&platform=linux.64\" || curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/godot.zip \"https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip\"; } && unzip -q /tmp/godot.zip -d /opt/godot && mv /opt/godot/Godot_v*_linux.x86_64 /opt/godot/godot && chmod 755 /opt/godot/godot && rm -rf /tmp/godot.zip /var/lib/apt/lists/*",
+        "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl unzip libxcursor1 libxinerama1 libxrandr2 libxi6 libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri libfontconfig1 libasound2t64 libpulse0 git gh openssh-client xterm tmux nano && printf 'set -g mouse on\\nset -g status-right-length 80\\nset -g status-right \" Ctrl+B then D: back to Godot. The terminal keeps running. \"\\n' > /etc/tmux.conf && { curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/godot.zip \"https://downloads.godotengine.org/?version=${GODOT_VERSION%-*}&flavor=${GODOT_VERSION#*-}&slug=linux.x86_64.zip&platform=linux.64\" || curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/godot.zip \"https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip\"; } && unzip -q /tmp/godot.zip -d /opt/godot && mv /opt/godot/Godot_v*_linux.x86_64 /opt/godot/godot && chmod 755 /opt/godot/godot && rm -rf /tmp/godot.zip /var/lib/apt/lists/*",
         "RUN mkdir -p /opt/wakatime /opt/godot/addons && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/wakatime.zip \"https://github.com/wakatime/wakatime-cli/releases/download/${WAKATIME_CLI_VERSION}/wakatime-cli-linux-amd64.zip\" && unzip -q /tmp/wakatime.zip -d /opt/wakatime && chmod 755 /opt/wakatime/wakatime-cli-linux-amd64 && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/godot-wakatime.tar.gz \"https://codeload.github.com/BudzioT/Godot_Super-Wakatime/tar.gz/${GODOT_WAKATIME_COMMIT}\" && tar -xzf /tmp/godot-wakatime.tar.gz -C /tmp && mv /tmp/Godot_Super-Wakatime-${GODOT_WAKATIME_COMMIT}/addons/godot_super-wakatime /opt/godot/addons/ && rm -rf /tmp/wakatime.zip /tmp/godot-wakatime.tar.gz /tmp/Godot_Super-Wakatime-*",
-        `RUN echo ${base64(GODOT_LAUNCHER)} | base64 -d > /opt/godot/run && echo ${base64(GODOT_UPLOAD_MOVER)} | base64 -d > /opt/godot/move-uploads && echo ${base64(GODOT_PLUGINS)} | base64 -d > /opt/godot/add-plugins && mkdir -p /opt/godot/addons/spaces_uploads && echo ${base64(GODOT_UPLOADS_PLUGIN_CFG)} | base64 -d > /opt/godot/addons/spaces_uploads/plugin.cfg && echo ${base64(GODOT_UPLOADS_PLUGIN)} | base64 -d > /opt/godot/addons/spaces_uploads/plugin.gd && chmod 755 /opt/godot/run /opt/godot/move-uploads /opt/godot/add-plugins && chmod -R a+rX /opt/godot/addons && echo /opt/godot/run > /defaults/autostart && echo ${base64('<?xml version="1.0" encoding="utf-8"?>\n<openbox_menu xmlns="http://openbox.org/3.4/menu"><menu id="root-menu" label="MENU"></menu></openbox_menu>')} | base64 -d > /defaults/menu.xml`
+        `RUN echo ${base64(GODOT_LAUNCHER)} | base64 -d > /opt/godot/run && echo ${base64(GODOT_UPLOAD_MOVER)} | base64 -d > /opt/godot/move-uploads && echo ${base64(GODOT_PLUGINS)} | base64 -d > /opt/godot/add-plugins && echo ${base64(GODOT_TERMINAL)} | base64 -d > /opt/godot/terminal && mkdir -p /opt/godot/addons/spaces_uploads && echo ${base64(GODOT_UPLOADS_PLUGIN_CFG)} | base64 -d > /opt/godot/addons/spaces_uploads/plugin.cfg && echo ${base64(GODOT_UPLOADS_PLUGIN)} | base64 -d > /opt/godot/addons/spaces_uploads/plugin.gd && chmod 755 /opt/godot/run /opt/godot/move-uploads /opt/godot/add-plugins /opt/godot/terminal && chmod -R a+rX /opt/godot/addons && echo /opt/godot/run > /defaults/autostart && echo ${base64('<?xml version="1.0" encoding="utf-8"?>\n<openbox_menu xmlns="http://openbox.org/3.4/menu"><menu id="root-menu" label="MENU"></menu></openbox_menu>')} | base64 -d > /defaults/menu.xml`
       ].join("\n")
     },
     env: {
-      HARDEN_DESKTOP: "true",
+      DISABLE_OPEN_TOOLS: "true",
+      SELKIES_COMMAND_ENABLED: "false",
+      SELKIES_PRINTING_ENABLED: "false",
       HARDEN_OPENBOX: "true",
       RESTART_APP: "false",
       FILE_MANAGER_PATH: "/config",
