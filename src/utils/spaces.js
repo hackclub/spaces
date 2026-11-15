@@ -98,7 +98,7 @@ const GODOT_LAUNCHER = [
   "mkdir -p \"$HOME/.wakatime\"",
   "ln -sf /opt/wakatime/wakatime-cli-linux-amd64 \"$HOME/.wakatime/wakatime-cli-linux-amd64\"",
   "/opt/godot/move-uploads &",
-  "/opt/godot/add-hackatime &",
+  "/opt/godot/add-plugins &",
   "while true; do",
   "  if [ -f /tmp/godot-reopen ]; then",
   "    dir=$(cat /tmp/godot-reopen)",
@@ -111,13 +111,15 @@ const GODOT_LAUNCHER = [
   "done"
 ].join("\n");
 
-const GODOT_HACKATIME = [
+const GODOT_PLUGINS = [
   "#!/bin/sh",
-  "ADDON=/opt/godot/addons/godot_super-wakatime",
-  "ENTRY=res://addons/godot_super-wakatime/plugin.cfg",
-  "enable() {",
-  "  if [ ! -f \"$1/addons/godot_super-wakatime/plugin.cfg\" ]; then",
-  "    mkdir -p \"$1/addons\" && cp -r \"$ADDON\" \"$1/addons/\" || return 1",
+  "add() {",
+  "  ENTRY=\"res://addons/$2/plugin.cfg\"",
+  "  SRC=\"/opt/godot/addons/$2\"",
+  "  if [ ! -f \"$1/addons/$2/plugin.cfg\" ]; then",
+  "    mkdir -p \"$1/addons\" && cp -r \"$SRC\" \"$1/addons/\" || return 1",
+  "  elif [ \"$2\" = spaces_uploads ] && ! { cmp -s \"$SRC/plugin.gd\" \"$1/addons/$2/plugin.gd\" && cmp -s \"$SRC/plugin.cfg\" \"$1/addons/$2/plugin.cfg\"; }; then",
+  "    cp \"$SRC/plugin.gd\" \"$SRC/plugin.cfg\" \"$1/addons/$2/\" || return 1",
   "  fi",
   "  grep -qF \"$ENTRY\" \"$1/project.godot\" && return 1",
   "  awk -v entry=\"\\\"$ENTRY\\\"\" '",
@@ -125,7 +127,13 @@ const GODOT_HACKATIME = [
   "    section && !done && /^enabled=PackedStringArray\\(/ { sub(/\\)[ \\t]*$/, \"\"); print $0 (/\\($/ ? \"\" : \", \") entry \")\"; done = 1; next }",
   "    { print }",
   "    END { if (!done) { if (!section) { print \"\"; print \"[editor_plugins]\"; print \"\" } print \"enabled=PackedStringArray(\" entry \")\" } }",
-  "  ' \"$1/project.godot\" > \"$1/.project.godot.hackatime\" && mv \"$1/.project.godot.hackatime\" \"$1/project.godot\"",
+  "  ' \"$1/project.godot\" > \"$1/.project.godot.spaces\" && mv \"$1/.project.godot.spaces\" \"$1/project.godot\"",
+  "}",
+  "enable() {",
+  "  changed=1",
+  "  add \"$1\" godot_super-wakatime && changed=0",
+  "  add \"$1\" spaces_uploads && changed=0",
+  "  return $changed",
   "}",
   "while true; do",
   "  for pid in $(pgrep -f \"^/opt/godot/godot.* --path \"); do",
@@ -139,6 +147,48 @@ const GODOT_HACKATIME = [
   "  find \"$HOME\" -maxdepth 4 -name \".*\" -prune -o -name project.godot -print 2>/dev/null | while read -r file; do enable \"$(dirname \"$file\")\"; done",
   "  sleep 1",
   "done"
+].join("\n");
+
+const GODOT_UPLOADS_PLUGIN_CFG = [
+  "[plugin]",
+  "",
+  "name=\"Spaces uploads\"",
+  "description=\"Shows files uploaded to your Hack Club space in the FileSystem dock.\"",
+  "author=\"Hack Club\"",
+  "version=\"1.0\"",
+  "script=\"plugin.gd\""
+].join("\n");
+
+const GODOT_UPLOADS_PLUGIN = [
+  "@tool",
+  "extends EditorPlugin",
+  "",
+  "const SIGNAL_FILE := \"/tmp/godot-rescan\"",
+  "",
+  "var timer: Timer",
+  "",
+  "",
+  "func _enter_tree() -> void:",
+  "\ttimer = Timer.new()",
+  "\ttimer.wait_time = 1.0",
+  "\ttimer.timeout.connect(_check)",
+  "\tadd_child(timer)",
+  "\ttimer.start()",
+  "",
+  "",
+  "func _exit_tree() -> void:",
+  "\tif is_instance_valid(timer):",
+  "\t\ttimer.queue_free()",
+  "",
+  "",
+  "func _check() -> void:",
+  "\tif not FileAccess.file_exists(SIGNAL_FILE):",
+  "\t\treturn",
+  "\tvar filesystem := EditorInterface.get_resource_filesystem()",
+  "\tif filesystem.is_scanning():",
+  "\t\treturn",
+  "\tDirAccess.remove_absolute(SIGNAL_FILE)",
+  "\tfilesystem.scan()"
 ].join("\n");
 
 const GODOT_UPLOAD_MOVER = [
@@ -162,7 +212,7 @@ const GODOT_UPLOAD_MOVER = [
   "    dest=\"$project/$name\"",
   "    n=1",
   "    while [ -e \"$dest\" ]; do dest=\"$project/$base-$n$ext\"; n=$((n + 1)); done",
-  "    mv \"$file\" \"$dest\"",
+  "    mv \"$file\" \"$dest\" && touch /tmp/godot-rescan",
   "  done",
   "done"
 ].join("\n");
@@ -245,7 +295,7 @@ export const spaceConfigs = {
       { name: "Desktop base", current: "baseimage-selkies:debiantrixie", latestUrl: "https://github.com/linuxserver/docker-baseimage-selkies/releases" }
     ],
     build: {
-      tag: "spaces-godot:4.7.2-6",
+      tag: "spaces-godot:4.7.2-7",
       dockerfile: [
         "FROM ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
         `ARG GODOT_VERSION=${GODOT_VERSION}-stable`,
@@ -253,7 +303,7 @@ export const spaceConfigs = {
         `ARG GODOT_WAKATIME_COMMIT=${GODOT_WAKATIME_COMMIT}`,
         "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl unzip libxcursor1 libxinerama1 libxrandr2 libxi6 libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri libfontconfig1 libasound2t64 libpulse0 && { curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/godot.zip \"https://downloads.godotengine.org/?version=${GODOT_VERSION%-*}&flavor=${GODOT_VERSION#*-}&slug=linux.x86_64.zip&platform=linux.64\" || curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/godot.zip \"https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip\"; } && unzip -q /tmp/godot.zip -d /opt/godot && mv /opt/godot/Godot_v*_linux.x86_64 /opt/godot/godot && chmod 755 /opt/godot/godot && rm -rf /tmp/godot.zip /var/lib/apt/lists/*",
         "RUN mkdir -p /opt/wakatime /opt/godot/addons && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/wakatime.zip \"https://github.com/wakatime/wakatime-cli/releases/download/${WAKATIME_CLI_VERSION}/wakatime-cli-linux-amd64.zip\" && unzip -q /tmp/wakatime.zip -d /opt/wakatime && chmod 755 /opt/wakatime/wakatime-cli-linux-amd64 && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/godot-wakatime.tar.gz \"https://codeload.github.com/BudzioT/Godot_Super-Wakatime/tar.gz/${GODOT_WAKATIME_COMMIT}\" && tar -xzf /tmp/godot-wakatime.tar.gz -C /tmp && mv /tmp/Godot_Super-Wakatime-${GODOT_WAKATIME_COMMIT}/addons/godot_super-wakatime /opt/godot/addons/ && rm -rf /tmp/wakatime.zip /tmp/godot-wakatime.tar.gz /tmp/Godot_Super-Wakatime-*",
-        `RUN echo ${base64(GODOT_LAUNCHER)} | base64 -d > /opt/godot/run && echo ${base64(GODOT_UPLOAD_MOVER)} | base64 -d > /opt/godot/move-uploads && echo ${base64(GODOT_HACKATIME)} | base64 -d > /opt/godot/add-hackatime && chmod 755 /opt/godot/run /opt/godot/move-uploads /opt/godot/add-hackatime && echo /opt/godot/run > /defaults/autostart && echo ${base64('<?xml version="1.0" encoding="utf-8"?>\n<openbox_menu xmlns="http://openbox.org/3.4/menu"><menu id="root-menu" label="MENU"></menu></openbox_menu>')} | base64 -d > /defaults/menu.xml`
+        `RUN echo ${base64(GODOT_LAUNCHER)} | base64 -d > /opt/godot/run && echo ${base64(GODOT_UPLOAD_MOVER)} | base64 -d > /opt/godot/move-uploads && echo ${base64(GODOT_PLUGINS)} | base64 -d > /opt/godot/add-plugins && mkdir -p /opt/godot/addons/spaces_uploads && echo ${base64(GODOT_UPLOADS_PLUGIN_CFG)} | base64 -d > /opt/godot/addons/spaces_uploads/plugin.cfg && echo ${base64(GODOT_UPLOADS_PLUGIN)} | base64 -d > /opt/godot/addons/spaces_uploads/plugin.gd && chmod 755 /opt/godot/run /opt/godot/move-uploads /opt/godot/add-plugins && chmod -R a+rX /opt/godot/addons && echo /opt/godot/run > /defaults/autostart && echo ${base64('<?xml version="1.0" encoding="utf-8"?>\n<openbox_menu xmlns="http://openbox.org/3.4/menu"><menu id="root-menu" label="MENU"></menu></openbox_menu>')} | base64 -d > /defaults/menu.xml`
       ].join("\n")
     },
     env: {
