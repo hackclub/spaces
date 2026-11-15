@@ -338,7 +338,7 @@ router.post('/role-invites/set', requireRoleGranting, async (req, res) => {
     const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
     const roleId = req.body?.roleId;
     const granted = req.body?.granted;
-    if (!EMAIL_PATTERN.test(email) || email.length > 254) {
+    if (email.length > 254 || !EMAIL_PATTERN.test(email)) {
       return res.status(400).json({ success: false, message: 'Enter a valid email' });
     }
     if (!Number.isInteger(roleId) || typeof granted !== 'boolean') {

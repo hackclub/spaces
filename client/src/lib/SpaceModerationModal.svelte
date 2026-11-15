@@ -19,9 +19,7 @@
   const dispatch = createEventDispatcher();
 
   const SHORTCUTS = [
-    { label: 'Workspace', path: '/vercel/sandbox' },
-    { label: 'Home folders', path: '/home' },
-    { label: 'Whole machine', path: '/' }
+    { label: 'Workspace', path: '/vercel/sandbox' }
   ];
 
   let explorer = null;

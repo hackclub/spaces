@@ -54,7 +54,7 @@
     }
   }
 
-  $: validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  $: validEmail = email.trim().length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   onMount(load);
 </script>

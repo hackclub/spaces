@@ -48,9 +48,28 @@ const fileError = (message, statusCode) => {
 export const cleanPath = (value) => {
   const raw = typeof value === 'string' && value.trim() ? value.trim() : DEFAULT_BROWSE_PATH;
   if (!raw.startsWith('/') || raw.includes('\0')) {
-    throw fileError('Use an absolute path, like /vercel/sandbox', 400);
+    throw fileError(`Use a path inside ${SANDBOX_ROOT}`, 400);
   }
-  return path.posix.normalize(raw);
+  const clean = path.posix.normalize(raw);
+  if (clean !== SANDBOX_ROOT && !clean.startsWith(`${SANDBOX_ROOT}/`)) {
+    throw fileError(`Only the space's own files, inside ${SANDBOX_ROOT}, can be browsed here`, 403);
+  }
+  return clean;
+};
+
+export const parentPath = (dir) => (dir === SANDBOX_ROOT ? null : path.posix.dirname(dir));
+
+const PROTECTED = '*/.wakatime.cfg|*/.config/gh|*/.config/gh/*|*/.ssh|*/.ssh/*|*/.git-credentials';
+
+const RESOLVE = [
+  'real=$(realpath -e -- "$TARGET" 2>/dev/null) || exit 3',
+  'case "$real" in "$ROOT"|"$ROOT"/*) ;; *) exit 5 ;; esac',
+  `case "$real" in ${PROTECTED}) exit 6 ;; esac`
+].join('; ');
+
+const pathErrors = (exitCode) => {
+  if (exitCode === 5) throw fileError(`That leads outside ${SANDBOX_ROOT}, so it can't be opened here`, 403);
+  if (exitCode === 6) throw fileError("That's a login or key file, so it can't be opened here", 403);
 };
 
 const sandboxFor = async (space) => {
@@ -70,9 +89,10 @@ export const listDirectory = async (space, dir) => {
   const sandbox = await sandboxFor(space);
   const { exitCode, stdout } = await runAsRoot(
     sandbox,
-    'test -d "$DIR" || exit 3; find "$DIR" -mindepth 1 -maxdepth 1 -printf "%y\t%s\t%T@\t%f\n" 2>/dev/null | head -n 2000',
-    { DIR: dir }
+    `${RESOLVE}; test -d "$real" || exit 3; find "$real" -mindepth 1 -maxdepth 1 -printf "%y\\t%s\\t%T@\\t%f\\n" 2>/dev/null | head -n 2000`,
+    { TARGET: dir, ROOT: SANDBOX_ROOT }
   );
+  pathErrors(exitCode);
   if (exitCode === 3) {
     throw fileError('That folder does not exist', 404);
   }
@@ -92,9 +112,10 @@ export const readSpaceFile = async (space, file, { maxBytes }) => {
   const sandbox = await sandboxFor(space);
   const { exitCode, stdout } = await runAsRoot(
     sandbox,
-    'test -f "$FILE" || exit 3; size=$(stat -L -c %s "$FILE"); [ "$size" -le "$MAX" ] || { echo "$size"; exit 4; }; head -c "$((MAX + 1))" "$FILE" | base64 -w0',
-    { FILE: file, MAX: String(maxBytes) }
+    `${RESOLVE}; test -f "$real" || exit 3; size=$(stat -c %s "$real"); [ "$size" -le "$MAX" ] || { echo "$size"; exit 4; }; head -c "$((MAX + 1))" "$real" | base64 -w0`,
+    { TARGET: file, ROOT: SANDBOX_ROOT, MAX: String(maxBytes) }
   );
+  pathErrors(exitCode);
   const tooBig = (size) => fileError(`That file is ${size ? `${Math.ceil(size / 1024 / 1024)} MB, ` : ''}over the ${Math.round(maxBytes / 1024 / 1024)} MB limit here. Use full access to get it.`, 413);
   if (exitCode === 3) {
     throw fileError('That file does not exist', 404);

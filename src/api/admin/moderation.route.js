@@ -9,6 +9,7 @@ import {
   unlockSpace,
   stopSandbox,
   cleanPath,
+  parentPath,
   listDirectory,
   readSpaceFile,
   looksLikeText,
@@ -146,7 +147,7 @@ router.post('/spaces/:spaceId/files', requirePermission('moderation.files'), asy
     const entries = await listDirectory(found.space, dir);
     res.status(200).json({
       success: true,
-      data: { path: dir, parent: dir === '/' ? null : path.posix.dirname(dir), entries }
+      data: { path: dir, parent: parentPath(dir), entries }
     });
   } catch (error) {
     sendFileError(res, error, 'Failed to list files');

@@ -63,7 +63,7 @@ const GITHUB_REPO_PATTERN = /^(?:(?:https?:\/\/)?(?:www\.)?github\.com\/)?([A-Za
 
 export const parseGithubRepo = (value) => {
   if (typeof value !== "string" || !value.trim()) return null;
-  const match = value.trim().match(GITHUB_REPO_PATTERN);
+  const match = value.trim().length <= 300 ? value.trim().match(GITHUB_REPO_PATTERN) : null;
   if (!match || match[2].startsWith(".") || match[2].startsWith("-")) {
     const error = new Error("Use a GitHub repo link like https://github.com/you/project");
     error.statusCode = 400;

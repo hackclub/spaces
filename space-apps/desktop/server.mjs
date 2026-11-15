@@ -149,8 +149,20 @@ const sameOrigin = (req) => {
   }
 };
 
+const pathOf = (req) => {
+  try {
+    return new URL(req.url, "http://localhost").pathname;
+  } catch {
+    return null;
+  }
+};
+
 const server = http.createServer(async (req, res) => {
-  const path = new URL(req.url, "http://localhost").pathname;
+  const path = pathOf(req);
+  if (path === null) {
+    res.writeHead(400, { "Content-Type": "text/plain" });
+    return res.end("Bad request");
+  }
 
   if (path === "/healthz") {
     res.writeHead(200, { "Content-Type": "text/plain" });
