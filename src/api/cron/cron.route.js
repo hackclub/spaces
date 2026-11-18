@@ -4,7 +4,7 @@ import { stopExpiredSpaces } from "../../utils/auto-stop.js";
 import { deleteExpiredSessions } from "../../utils/sessions.js";
 import { rebuildTemplates } from "../../utils/templates.js";
 import { spaceConfigs } from "../../utils/spaces.js";
-import { syncSpacesActivity } from "../../utils/hackatime.js";
+import { syncSpacesActivity, typeDeletedSpacesActivity } from "../../utils/hackatime.js";
 
 const router = express.Router();
 
@@ -37,7 +37,8 @@ router.get("/templates", requireCronSecret, async (req, res) => {
 router.get("/hackatime", requireCronSecret, async (req, res) => {
   const lookbackHours = new Date().getUTCHours() === 4 ? 48 : 3;
   const summary = await syncSpacesActivity({ lookbackMs: lookbackHours * 60 * 60 * 1000 });
-  res.status(200).json({ success: true, lookbackHours, ...summary });
+  const deletedSpaceTypes = await typeDeletedSpacesActivity({ budgetMs: 30 * 1000, limit: 200 });
+  res.status(200).json({ success: true, lookbackHours, ...summary, deletedSpaceTypes });
 });
 
 export default router;

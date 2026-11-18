@@ -34,6 +34,8 @@ const adminGet = async (path, params = {}, { timeoutMs = 60000 } = {}) => {
 
 const toSeconds = (time) => (time > 1e12 ? time / 1000 : time);
 
+const FALLBACK_TYPE = 'code-server';
+
 const fetchHeartbeats = async ({ hackatimeUserId, machine, start, end }) => {
   const heartbeats = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
@@ -72,7 +74,7 @@ export const bucketize = (times) => {
   return buckets;
 };
 
-const saveBuckets = async ({ source, machine, hackatimeUserId, spaceId = null, userId = null, buckets, fromHour = 0 }) => {
+const saveBuckets = async ({ source, machine, hackatimeUserId, spaceId = null, userId = null, spaceType = null, buckets, fromHour = 0 }) => {
   const rows = [...buckets.entries()]
     .filter(([hour]) => hour >= fromHour)
     .map(([hour, bucket]) => ({
@@ -81,6 +83,7 @@ const saveBuckets = async ({ source, machine, hackatimeUserId, spaceId = null, u
       hackatime_user_id: String(hackatimeUserId),
       space_id: spaceId,
       user_id: userId,
+      space_type: spaceType,
       hour: new Date(hour),
       seconds: Math.round(bucket.seconds),
       heartbeats: bucket.heartbeats,
@@ -93,7 +96,7 @@ const saveBuckets = async ({ source, machine, hackatimeUserId, spaceId = null, u
   await pg('hackatime_activity')
     .insert(rows)
     .onConflict(['machine', 'hackatime_user_id', 'hour'])
-    .merge(['source', 'space_id', 'user_id', 'seconds', 'heartbeats', 'first_at', 'last_at']);
+    .merge(['source', 'space_id', 'user_id', 'seconds', 'heartbeats', 'first_at', 'last_at', ...(spaceType ? ['space_type'] : [])]);
 
   return rows.length;
 };
@@ -129,6 +132,7 @@ const syncSpace = async (space, fromHour) => {
     hackatimeUserId,
     spaceId: space.id,
     userId: space.user_id,
+    spaceType: space.type ?? null,
     buckets: bucketize(heartbeats.map((heartbeat) => heartbeat.time)),
     fromHour
   });
@@ -141,9 +145,9 @@ export const recalculateSpacesActivity = async ({ afterId = 0, budgetMs = SYNC_B
     .join('users as u', 'u.id', 's.user_id')
     .where('a.source', 'spaces')
     .where('a.space_id', '>', afterId)
-    .groupBy('s.id', 's.user_id', 'u.hackatime_api_key', 'u.hackatime_user_id')
+    .groupBy('s.id', 's.user_id', 's.type', 'u.hackatime_api_key', 'u.hackatime_user_id')
     .orderBy('s.id')
-    .select('s.id', 's.user_id', 'u.hackatime_api_key', 'u.hackatime_user_id')
+    .select('s.id', 's.user_id', 's.type', 'u.hackatime_api_key', 'u.hackatime_user_id')
     .min('a.hour as first_hour');
 
   let lastId = afterId;
@@ -162,6 +166,58 @@ export const recalculateSpacesActivity = async ({ afterId = 0, budgetMs = SYNC_B
   return { afterId: lastId, remaining: spaces.filter((space) => space.id > lastId).length, failed };
 };
 
+const TYPE_SIGNS = [
+  ['love2d', /cupid|hackclub-spaces/i],
+  ['godot', /godot/i],
+  ['blender', /blender/i],
+  ['code-server', /vs ?code|code-server|vscode/i]
+];
+
+export const typeFromHeartbeats = (heartbeats) => {
+  const counts = new Map();
+  for (const heartbeat of heartbeats) {
+    const text = `${heartbeat.editor ?? ''} ${heartbeat.user_agent ?? ''}`;
+    const match = TYPE_SIGNS.find(([, pattern]) => pattern.test(text));
+    if (match) counts.set(match[0], (counts.get(match[0]) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? FALLBACK_TYPE;
+};
+
+export const typeDeletedSpacesActivity = async ({ budgetMs = SYNC_BUDGET_MS, limit = 50 } = {}) => {
+  if (!hackatimeConfigured()) return { skipped: 'HACKATIME_ADMIN_KEY is not set' };
+  const deadline = Date.now() + budgetMs;
+  const machines = await pg('hackatime_activity')
+    .whereNull('space_type')
+    .groupBy('machine', 'hackatime_user_id')
+    .select('machine', 'hackatime_user_id')
+    .min('hour as first_hour')
+    .limit(limit);
+
+  const summary = { machines: machines.length, typed: 0, failed: 0 };
+  for (const row of machines) {
+    if (Date.now() > deadline) break;
+    try {
+      const start = new Date(row.first_hour).getTime();
+      const data = await adminGet('user/heartbeats', {
+        user_id: row.hackatime_user_id,
+        machine: row.machine,
+        start_date: Math.floor(start / 1000),
+        limit: 100
+      });
+      const spaceType = typeFromHeartbeats(data.heartbeats ?? []);
+      await pg('hackatime_activity')
+        .where({ machine: row.machine, hackatime_user_id: row.hackatime_user_id })
+        .whereNull('space_type')
+        .update({ space_type: spaceType });
+      summary.typed += 1;
+    } catch (err) {
+      summary.failed += 1;
+      console.error(`Failed to work out the space type of ${row.machine}:`, err.message);
+    }
+  }
+  return summary;
+};
+
 export const syncSpacesActivity = async ({ lookbackMs = 3 * HOUR_MS, budgetMs = SYNC_BUDGET_MS } = {}) => {
   if (!hackatimeConfigured()) return { skipped: 'HACKATIME_ADMIN_KEY is not set' };
 
@@ -176,7 +232,7 @@ export const syncSpacesActivity = async ({ lookbackMs = 3 * HOUR_MS, budgetMs = 
     ? await pg('spaces')
       .join('users', 'users.id', 'spaces.user_id')
       .whereIn('spaces.id', recentIds)
-      .select('spaces.id', 'spaces.user_id', 'users.hackatime_api_key', 'users.hackatime_user_id')
+      .select('spaces.id', 'spaces.user_id', 'spaces.type', 'users.hackatime_api_key', 'users.hackatime_user_id')
     : [];
 
   const summary = { spaces: spaces.length, hours: 0, failed: 0, noKey: 0, unfinished: 0 };
@@ -255,7 +311,7 @@ export const continueHetznerImport = async ({ budgetMs = IMPORT_BUDGET_MS } = {}
         byMachine.get(machine).push(heartbeat.time);
       }
       for (const [machine, times] of byMachine) {
-        await saveBuckets({ source: 'hetzner', machine, hackatimeUserId, userId: job.user_id, buckets: bucketize(times) });
+        await saveBuckets({ source: 'hetzner', machine, hackatimeUserId, userId: job.user_id, spaceType: FALLBACK_TYPE, buckets: bucketize(times) });
       }
 
       await finish('done');
@@ -276,18 +332,17 @@ export const retryFailedHetznerImports = () => pg('hackatime_imports')
   .where('status', 'failed')
   .update({ status: 'pending', error: null, updated_at: pg.fn.now() });
 
-const FALLBACK_TYPE = 'code-server';
 
 const ACTIVITY_SQL = `
   with activity as (
-    select a.*,
+    select a.id, a.source, a.machine, a.hackatime_user_id, a.space_id, a.user_id, a.hour, a.seconds, a.heartbeats, a.first_at, a.last_at,
       coalesce(a.space_id, m.space_id) as effective_space_id,
       coalesce(a.user_id, m.user_id, s.user_id) as effective_user_id,
-      coalesce(s.type, '${FALLBACK_TYPE}') as space_type
+      coalesce(a.space_type, s.type, '${FALLBACK_TYPE}') as space_type
     from hackatime_activity a
     left join hackatime_legacy_machines m on m.machine = a.machine
     left join spaces s on s.id = coalesce(a.space_id, m.space_id)
-    where a.hour >= ? and (?::text is null or coalesce(s.type, '${FALLBACK_TYPE}') = ?) and not coalesce(s.hackatime_excluded, false)
+    where a.hour >= ? and (?::text is null or coalesce(a.space_type, s.type, '${FALLBACK_TYPE}') = ?) and not coalesce(s.hackatime_excluded, false)
   )
 `;
 
