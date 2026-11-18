@@ -276,26 +276,26 @@ export const retryFailedHetznerImports = () => pg('hackatime_imports')
   .where('status', 'failed')
   .update({ status: 'pending', error: null, updated_at: pg.fn.now() });
 
-const UNKNOWN_TYPE = 'unknown';
+const FALLBACK_TYPE = 'code-server';
 
 const ACTIVITY_SQL = `
   with activity as (
     select a.*,
       coalesce(a.space_id, m.space_id) as effective_space_id,
       coalesce(a.user_id, m.user_id, s.user_id) as effective_user_id,
-      coalesce(s.type, '${UNKNOWN_TYPE}') as space_type
+      coalesce(s.type, '${FALLBACK_TYPE}') as space_type
     from hackatime_activity a
     left join hackatime_legacy_machines m on m.machine = a.machine
     left join spaces s on s.id = coalesce(a.space_id, m.space_id)
-    where a.hour >= ? and (?::text is null or coalesce(s.type, '${UNKNOWN_TYPE}') = ?) and not coalesce(s.hackatime_excluded, false)
+    where a.hour >= ? and (?::text is null or coalesce(s.type, '${FALLBACK_TYPE}') = ?) and not coalesce(s.hackatime_excluded, false)
   )
 `;
 
-const typeLabel = (type) => (type === UNKNOWN_TYPE ? 'Deleted or unmatched spaces' : spaceConfigs[type]?.title ?? type);
+const typeLabel = (type) => spaceConfigs[type]?.title ?? type;
 
 const tracksHackatime = (config) => config.kind === 'editor' || Boolean(config.hackatime);
 
-export const hackatimeReportTypes = () => [...Object.keys(spaceConfigs), UNKNOWN_TYPE];
+export const hackatimeReportTypes = () => Object.keys(spaceConfigs);
 
 const summarizeTypes = async (since) => {
   const [activity, combined, spaceCounts] = await Promise.all([
@@ -353,7 +353,6 @@ const summarizeTypes = async (since) => {
 
   const total = [...byType.values()].reduce((sum, item) => sum + item.seconds, 0);
   return [...byType.values()]
-    .filter((item) => item.type !== UNKNOWN_TYPE || item.seconds > 0)
     .map((item) => ({ ...item, share: total ? item.seconds / total : 0 }))
     .sort((a, b) => b.seconds - a.seconds || a.label.localeCompare(b.label));
 };

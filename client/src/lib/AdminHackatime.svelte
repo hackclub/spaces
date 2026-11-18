@@ -222,7 +222,7 @@
               </td>
               <td>{percent(item.share)}</td>
               <td>{item.people}</td>
-              <td>{item.type === 'unknown' ? item.spaces : `${item.spaces} of ${item.totalSpaces}`}</td>
+              <td>{item.spaces > item.totalSpaces ? item.spaces : `${item.spaces} of ${item.totalSpaces}`}</td>
               <td>{item.people ? hours(item.seconds / item.people) : '—'}</td>
               <td>{item.activeDays}</td>
               <td>{item.bySource.spaces ? hours(item.bySource.spaces) : '—'}</td>
