@@ -405,8 +405,16 @@ export const deleteSnapshot = async (snapshotId) => {
   }
 };
 
-export const startGuiApp = async (sandbox, { image, password, build, env = {}, resetFiles = [] }) => {
+const GUI_STREAM_ENV = {
+  SELKIES_USE_CSS_SCALING: "true|locked",
+  SELKIES_FRAMERATE: "30",
+  SELKIES_VIDEO_STREAMING_MODE: "true",
+  SELKIES_USE_PAINT_OVER_QUALITY: "true"
+};
+
+export const startGuiApp = async (sandbox, { image, password, build, env: typeEnv = {}, resetFiles = [] }) => {
   const [runImage] = await Promise.all([setupGuiApp(sandbox, { image, build }), installDesktopApp(sandbox)]);
+  const env = { ...GUI_STREAM_ENV, ...typeEnv };
   const extraEnv = Object.keys(env).map((name) => `-e ${name}="$${name}"`).join(" ");
 
   await run(
