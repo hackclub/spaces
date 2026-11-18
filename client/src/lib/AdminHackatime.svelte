@@ -11,7 +11,7 @@
     { value: null, label: 'All time' }
   ];
 
-  let days = 30;
+  let days = null;
   let type = '';
   let report = null;
   let loading = true;
