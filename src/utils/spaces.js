@@ -255,7 +255,9 @@ const BLENDER_HACKATIME_INSTALL = [
   "#!/bin/bash",
   "BLENDER=$(command -v blender || ls /opt/blender*/blender 2>/dev/null | head -n 1)",
   "[ -n \"$BLENDER\" ] || exit 0",
-  "s6-setuidgid abc env HOME=/config \"$BLENDER\" --command extension install-file -r user_default -e /opt/blender-hackatime/blender_hackatime.zip > /tmp/blender-hackatime-install.log 2>&1 || true"
+  "s6-setuidgid abc env HOME=/config \"$BLENDER\" --command extension install-file -r user_default -e /opt/blender-hackatime/blender_hackatime.zip > /tmp/blender-hackatime-install.log 2>&1 || true",
+  "MARK=/config/.config/blender/.spaces-viewport-aa-off",
+  "[ -f \"$MARK\" ] || { s6-setuidgid abc env HOME=/config \"$BLENDER\" -b --python-expr \"import bpy; bpy.context.preferences.system.viewport_aa = 'OFF'; bpy.ops.wm.save_userpref()\" >> /tmp/blender-hackatime-install.log 2>&1 && s6-setuidgid abc mkdir -p /config/.config/blender && s6-setuidgid abc touch \"$MARK\"; }"
 ].join("\n");
 
 const RENPY_LAUNCHER = [
@@ -330,7 +332,7 @@ export const spaceConfigs = {
       { name: "wakatime-cli", current: WAKATIME_CLI_VERSION, latestUrl: "https://github.com/wakatime/wakatime-cli/releases/latest" }
     ],
     build: {
-      tag: `spaces-blender-hackatime:${BLENDER_HACKATIME_VERSION}-2`,
+      tag: `spaces-blender-hackatime:${BLENDER_HACKATIME_VERSION}-3`,
       dockerfile: [
         "FROM linuxserver/blender",
         `ARG WAKATIME_CLI_VERSION=${WAKATIME_CLI_VERSION}`,
