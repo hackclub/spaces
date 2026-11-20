@@ -11,6 +11,7 @@
     import { API_BASE } from "./config.js";
     import { applyTheme, currentTheme } from "./stores/theme.js";
     import { get } from "svelte/store";
+    import HackatimePrompt from "./lib/HackatimePrompt.svelte";
 
     import { userData } from "./stores/user.svelte";
 
@@ -29,6 +30,7 @@
     let showClubs = false;
     let showAuth = false;
     let showClubMemberAuth = false;
+    let hackatimePromptClosed = false;
 
     onMount(async () => {
         applyTheme(get(currentTheme));
@@ -48,6 +50,10 @@
         };
 
         isAuthenticated = await userData.refresh();
+
+        if (isAuthenticated && /(^|[#&])hackatime(_error)?=/.test(window.location.hash)) {
+            showSettings = true;
+        }
     });
 
     async function handleAuthenticated(event) {
@@ -94,6 +100,9 @@
 
 <main class:has-theme-switcher={isAuthenticated && userData.user}>
     {#if isAuthenticated && userData.user}
+        {#if userData.user.hackatime_prompt && !hackatimePromptClosed && !showSettings}
+            <HackatimePrompt on:close={() => (hackatimePromptClosed = true)} />
+        {/if}
         <ThemeSwitcher />
         {#if showAdminPanel && userData.user.is_admin}
             <div class="nav-header">

@@ -7,6 +7,7 @@ import roles from './admin/roles.route.js';
 import oauth from './oauth/oauth.route.js';
 import clubs from './clubs/clubs.route.js';
 import cron from './cron/cron.route.js';
+import hackatimeOauth from './oauth/hackatime.route.js';
 
 const router = express.Router();
 
@@ -28,6 +29,7 @@ router.use('/users/', users);
 router.use('/admin/moderation/', moderation);
 router.use('/admin/roles/', roles);
 router.use('/admin/', admin);
+router.use('/oauth/hackatime/', hackatimeOauth);
 router.use('/oauth/', oauth);
 router.use('/clubs/', clubs);
 router.use('/cron/', cron);

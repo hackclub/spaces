@@ -9,6 +9,8 @@ class UserData {
         permissions: string[],
         viewing_as: { id: number, name: string }[] | null,
         hackatime_api_key: string,
+        hackatime_linked: boolean,
+        hackatime_prompt: boolean,
         hackclub_id: string,
         hackclub_verification_status: string,
         vscode_extensions: string
