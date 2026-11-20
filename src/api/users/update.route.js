@@ -61,7 +61,12 @@ router.post('/', async (req, res) => {
     }
     
     if (username !== undefined) updateData.username = username;
-    if (hackatime_api_key !== undefined) updateData.hackatime_api_key = hackatime_api_key;
+    if (hackatime_api_key !== undefined && hackatime_api_key !== user.hackatime_api_key) {
+      // A different key may belong to a different Hackatime account, and it didn't come from OAuth.
+      updateData.hackatime_api_key = hackatime_api_key;
+      updateData.hackatime_user_id = null;
+      updateData.hackatime_linked_at = null;
+    }
 
     const updatedUser = await updateUser(authorization, updateData);
     
