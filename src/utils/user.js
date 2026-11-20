@@ -135,6 +135,11 @@ export const updateUser = async (authorization, updateData) => {
     
     if (updateData.hackatime_api_key !== undefined) {
       updates.hackatime_api_key = updateData.hackatime_api_key;
+      if (updateData.hackatime_api_key !== user.hackatime_api_key) {
+        // A different key may belong to a different Hackatime account, and it didn't come from OAuth.
+        updates.hackatime_user_id = null;
+        updates.hackatime_linked_at = null;
+      }
     }
 
     if (Object.keys(updates).length === 0) {

@@ -31,6 +31,9 @@ const DEFAULT_WORKSPACE_DIR = "/config/workspace";
 const PROJECTS_DIR = "/config/projects";
 const RENPY_VERSION = "8.6.1";
 const RENPY_SHA256 = "4d76d88f690ff7d600218dad3941dfddb88e2104e107367a0600a17364335509";
+// From GitHub releases: VSCodium's apt key is on GitLab, which answers scripts with a Cloudflare challenge.
+const VSCODIUM_VERSION = "1.143.17232";
+const VSCODIUM_SHA256 = "988330df203f4d2dbfb9ee0052a0356a27af7c0a2a7ff606424c531ae4a7b538";
 const RENPY_EXTENSIONS = ["WakaTime.vscode-wakatime", "LuqueDaniel.languague-renpy"];
 
 
@@ -438,18 +441,20 @@ export const spaceConfigs = {
     hackatime: true,
     versions: [
       { name: "Ren'Py", current: RENPY_VERSION, latestUrl: "https://www.renpy.org/latest.html" },
-      { name: "VSCodium", note: "newest release, installed when the template builds", latestUrl: "https://github.com/VSCodium/vscodium/releases/latest" },
+      { name: "VSCodium", current: VSCODIUM_VERSION, latestUrl: "https://github.com/VSCodium/vscodium/releases/latest" },
       { name: "wakatime-cli", current: WAKATIME_CLI_VERSION, latestUrl: "https://github.com/wakatime/wakatime-cli/releases/latest" },
       { name: "Desktop base", current: "baseimage-selkies:debiantrixie", latestUrl: "https://github.com/linuxserver/docker-baseimage-selkies/releases" }
     ],
     build: {
-      tag: `spaces-renpy:${RENPY_VERSION}-1`,
+      tag: `spaces-renpy:${RENPY_VERSION}-2`,
       dockerfile: [
         "FROM ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
         `ARG RENPY_VERSION=${RENPY_VERSION}`,
         `ARG RENPY_SHA256=${RENPY_SHA256}`,
+        `ARG VSCODIUM_VERSION=${VSCODIUM_VERSION}`,
+        `ARG VSCODIUM_SHA256=${VSCODIUM_SHA256}`,
         `ARG WAKATIME_CLI_VERSION=${WAKATIME_CLI_VERSION}`,
-        "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl gpg bzip2 unzip xdg-utils libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri libfontconfig1 libxcursor1 libxinerama1 libxrandr2 libxi6 libasound2t64 libpulse0 && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 https://gitlab.com/paulcarroll/vscodium-deb-rpm-repo/raw/master/pub.gpg | gpg --dearmor -o /usr/share/keyrings/vscodium-archive-keyring.gpg && echo \"deb [arch=amd64 signed-by=/usr/share/keyrings/vscodium-archive-keyring.gpg] https://download.vscodium.com/debs vscodium main\" > /etc/apt/sources.list.d/vscodium.list && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends codium && rm -rf /var/lib/apt/lists/*",
+        "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl bzip2 unzip xdg-utils libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri libfontconfig1 libxcursor1 libxinerama1 libxrandr2 libxi6 libasound2t64 libpulse0 && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/codium.deb \"https://github.com/VSCodium/vscodium/releases/download/${VSCODIUM_VERSION}/codium_${VSCODIUM_VERSION}_amd64.deb\" && echo \"${VSCODIUM_SHA256}  /tmp/codium.deb\" | sha256sum -c - && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends /tmp/codium.deb && rm -rf /tmp/codium.deb /var/lib/apt/lists/*",
         "RUN mkdir -p /opt/renpy /opt/wakatime && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/renpy.tar.bz2 \"https://www.renpy.org/dl/${RENPY_VERSION}/renpy-${RENPY_VERSION}-sdk.tar.bz2\" && echo \"${RENPY_SHA256}  /tmp/renpy.tar.bz2\" | sha256sum -c - && tar -xjf /tmp/renpy.tar.bz2 -C /opt/renpy && mv /opt/renpy/renpy-*-sdk /opt/renpy/sdk && chown -R 1000:1000 /opt/renpy/sdk && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/wakatime.zip \"https://github.com/wakatime/wakatime-cli/releases/download/${WAKATIME_CLI_VERSION}/wakatime-cli-linux-amd64.zip\" && unzip -q /tmp/wakatime.zip -d /opt/wakatime && chmod 755 /opt/wakatime/wakatime-cli-linux-amd64 && rm -f /tmp/renpy.tar.bz2 /tmp/wakatime.zip",
         `RUN echo ${base64(RENPY_LAUNCHER)} | base64 -d > /opt/renpy/run && echo ${base64(RENPY_CODIUM_EDITOR)} | base64 -d > /opt/renpy/codium.edit.py && chmod 755 /opt/renpy/run && chmod 644 /opt/renpy/codium.edit.py && echo /opt/renpy/run > /defaults/autostart && echo ${base64('<?xml version="1.0" encoding="utf-8"?>\n<openbox_menu xmlns="http://openbox.org/3.4/menu"><menu id="root-menu" label="MENU"></menu></openbox_menu>')} | base64 -d > /defaults/menu.xml`
       ].join("\n")
