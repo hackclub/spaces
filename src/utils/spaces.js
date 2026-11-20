@@ -29,6 +29,10 @@ import {
 
 const DEFAULT_WORKSPACE_DIR = "/config/workspace";
 const PROJECTS_DIR = "/config/projects";
+const RENPY_VERSION = "8.6.1";
+const RENPY_SHA256 = "4d76d88f690ff7d600218dad3941dfddb88e2104e107367a0600a17364335509";
+const RENPY_EXTENSIONS = ["WakaTime.vscode-wakatime", "LuqueDaniel.languague-renpy"];
+
 
 const sanitizeWorkspaceDir = (homeDir) => {
   if (!homeDir || typeof homeDir !== "string" || !homeDir.trim()) {
@@ -250,6 +254,49 @@ const BLENDER_HACKATIME_INSTALL = [
   "s6-setuidgid abc env HOME=/config \"$BLENDER\" --command extension install-file -r user_default -e /opt/blender-hackatime/blender_hackatime.zip > /tmp/blender-hackatime-install.log 2>&1 || true"
 ].join("\n");
 
+const RENPY_LAUNCHER = [
+  "#!/bin/sh",
+  "new=\"\"",
+  "IFS=:",
+  "for lib in $LD_PRELOAD; do case \"$lib\" in *libudev*) ;; *) new=\"${new:+$new:}$lib\" ;; esac; done",
+  "unset IFS",
+  "export LD_PRELOAD=\"$new\"",
+  "export RENPY_EDIT_PY=/opt/renpy/codium.edit.py",
+  "export RENPY_SKIP_SPLASHSCREEN=1",
+  "mkdir -p \"$HOME/projects\" \"$HOME/.wakatime\"",
+  "ln -sf /opt/wakatime/wakatime-cli-linux-amd64 \"$HOME/.wakatime/wakatime-cli-linux-amd64\"",
+  "/opt/renpy/sdk/renpy.sh /opt/renpy/sdk/launcher set_projects_directory \"$HOME/projects\" >/tmp/renpy-projects.log 2>&1 || true",
+  `( for ext in ${RENPY_EXTENSIONS.join(" ")}; do codium --list-extensions 2>/dev/null | grep -qix "$ext" || codium --install-extension "$ext" >>/tmp/renpy-extensions.log 2>&1; done ) &`,
+  "while true; do",
+  "  /opt/renpy/sdk/renpy.sh",
+  "  sleep 1",
+  "done"
+].join("\n");
+
+const RENPY_CODIUM_EDITOR = [
+  "import subprocess",
+  "import renpy",
+  "",
+  "class Editor(renpy.editor.Editor):",
+  "    has_projects = True",
+  "",
+  "    def begin(self, new_window=False, **kwargs):",
+  "        self.args = []",
+  "",
+  "    def open_project(self, project):",
+  "        self.args.append(project)",
+  "",
+  "    def open(self, filename, line=None, **kwargs):",
+  "        if line:",
+  "            self.args.extend([\"--goto\", \"{}:{}\".format(filename, line)])",
+  "        else:",
+  "            self.args.append(filename)",
+  "",
+  "    def end(self, **kwargs):",
+  "        subprocess.Popen([\"codium\", \"--no-sandbox\", \"--disable-gpu\", \"--reuse-window\"] + self.args)"
+].join("\n");
+
+
 export const spaceConfigs = {
   "code-server": {
     kind: "editor",
@@ -377,7 +424,59 @@ export const spaceConfigs = {
       { name: "Cupid", current: CUPID_COMMIT.slice(0, 7), note: "the editor, updated by copying its build into client/public/love", latestUrl: "https://github.com/mostlime12195/cupid/commits" },
       { name: "wakatime-cli", current: WAKATIME_CLI_VERSION, latestUrl: "https://github.com/wakatime/wakatime-cli/releases/latest" }
     ]
-  }
+  },
+  "renpy": {
+    kind: "gui",
+    category: "Game engines",
+    image: "ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
+    label: "Ren'Py",
+    title: "Ren'Py",
+    summary: "Visual novel engine",
+    about: "Ren'Py is a free and open-source engine for making visual novels and story-driven games in its own Python-based scripting language. This space has the Ren'Py launcher and VSCodium with the Ren'Py language extension and WakaTime, so the time you spend writing your game is tracked on Hackatime.",
+    description: "Ren'Py Visual Novel Engine",
+    vcpus: 4,
+    hackatime: true,
+    versions: [
+      { name: "Ren'Py", current: RENPY_VERSION, latestUrl: "https://www.renpy.org/latest.html" },
+      { name: "VSCodium", note: "newest release, installed when the template builds", latestUrl: "https://github.com/VSCodium/vscodium/releases/latest" },
+      { name: "wakatime-cli", current: WAKATIME_CLI_VERSION, latestUrl: "https://github.com/wakatime/wakatime-cli/releases/latest" },
+      { name: "Desktop base", current: "baseimage-selkies:debiantrixie", latestUrl: "https://github.com/linuxserver/docker-baseimage-selkies/releases" }
+    ],
+    build: {
+      tag: `spaces-renpy:${RENPY_VERSION}-1`,
+      dockerfile: [
+        "FROM ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
+        `ARG RENPY_VERSION=${RENPY_VERSION}`,
+        `ARG RENPY_SHA256=${RENPY_SHA256}`,
+        `ARG WAKATIME_CLI_VERSION=${WAKATIME_CLI_VERSION}`,
+        "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl gpg bzip2 unzip xdg-utils libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri libfontconfig1 libxcursor1 libxinerama1 libxrandr2 libxi6 libasound2t64 libpulse0 && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 https://gitlab.com/paulcarroll/vscodium-deb-rpm-repo/raw/master/pub.gpg | gpg --dearmor -o /usr/share/keyrings/vscodium-archive-keyring.gpg && echo \"deb [arch=amd64 signed-by=/usr/share/keyrings/vscodium-archive-keyring.gpg] https://download.vscodium.com/debs vscodium main\" > /etc/apt/sources.list.d/vscodium.list && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends codium && rm -rf /var/lib/apt/lists/*",
+        "RUN mkdir -p /opt/renpy /opt/wakatime && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/renpy.tar.bz2 \"https://www.renpy.org/dl/${RENPY_VERSION}/renpy-${RENPY_VERSION}-sdk.tar.bz2\" && echo \"${RENPY_SHA256}  /tmp/renpy.tar.bz2\" | sha256sum -c - && tar -xjf /tmp/renpy.tar.bz2 -C /opt/renpy && mv /opt/renpy/renpy-*-sdk /opt/renpy/sdk && chown -R 1000:1000 /opt/renpy/sdk && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/wakatime.zip \"https://github.com/wakatime/wakatime-cli/releases/download/${WAKATIME_CLI_VERSION}/wakatime-cli-linux-amd64.zip\" && unzip -q /tmp/wakatime.zip -d /opt/wakatime && chmod 755 /opt/wakatime/wakatime-cli-linux-amd64 && rm -f /tmp/renpy.tar.bz2 /tmp/wakatime.zip",
+        `RUN echo ${base64(RENPY_LAUNCHER)} | base64 -d > /opt/renpy/run && echo ${base64(RENPY_CODIUM_EDITOR)} | base64 -d > /opt/renpy/codium.edit.py && chmod 755 /opt/renpy/run && chmod 644 /opt/renpy/codium.edit.py && echo /opt/renpy/run > /defaults/autostart && echo ${base64('<?xml version="1.0" encoding="utf-8"?>\n<openbox_menu xmlns="http://openbox.org/3.4/menu"><menu id="root-menu" label="MENU"></menu></openbox_menu>')} | base64 -d > /defaults/menu.xml`
+      ].join("\n")
+    },
+    env: {
+      DISABLE_OPEN_TOOLS: "true",
+      SELKIES_COMMAND_ENABLED: "false",
+      SELKIES_PRINTING_ENABLED: "false",
+      HARDEN_OPENBOX: "true",
+      RESTART_APP: "false",
+      FILE_MANAGER_PATH: "/config",
+      SELKIES_UI_SIDEBAR_SHOW_APPS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_VIDEO_SETTINGS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_SCREEN_SETTINGS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_AUDIO_SETTINGS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_STATS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_SHORTCUTS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_SHARING: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_GAMEPADS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_SOFT_BUTTONS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_GAMING_MODE: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_TRACKPAD: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_WEBCAM: "false|locked"
+    },
+    resetFiles: [".config/openbox/autostart", ".config/openbox/menu.xml", ".config/openbox/menu.xml.bak"]
+  },
+
 };
 
 const configFor = (type) => spaceConfigs[(type || "").toLowerCase()];

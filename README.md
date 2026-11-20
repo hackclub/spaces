@@ -181,6 +181,7 @@ Creating a space needs a verified Hack Club account or a club membership. Each u
 | `freecad` | CAD software | `linuxserver/freecad` in Docker |
 | `godot` | Godot Engine | a Godot desktop image built on `linuxserver/baseimage-selkies`, in Docker |
 | `love2d` | LÖVE 2D | Cupid and its Node server in the sandbox |
+| `renpy` | Ren'Py | a Ren'Py SDK and VSCodium (with WakaTime and the Ren'Py language extension) desktop image built on `linuxserver/baseimage-selkies`, in Docker; projects are saved in `/config/projects` |
 
 ### Clubs API (`/api/v1/clubs`)
 

@@ -170,6 +170,7 @@ const TYPE_SIGNS = [
   ['love2d', /cupid|hackclub-spaces/i],
   ['godot', /godot/i],
   ['blender', /blender/i],
+  ['renpy', /vscodium|renpy/i],
   ['code-server', /vs ?code|code-server|vscode/i]
 ];
 
