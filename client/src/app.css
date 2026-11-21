@@ -131,13 +131,22 @@ input, textarea, select {
   animation: gradientShift 15s ease infinite;
 }
 
-[data-theme="lgbtq"] body {
-  background:
-    radial-gradient(55% 45% at 0% 0%, rgba(255, 92, 108, 0.16), transparent 70%),
-    radial-gradient(45% 40% at 100% 0%, rgba(255, 216, 77, 0.11), transparent 70%),
-    radial-gradient(50% 45% at 100% 100%, rgba(76, 201, 240, 0.13), transparent 70%),
-    radial-gradient(55% 50% at 0% 100%, rgba(192, 132, 252, 0.16), transparent 70%),
+:root {
+  --rainbow-band: linear-gradient(90deg, #ff5c6c, #ff9f43, #ffd84d, #3ddc84, #4cc9f0, #7aa7ff, #c084fc);
+  --rainbow-glows:
+    radial-gradient(42% 38% at 0% 0%, rgba(255, 92, 108, 0.24), transparent 70%),
+    radial-gradient(36% 32% at 34% 0%, rgba(255, 159, 67, 0.18), transparent 70%),
+    radial-gradient(36% 32% at 68% 0%, rgba(255, 216, 77, 0.15), transparent 70%),
+    radial-gradient(40% 40% at 100% 22%, rgba(61, 220, 132, 0.17), transparent 70%),
+    radial-gradient(46% 42% at 100% 100%, rgba(76, 201, 240, 0.21), transparent 70%),
+    radial-gradient(44% 40% at 50% 100%, rgba(122, 167, 255, 0.16), transparent 70%),
+    radial-gradient(46% 44% at 0% 82%, rgba(192, 132, 252, 0.24), transparent 70%),
     #0f0a15;
+  --sunset-glow: linear-gradient(180deg, #fff1e6 0%, #ffe6d8 55%, #fddbd6 100%);
+}
+
+[data-theme="lgbtq"] body {
+  background: var(--rainbow-glows);
   background-attachment: fixed;
 }
 
@@ -148,20 +157,17 @@ input, textarea, select {
   height: 4px;
   z-index: 2000;
   pointer-events: none;
-  background: linear-gradient(90deg,
-    #ff5c6c 0 16.66%,
-    #ff9f43 16.66% 33.33%,
-    #ffd84d 33.33% 50%,
-    #3ddc84 50% 66.66%,
-    #4cc9f0 66.66% 83.33%,
-    #c084fc 83.33% 100%);
+  background: var(--rainbow-band);
 }
 
 [data-theme="lgbtq"] .dashboard,
-[data-theme="lgbtq"] .auth-container,
+[data-theme="lgbtq"] .auth-container {
+  background: transparent !important;
+}
+
 [data-theme="lgbtq"] .create-form,
 [data-theme="lgbtq"] .space-card {
-  background: rgba(21, 15, 28, 0.72) !important;
+  background: rgba(15, 10, 21, 0.7) !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -173,7 +179,7 @@ input, textarea, select {
 }
 
 [data-theme="sunset"] body {
-  background: linear-gradient(180deg, #fff1e6 0%, #ffe6d8 55%, #fddbd6 100%);
+  background: var(--sunset-glow);
   background-attachment: fixed;
 }
 
