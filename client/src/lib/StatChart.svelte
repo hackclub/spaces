@@ -130,7 +130,7 @@
 <style>
   .chart {
     padding: 16px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 8px;
     min-width: 0;
   }
@@ -138,7 +138,7 @@
   .chart h3 {
     margin: 0 0 8px 0;
     font-size: 14px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .chart-plot {
@@ -153,21 +153,21 @@
   }
 
   .unrecorded {
-    fill: #f6f6f6;
+    fill: var(--ui-surface-alt);
   }
 
   .grid {
-    stroke: #eee;
+    stroke: var(--ui-border-soft);
     stroke-width: 1;
   }
 
   .axis {
     font-size: 10px;
-    fill: #888;
+    fill: var(--ui-text-muted);
   }
 
   .bar {
-    fill: #338eda;
+    fill: var(--ui-chart);
   }
 
   .bar.dim {
@@ -176,19 +176,19 @@
 
   .line {
     fill: none;
-    stroke: #338eda;
+    stroke: var(--ui-chart);
     stroke-width: 2;
     stroke-linejoin: round;
   }
 
   .crosshair {
-    stroke: #bbb;
+    stroke: var(--ui-border);
     stroke-width: 1;
   }
 
   .dot {
-    fill: #338eda;
-    stroke: #fff;
+    fill: var(--ui-chart);
+    stroke: var(--ui-surface);
     stroke-width: 2;
   }
 
@@ -203,8 +203,8 @@
     flex-direction: column;
     gap: 2px;
     padding: 6px 8px;
-    background: #fff;
-    border: 1px solid #ddd;
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
     border-radius: 6px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
     font-size: 12px;
@@ -213,13 +213,13 @@
   }
 
   .tooltip-detail {
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .chart-empty {
     margin: 24px 0;
     font-size: 13px;
-    color: #888;
+    color: var(--ui-text-muted);
     text-align: center;
   }
 </style>

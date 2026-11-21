@@ -389,8 +389,8 @@
   }
 
   .modal {
-    background: #fff;
-    color: #222;
+    background: var(--ui-surface);
+    color: var(--ui-text);
     border-radius: 8px;
     padding: 20px;
     width: 100%;
@@ -415,18 +415,18 @@
   h3 {
     margin: 0 0 8px 0;
     font-size: 14px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .muted {
-    color: #888;
+    color: var(--ui-text-muted);
     font-weight: normal;
   }
 
   .sub {
     margin: 4px 0 0 0;
     font-size: 13px;
-    color: #666;
+    color: var(--ui-text-muted);
     word-break: break-all;
   }
 
@@ -436,7 +436,7 @@
     font-size: 24px;
     line-height: 1;
     cursor: pointer;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .badges {
@@ -450,7 +450,7 @@
     font-size: 12px;
     padding: 3px 8px;
     border-radius: 4px;
-    background: #f0f0f0;
+    background: var(--ui-surface-alt);
   }
 
   .badge.locked {
@@ -460,7 +460,7 @@
 
   section {
     margin-top: 18px;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--ui-border-soft);
     padding-top: 14px;
   }
 
@@ -475,20 +475,20 @@
     flex: 1;
     min-width: 200px;
     padding: 6px 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
   }
 
   .btn {
     padding: 6px 12px;
-    background: #fff;
-    border: 1px solid #ccc;
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     cursor: pointer;
   }
 
   .btn:hover:not(:disabled) {
-    background: #f5f5f5;
+    background: var(--ui-surface-alt);
   }
 
   .lock-btn {
@@ -507,7 +507,7 @@
   }
 
   .login code {
-    background: #f3f3f3;
+    background: var(--ui-surface-alt);
     padding: 1px 4px;
     border-radius: 3px;
     word-break: break-all;
@@ -519,7 +519,7 @@
 
   .files {
     margin-top: 10px;
-    border: 1px solid #eee;
+    border: 1px solid var(--ui-border-soft);
     border-radius: 6px;
     max-height: 320px;
     overflow-y: auto;
@@ -534,7 +534,7 @@
     padding: 6px 10px;
     background: none;
     border: none;
-    border-bottom: 1px solid #f3f3f3;
+    border-bottom: 1px solid var(--ui-border-soft);
     font: inherit;
     font-size: 13px;
     text-align: left;
@@ -547,7 +547,7 @@
 
   button.file-row:hover,
   .file-name:hover {
-    background: #f7f9fc;
+    background: var(--ui-surface-alt);
   }
 
   .file-name {
@@ -570,7 +570,7 @@
     padding: 0;
     background: none;
     border: none;
-    color: #007bff;
+    color: var(--ui-accent);
     text-decoration: underline;
     cursor: pointer;
     font: inherit;
@@ -578,7 +578,7 @@
 
   .preview {
     margin-top: 12px;
-    border: 1px solid #eee;
+    border: 1px solid var(--ui-border-soft);
     border-radius: 6px;
   }
 
@@ -587,7 +587,7 @@
     justify-content: space-between;
     gap: 12px;
     padding: 6px 10px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--ui-border-soft);
     font-size: 13px;
     word-break: break-all;
   }
@@ -604,21 +604,21 @@
 
   .note {
     font-size: 13px;
-    color: #666;
+    color: var(--ui-text-muted);
     margin: 8px 0;
   }
 
   .result {
     margin: 16px 0 0 0;
     font-size: 13px;
-    color: #1e7e34;
+    color: var(--ui-success);
   }
 
   .result.prompt {
-    color: #b45309;
+    color: var(--ui-warning);
   }
 
   .result.error {
-    color: #c82333;
+    color: var(--ui-danger);
   }
 </style>

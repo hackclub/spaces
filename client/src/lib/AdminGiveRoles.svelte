@@ -120,7 +120,7 @@
   h3 {
     margin: 24px 0 8px 0;
     font-size: 14px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .row {
@@ -134,25 +134,25 @@
     flex: 1 1 220px;
     min-width: 0;
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     font-size: 14px;
   }
 
   select {
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     font-size: 14px;
-    background: #fff;
-    color: #222;
+    background: var(--ui-surface);
+    color: var(--ui-text);
   }
 
   .btn {
     padding: 6px 12px;
-    background: #fff;
-    color: #222;
-    border: 1px solid #ccc;
+    background: var(--ui-surface);
+    color: var(--ui-text);
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     cursor: pointer;
   }
@@ -163,8 +163,8 @@
   }
 
   .btn.primary {
-    background: #007bff;
-    border-color: #007bff;
+    background: var(--ui-accent);
+    border-color: var(--ui-accent);
     color: #fff;
   }
 
@@ -183,29 +183,29 @@
     gap: 8px;
     font-size: 14px;
     padding: 8px 0;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--ui-border-soft);
     word-break: break-all;
   }
 
   .meta {
     display: block;
     font-size: 12px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .note {
     font-size: 13px;
-    color: #666;
+    color: var(--ui-text-muted);
     margin: 4px 0;
   }
 
   .result {
     margin: 12px 0 0 0;
     font-size: 13px;
-    color: #1e7e34;
+    color: var(--ui-success);
   }
 
   .result.error {
-    color: #c82333;
+    color: var(--ui-danger);
   }
 </style>

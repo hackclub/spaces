@@ -932,7 +932,7 @@
     display: flex;
     gap: 10px;
     margin-bottom: 20px;
-    border-bottom: 2px solid #ddd;
+    border-bottom: 2px solid var(--ui-border);
   }
 
   .tabs button {
@@ -945,7 +945,7 @@
   }
 
   .tabs button.active {
-    border-bottom-color: #007bff;
+    border-bottom-color: var(--ui-accent);
     font-weight: bold;
   }
 
@@ -982,7 +982,7 @@
 
   .stat-card {
     padding: 20px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 8px;
     text-align: center;
   }
@@ -990,7 +990,7 @@
   .stat-card h3 {
     margin: 0 0 10px 0;
     font-size: 14px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .stat {
@@ -1002,7 +1002,7 @@
   .stat-sub {
     margin: 6px 0 0 0;
     font-size: 12px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .growth-cards {
@@ -1038,7 +1038,7 @@
 
   .result-count {
     font-size: 13px;
-    color: #666;
+    color: var(--ui-text-muted);
     white-space: nowrap;
   }
 
@@ -1055,18 +1055,18 @@
   th, td {
     padding: 10px;
     text-align: left;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--ui-border);
   }
 
   th {
-    background-color: #f5f5f5;
+    background-color: var(--ui-surface-alt);
     font-weight: bold;
   }
 
   input[type="number"] {
     width: 60px;
     padding: 5px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
   }
 
@@ -1100,14 +1100,14 @@
   }
 
   .loading-note {
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .link-btn {
     padding: 0;
     background: none;
     border: none;
-    color: #007bff;
+    color: var(--ui-accent);
     text-decoration: underline;
     cursor: pointer;
     font: inherit;
@@ -1118,28 +1118,28 @@
     margin: 15px auto 0;
     padding: 8px 16px;
     background: none;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
   }
 
   .show-more-btn:hover {
-    border-color: #007bff;
+    border-color: var(--ui-accent);
   }
 
   .search-input {
     flex: 1;
     min-width: 220px;
     padding: 8px 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     font-size: 14px;
   }
 
   .sort-select {
     padding: 8px 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     font-size: 14px;
     cursor: pointer;
@@ -1169,13 +1169,13 @@
 
   .manage-btn {
     padding: 5px 12px;
-    background: #fff;
-    border: 1px solid #ccc;
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     cursor: pointer;
   }
 
   .manage-btn:hover {
-    border-color: #007bff;
+    border-color: var(--ui-accent);
   }
 </style>

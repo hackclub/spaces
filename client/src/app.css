@@ -59,6 +59,46 @@
   -webkit-text-size-adjust: 100%;
 }
 
+:root {
+  --ui-surface: #ffffff;
+  --ui-surface-alt: #f5f5f5;
+  --ui-hover: rgba(0, 0, 0, 0.03);
+  --ui-border: #dddddd;
+  --ui-border-soft: #eeeeee;
+  --ui-text: #222222;
+  --ui-text-muted: #666666;
+  --ui-accent: #007bff;
+  --ui-chart: #338eda;
+  --ui-success: #1e7e34;
+  --ui-warning: #b45309;
+  --ui-danger: #c82333;
+}
+
+:root[data-theme]:not([data-theme="light"]) {
+  --ui-surface: var(--white);
+  --ui-surface-alt: color-mix(in srgb, var(--smoke) 55%, var(--white));
+  --ui-hover: color-mix(in srgb, var(--muted) 10%, transparent);
+  --ui-border: color-mix(in srgb, var(--muted) 35%, var(--white));
+  --ui-border-soft: color-mix(in srgb, var(--muted) 18%, var(--white));
+  --ui-text: var(--black);
+  --ui-text-muted: var(--muted);
+  --ui-accent: var(--blue);
+  --ui-chart: var(--blue);
+  --ui-success: var(--green);
+  --ui-warning: var(--orange);
+  --ui-danger: var(--red);
+}
+
+:root[data-theme]:not([data-theme="light"]):not([data-theme="sunset"]) {
+  color-scheme: dark;
+}
+
+:root[data-theme]:not([data-theme="light"]) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+  background-color: var(--ui-surface);
+  color: var(--ui-text);
+  border-color: var(--ui-border);
+}
+
 * {
   box-sizing: border-box;
 }

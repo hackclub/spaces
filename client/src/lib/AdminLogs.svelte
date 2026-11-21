@@ -163,24 +163,24 @@
     flex: 1;
     min-width: 200px;
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
   }
 
   .sort-select {
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
   }
 
   .stat-sub {
     margin: 6px 0 0 0;
     font-size: 12px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .loading-note {
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .table-container {
@@ -196,11 +196,11 @@
   th, td {
     padding: 10px;
     text-align: left;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--ui-border);
   }
 
   th {
-    background-color: #f5f5f5;
+    background-color: var(--ui-surface-alt);
     font-weight: bold;
   }
 
@@ -214,7 +214,7 @@
     margin: 15px auto 0;
     padding: 8px 16px;
     background: none;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     cursor: pointer;
   }

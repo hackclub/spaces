@@ -259,8 +259,8 @@
   }
 
   .modal {
-    background: #fff;
-    color: #222;
+    background: var(--ui-surface);
+    color: var(--ui-text);
     border-radius: 8px;
     padding: 20px;
     width: 100%;
@@ -285,13 +285,13 @@
   h3 {
     margin: 0 0 8px 0;
     font-size: 14px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .sub {
     margin: 4px 0 0 0;
     font-size: 13px;
-    color: #666;
+    color: var(--ui-text-muted);
     word-break: break-all;
   }
 
@@ -301,7 +301,7 @@
     font-size: 24px;
     line-height: 1;
     cursor: pointer;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .badges {
@@ -315,11 +315,11 @@
     font-size: 12px;
     padding: 3px 8px;
     border-radius: 4px;
-    background: #f0f0f0;
+    background: var(--ui-surface-alt);
   }
 
   .badge.strong {
-    background: #007bff;
+    background: var(--ui-accent);
     color: #fff;
   }
 
@@ -348,20 +348,20 @@
   input[type="number"] {
     width: 70px;
     padding: 6px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
   }
 
   .btn {
     padding: 6px 12px;
-    background: #fff;
-    border: 1px solid #ccc;
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     cursor: pointer;
   }
 
   .btn:hover:not(:disabled) {
-    background: #f5f5f5;
+    background: var(--ui-surface-alt);
   }
 
   .btn:disabled,
@@ -396,7 +396,7 @@
 
   .role-desc {
     display: block;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .grant {
@@ -410,27 +410,27 @@
   }
 
   .danger {
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--ui-border-soft);
     padding-top: 14px;
   }
 
   .note {
     font-size: 13px;
-    color: #666;
+    color: var(--ui-text-muted);
     margin: 0 0 8px 0;
   }
 
   .result {
     margin: 16px 0 0 0;
     font-size: 13px;
-    color: #1e7e34;
+    color: var(--ui-success);
   }
 
   .result.prompt {
-    color: #b45309;
+    color: var(--ui-warning);
   }
 
   .result.error {
-    color: #c82333;
+    color: var(--ui-danger);
   }
 </style>

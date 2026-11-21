@@ -648,22 +648,30 @@ astro-build.astro-vscode
 
   textarea {
     resize: none;
-
     height: 16rem;
-    width: 100%;
+    font-family: inherit;
+    line-height: 1.5;
   }
 
-  input {
+  input,
+  textarea {
     width: 100%;
+    box-sizing: border-box;
     padding: 8px 12px;
     border: 1px solid var(--muted);
     border-radius: 4px;
     font-size: 14px;
     background: var(--white);
-    color: var(--text);
+    color: var(--black);
   }
 
-  input:focus {
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--muted);
+  }
+
+  input:focus,
+  textarea:focus {
     outline: none;
     border-color: var(--blue);
   }

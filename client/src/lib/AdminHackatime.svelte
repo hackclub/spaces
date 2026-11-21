@@ -332,7 +332,7 @@
   }
 
   .type-row:hover {
-    background: rgba(0, 0, 0, 0.03);
+    background: var(--ui-hover);
   }
 
   .type-row.selected {
@@ -345,7 +345,7 @@
     height: 4px;
     margin-top: 4px;
     border-radius: 2px;
-    background: #eee;
+    background: var(--ui-surface-alt);
   }
 
   .bar span {
@@ -371,7 +371,7 @@
 
   .period {
     padding: 8px 12px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     font-size: 14px;
   }
@@ -385,14 +385,14 @@
 
   .card {
     padding: 16px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 8px;
   }
 
   .card h3 {
     margin: 0 0 8px 0;
     font-size: 14px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .big {
@@ -411,21 +411,21 @@
   .sub {
     margin: 4px 0 0 0;
     font-size: 12px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .note {
     font-size: 13px;
-    color: #555;
+    color: var(--ui-text-muted);
     margin: 8px 0;
   }
 
   .note.warn {
-    color: #b45309;
+    color: var(--ui-warning);
   }
 
   .note.error {
-    color: #c82333;
+    color: var(--ui-danger);
   }
 
   .import {
@@ -438,8 +438,8 @@
 
   .btn {
     padding: 8px 14px;
-    background: #fff;
-    border: 1px solid #ccc;
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     cursor: pointer;
   }
@@ -464,7 +464,7 @@
   td {
     text-align: left;
     padding: 8px 10px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--ui-border-soft);
     white-space: nowrap;
   }
 
@@ -477,7 +477,7 @@
   }
 
   .person:hover {
-    background: rgba(0, 0, 0, 0.03);
+    background: var(--ui-hover);
   }
 
   .space-row td:first-child {
@@ -488,7 +488,7 @@
     width: 22px;
     height: 22px;
     margin-right: 8px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     background: transparent;
     cursor: pointer;
@@ -500,7 +500,7 @@
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 11px;
-    background: #eee;
+    background: var(--ui-surface-alt);
   }
 
   code {

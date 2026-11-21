@@ -310,7 +310,7 @@
   h3 {
     margin: 20px 0 8px 0;
     font-size: 14px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .list-header {
@@ -332,7 +332,7 @@
     gap: 2px;
     text-align: left;
     padding: 10px 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 8px;
     background: transparent;
     color: inherit;
@@ -340,8 +340,8 @@
   }
 
   .role-row.active {
-    border-color: #007bff;
-    box-shadow: 0 0 0 1px #007bff;
+    border-color: var(--ui-accent);
+    box-shadow: 0 0 0 1px var(--ui-accent);
   }
 
   .role-name {
@@ -350,11 +350,11 @@
 
   .role-meta {
     font-size: 12px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .editor {
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 8px;
     padding: 16px;
     min-width: 0;
@@ -370,7 +370,7 @@
 
   input[type="text"] {
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     font-size: 14px;
     width: 100%;
@@ -382,7 +382,7 @@
   }
 
   fieldset {
-    border: 1px solid #eee;
+    border: 1px solid var(--ui-border-soft);
     border-radius: 6px;
     margin: 0 0 10px 0;
     padding: 8px 12px;
@@ -403,7 +403,7 @@
 
   code {
     font-size: 11px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   .row {
@@ -415,9 +415,9 @@
 
   .btn {
     padding: 6px 12px;
-    background: #fff;
-    color: #222;
-    border: 1px solid #ccc;
+    background: var(--ui-surface);
+    color: var(--ui-text);
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     cursor: pointer;
   }
@@ -428,8 +428,8 @@
   }
 
   .btn.primary {
-    background: #007bff;
-    border-color: #007bff;
+    background: var(--ui-accent);
+    border-color: var(--ui-accent);
     color: #fff;
   }
 
@@ -445,7 +445,7 @@
     padding: 0;
     font-weight: bold;
     font-size: 13px;
-    color: #007bff;
+    color: var(--ui-accent);
     cursor: pointer;
   }
 
@@ -465,7 +465,7 @@
     gap: 8px;
     font-size: 14px;
     padding: 6px 0;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--ui-border-soft);
   }
 
   .people .role-meta {
@@ -476,28 +476,28 @@
     font-size: 11px;
     padding: 1px 6px;
     border-radius: 4px;
-    background: #007bff;
+    background: var(--ui-accent);
     color: #fff;
     margin-left: 4px;
   }
 
   .note {
     font-size: 13px;
-    color: #666;
+    color: var(--ui-text-muted);
     margin: 4px 0;
   }
 
   .result {
     margin: 12px 0 0 0;
     font-size: 13px;
-    color: #1e7e34;
+    color: var(--ui-success);
   }
 
   .result.prompt {
-    color: #b45309;
+    color: var(--ui-warning);
   }
 
   .result.error {
-    color: #c82333;
+    color: var(--ui-danger);
   }
 </style>

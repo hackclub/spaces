@@ -176,23 +176,23 @@
   .note {
     margin: 0;
     font-size: 13px;
-    color: #555;
+    color: var(--ui-text-muted);
     max-width: 70ch;
   }
 
   .note.result {
     margin: 8px 0;
-    color: #1e7e34;
+    color: var(--ui-success);
   }
 
   .note.error {
-    color: #c82333;
+    color: var(--ui-danger);
   }
 
   .btn {
     padding: 8px 14px;
-    background: #fff;
-    border: 1px solid #ccc;
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
     border-radius: 4px;
     cursor: pointer;
     white-space: nowrap;
@@ -219,14 +219,14 @@
     text-align: left;
     vertical-align: top;
     padding: 12px 10px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--ui-border-soft);
   }
 
   .sub {
     display: block;
     margin-top: 2px;
     font-size: 12px;
-    color: #666;
+    color: var(--ui-text-muted);
   }
 
   code {
@@ -268,22 +268,22 @@
   }
 
   .version-value.muted {
-    color: #666;
+    color: var(--ui-text-muted);
     font-style: italic;
   }
 
   .versions a {
-    color: #007bff;
+    color: var(--ui-accent);
     font-size: 13px;
     white-space: nowrap;
   }
 
   .status {
     font-weight: bold;
-    color: #b45309;
+    color: var(--ui-warning);
   }
 
   .status.ok {
-    color: #1e7e34;
+    color: var(--ui-success);
   }
 </style>
