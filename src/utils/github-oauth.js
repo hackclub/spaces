@@ -46,7 +46,12 @@ export const fetchGithubAccount = async (accessToken, timeoutMs) => {
 export const fetchGithubRepos = async (accessToken) => {
   const repos = await githubApi('/user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator,organization_member', accessToken);
   return Array.isArray(repos)
-    ? repos.map((repo) => ({ name: repo.full_name, private: Boolean(repo.private), description: repo.description || '' }))
+    ? repos.map((repo) => ({
+        name: repo.full_name,
+        private: Boolean(repo.private),
+        description: repo.description || '',
+        pushed_at: repo.pushed_at || null
+      }))
     : [];
 };
 

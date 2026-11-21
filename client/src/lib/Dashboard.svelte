@@ -7,6 +7,7 @@
   import FlagIcon from "../assets/flag.svg?raw";
   import ShareWithClubToggle from "./ShareWithClubToggle.svelte";
   import ProgressNotice from "./ProgressNotice.svelte";
+  import RepoPicker from "./RepoPicker.svelte";
   import { userData } from "../stores/user.svelte";
   import { createConfirm } from "./confirm.js";
   import { findLegacyGodotProjects, downloadLegacyGodotProjects } from "./godot-legacy.js";
@@ -28,6 +29,7 @@
   let nameFromRepo = "";
   let githubRepos = [];
   let githubReposFor = "";
+  let githubReposLoading = false;
   let error = "";
   let loading = false;
   let actionLoading = {};
@@ -418,18 +420,15 @@
 
   async function loadGithubRepos(login) {
     githubReposFor = login;
+    githubReposLoading = true;
     try {
       const response = await fetch(`${API_BASE}/oauth/github/repos`, { credentials: "include" });
       const data = response.ok ? await response.json() : null;
-      githubRepos = Array.isArray(data?.data)
-        ? data.data.map((repo) => ({
-            value: repo.name,
-            label: [repo.private ? "Private" : "", repo.description].filter(Boolean).join(" · "),
-          }))
-        : [];
+      githubRepos = Array.isArray(data?.data) ? data.data : [];
     } catch (err) {
       githubRepos = [];
     }
+    githubReposLoading = false;
   }
 
   function handleRepoInput() {
@@ -954,28 +953,19 @@
             {#if kindOf(newSpaceType) === "editor"}
               <div class="form-group">
                 <label class="form-label" for="spaceRepo">Start from a GitHub repo <span class="optional-mark">(optional)</span></label>
-                <input
-                  class="form-input"
+                <RepoPicker
                   id="spaceRepo"
-                  type="text"
-                  inputmode="url"
-                  autocomplete="off"
-                  spellcheck="false"
-                  disabled={loading}
+                  describedby="spaceRepoHint"
                   bind:value={newSpaceRepo}
+                  repos={userData.user.github_linked ? githubRepos : []}
+                  loading={userData.user.github_linked && githubReposLoading}
+                  disabled={loading}
+                  placeholder={userData.user.github_linked ? `Search your repos or paste a link` : "https://github.com/you/project"}
                   on:input={handleRepoInput}
-                  list="spaceRepoList"
-                  placeholder={userData.user.github_linked ? `${userData.user.github_username}/project` : "https://github.com/you/project"}
-                  aria-describedby="spaceRepoHint"
                 />
-                <datalist id="spaceRepoList">
-                  {#each githubRepos as repo (repo.value)}
-                    <option value={repo.value}>{repo.label}</option>
-                  {/each}
-                </datalist>
                 <p class="form-hint" id="spaceRepoHint">
                   {#if userData.user.github_linked}
-                    Start typing to pick one of your repos, private ones too, or paste a link. Your space can push to GitHub as you.
+                    Pick one of your repos, private ones too, or paste a link to any public repo. Your space can push to GitHub as you.
                   {:else if userData.user.github_available}
                     Public repos only. <button type="button" class="link-button" on:click={() => dispatch("settings")}>Connect GitHub in Settings</button> to use private repos and push your work.
                   {:else}
