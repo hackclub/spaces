@@ -663,11 +663,15 @@ const limitError = (message, statusCode) => {
   return error;
 };
 
-const runningLimitError = (maxRunning) => limitError(maxRunning === 1
-  ? "You can only have one space running at a time. Please stop your other space first."
-  : maxRunning === 0
-    ? "You can't start spaces right now."
-    : `You can only have ${maxRunning} spaces running at a time. Please stop one first.`, 400);
+const runningLimitError = (maxRunning) => {
+  const error = limitError(maxRunning === 1
+    ? "You can only have one space running at a time. Please stop your other space first."
+    : maxRunning === 0
+      ? "You can't start spaces right now."
+      : `You can only have ${maxRunning} spaces running at a time. Please stop one first.`, 400);
+  if (maxRunning > 0) error.reason = "running_limit";
+  return error;
+};
 
 const removeStalePlaceholders = async (user) => {
   const stale = await pg('spaces')

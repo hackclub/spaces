@@ -31,7 +31,7 @@ router.use(extractAuth);
 
 const sendError = (res, err) => {
   if (err.statusCode) {
-    return res.status(err.statusCode).json({ error: err.message });
+    return res.status(err.statusCode).json({ error: err.message, ...(err.reason ? { reason: err.reason } : {}) });
   }
   if (/required|Missing|Invalid authorization/.test(err.message)) {
     return res.status(400).json({ error: err.message });

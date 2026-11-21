@@ -439,8 +439,28 @@
     }
   }
 
+  let runningConflict = [];
+  let stoppingForCreate = null;
+  $: if (!showCreateForm) runningConflict = [];
+
+  const spaceLabel = (space) => space.name || space.type;
+
+  async function stopAndCreate(space) {
+    stoppingForCreate = space.id;
+    await stopSpace(space.id);
+    const stopError = actionError[space.id];
+    stoppingForCreate = null;
+    if (stopError) {
+      error = `Couldn't stop ${spaceLabel(space)}: ${stopError}`;
+      runningConflict = [];
+      return;
+    }
+    await createSpace();
+  }
+
   async function createSpace() {
     error = "";
+    runningConflict = [];
 
     const body = { type: newSpaceType };
     if (!isGuiType(newSpaceType)) {
@@ -485,6 +505,10 @@
           error = data.error;
         } else {
           error = data.error || ERROR_MESSAGES.CREATE_FAILED;
+        }
+        if (data.reason === "running_limit") {
+          await loadSpaces();
+          runningConflict = spaces.filter((space) => space.running);
         }
       }
     } catch (err) {
@@ -975,7 +999,21 @@
               </div>
             {/if}
 
-            {#if error}
+            {#if runningConflict.length}
+              <div class="running-conflict" role="alert">
+                <p class="running-conflict-title">{error}</p>
+                <p class="running-conflict-note">
+                  Stopping a space closes it. Files you've saved stay in it, but anything you haven't saved will be lost, so save your work there first.
+                </p>
+                <div class="running-conflict-actions">
+                  {#each runningConflict as space (space.id)}
+                    <button type="button" class="running-conflict-button" on:click={() => stopAndCreate(space)} disabled={loading || stoppingForCreate !== null}>
+                      {stoppingForCreate === space.id ? `Stopping ${spaceLabel(space)}…` : `Stop ${spaceLabel(space)} and create`}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+            {:else if error}
               <div class="error-message">{error}</div>
             {/if}
 
