@@ -139,7 +139,10 @@ router.get('/callback', async (req, res) => {
     }
     res.clearCookie(STATE_COOKIE, STATE_COOKIE_OPTIONS);
 
-    const stateRow = await pg('oauth_states').where({ state }).first();
+    const stateRow = await pg('oauth_states')
+      .where({ state })
+      .where((query) => query.whereNull('mode').orWhereNot('mode', 'hackatime'))
+      .first();
     if (!stateRow) {
       return res.redirect('/?error=oauth_invalid_state');
     }

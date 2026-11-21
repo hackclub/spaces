@@ -429,10 +429,13 @@
         <button id="hackatime" class="secondary danger" on:click={disconnectHackatime} disabled={hackatimeLoading}>
           Disconnect Hackatime
         </button>
-      {:else}
+      {:else if userData.user.hackatime_available}
+        <small>Connect Hackatime so your spaces log your coding time.</small>
         <button id="hackatime" on:click={connectHackatime} disabled={hackatimeLoading}>
           {hackatimeLoading ? "Redirecting…" : "Connect Hackatime"}
         </button>
+      {:else}
+        <small>Connecting Hackatime isn't available yet.</small>
       {/if}
       {#if hackatimeMessage}<div class="success">{hackatimeMessage}</div>{/if}
       {#if hackatimeError}<div class="error">{hackatimeError}</div>{/if}

@@ -4,6 +4,7 @@ import { getUserPrimaryMembership } from "./clubs.js";
 import { recordRunStart, recordRunStop } from "./space-runs.js";
 import { findTemplate } from "./templates.js";
 import { hasPermission } from "./permissions.js";
+import { currentHackatimeKey } from "./hackatime-oauth.js";
 import path from "path";
 import crypto from "crypto";
 import {
@@ -430,6 +431,7 @@ export const spaceConfigs = {
   },
   "renpy": {
     kind: "gui",
+    beta: true,
     category: "Game engines",
     image: "ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
     label: "Ren'Py",
@@ -761,6 +763,7 @@ export const createContainer = async (password, type, authorization, name, repo 
     if (isGui) {
       await setupGuiApp(sandbox, { image: config.image, build: config.build });
     }
+    user.hackatime_api_key = await currentHackatimeKey(user);
     if (config.hackatime) {
       await writeSpaceHackatime(sandbox, config, user.hackatime_api_key, reservedId);
     }
@@ -879,6 +882,7 @@ export const startContainer = async (spaceId, authorization) => {
     const password = space.password || crypto.randomBytes(16).toString('hex');
 
     const config = configFor(space.type);
+    user.hackatime_api_key = await currentHackatimeKey(user);
     if (config?.hackatime) {
       await writeSpaceHackatime(sandbox, config, user.hackatime_api_key, space.id);
     }

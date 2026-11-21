@@ -3,15 +3,20 @@ import crypto from 'crypto';
 import pg from '../../utils/db.js';
 import { getUser } from '../../utils/user.js';
 import { extractAuth } from '../../middlewares/auth.middleware.js';
+import {
+  HACKATIME_SCOPES,
+  AUTHORIZE_URL,
+  TOKEN_URL,
+  hackatimeOAuthConfigured,
+  encryptToken,
+  decryptToken,
+  fetchHackatimeProfile,
+  fetchHackatimeKey,
+  revokeHackatimeToken
+} from '../../utils/hackatime-oauth.js';
 
 const router = express.Router();
 router.use(extractAuth);
-
-const HACKATIME_URL = process.env.HACKATIME_URL || 'https://hackatime.hackclub.com';
-const AUTHORIZE_URL = new URL('/oauth/authorize', HACKATIME_URL).toString();
-const TOKEN_URL = new URL('/oauth/token', HACKATIME_URL).toString();
-const REVOKE_URL = new URL('/oauth/revoke', HACKATIME_URL).toString();
-const API_KEYS_URL = new URL('/api/v1/authenticated/api_keys', HACKATIME_URL).toString();
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const STATE_COOKIE = 'hackatime_oauth_state';
@@ -22,10 +27,6 @@ const STATE_COOKIE_OPTIONS = {
   path: '/api/v1/oauth/hackatime',
   maxAge: STATE_TTL_MS
 };
-
-const oauthConfigured = () => Boolean(
-  process.env.HACKATIME_CLIENT_ID && process.env.HACKATIME_CLIENT_SECRET && process.env.HACKATIME_REDIRECT_URI
-);
 
 const finish = (res, params) => res.redirect(`/#${new URLSearchParams(params)}`);
 
@@ -43,27 +44,10 @@ const currentUser = async (req, res) => {
   return user;
 };
 
-const revokeToken = async (token) => {
-  try {
-    await fetch(REVOKE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        token,
-        client_id: process.env.HACKATIME_CLIENT_ID,
-        client_secret: process.env.HACKATIME_CLIENT_SECRET
-      }),
-      signal: AbortSignal.timeout(10000)
-    });
-  } catch (err) {
-    console.error('Failed to revoke Hackatime token:', err.message);
-  }
-};
-
 router.post('/link', async (req, res) => {
   try {
-    if (!oauthConfigured()) {
-      return res.status(503).json({ success: false, message: 'Hackatime login is not set up on this server' });
+    if (!hackatimeOAuthConfigured()) {
+      return res.status(503).json({ success: false, message: 'Connecting Hackatime is not set up on this server yet' });
     }
     const user = await currentUser(req, res);
     if (!user) return;
@@ -86,7 +70,7 @@ router.post('/link', async (req, res) => {
     url.searchParams.set('client_id', process.env.HACKATIME_CLIENT_ID);
     url.searchParams.set('redirect_uri', process.env.HACKATIME_REDIRECT_URI);
     url.searchParams.set('response_type', 'code');
-    url.searchParams.set('scope', 'profile');
+    url.searchParams.set('scope', HACKATIME_SCOPES);
     url.searchParams.set('state', state);
     url.searchParams.set('code_challenge', codeChallenge);
     url.searchParams.set('code_challenge_method', 'S256');
@@ -101,6 +85,8 @@ router.post('/link', async (req, res) => {
 
 router.get('/callback', async (req, res) => {
   try {
+    if (!hackatimeOAuthConfigured()) return finish(res, { hackatime_error: 'failed' });
+
     const { code, state, error: oauthError } = req.query;
 
     if (oauthError) return finish(res, { hackatime_error: 'denied' });
@@ -146,29 +132,23 @@ router.get('/callback', async (req, res) => {
     if (!accessToken) return finish(res, { hackatime_error: 'token_failed' });
 
     let apiKey;
+    let profile;
     try {
-      const keyResponse = await fetch(API_KEYS_URL, {
-        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
-        signal: AbortSignal.timeout(15000)
-      });
-      if (!keyResponse.ok) {
-        console.error('Hackatime api_keys failed:', keyResponse.status);
-        return finish(res, { hackatime_error: 'key_failed' });
-      }
-      apiKey = (await keyResponse.json())?.token;
-    } finally {
-      await revokeToken(accessToken);
-    }
-
-    if (typeof apiKey !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(apiKey)) {
+      [apiKey, profile] = await Promise.all([fetchHackatimeKey(accessToken), fetchHackatimeProfile(accessToken)]);
+    } catch (err) {
+      console.error('Reading the new Hackatime connection failed:', err.message);
+      await revokeHackatimeToken(accessToken);
       return finish(res, { hackatime_error: 'key_failed' });
     }
 
+    const previous = await pg('users').where({ id: stateRow.user_id }).first('hackatime_token');
     await pg('users').where({ id: stateRow.user_id }).update({
       hackatime_api_key: apiKey,
-      hackatime_user_id: null,
+      hackatime_user_id: profile?.id != null ? String(profile.id) : null,
+      hackatime_token: encryptToken(accessToken),
       hackatime_linked_at: new Date()
     });
+    await revokeHackatimeToken(decryptToken(previous?.hackatime_token));
 
     finish(res, { hackatime: 'linked' });
   } catch (error) {
@@ -189,8 +169,10 @@ router.post('/unlink', async (req, res) => {
     await pg('users').where({ id: user.id }).update({
       hackatime_api_key: null,
       hackatime_user_id: null,
+      hackatime_token: null,
       hackatime_linked_at: null
     });
+    await revokeHackatimeToken(decryptToken(user.hackatime_token));
 
     res.json({ success: true, message: 'Hackatime disconnected' });
   } catch (error) {
