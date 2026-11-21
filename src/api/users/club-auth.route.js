@@ -124,7 +124,7 @@ router.post('/club-member/signup', accountIpLimiter, authLimiter, async (req, re
       }
     }
 
-    setSessionCookie(res, await createSession(newUser.id, 'password'));
+    setSessionCookie(res, await createSession(newUser.id, 'password', req));
 
     res.status(201).json({
       success: true,
@@ -203,7 +203,7 @@ router.post('/club-member/login', accountIpLimiter, authLimiter, async (req, res
       return res.status(401).json(genericAuthError);
     }
 
-    setSessionCookie(res, await createSession(user.id, 'password'));
+    setSessionCookie(res, await createSession(user.id, 'password', req));
 
     res.status(200).json({
       success: true,

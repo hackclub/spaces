@@ -14,7 +14,7 @@ const recordLogin = async (userId, method) => {
   }
 };
 
-export const createSession = async (userId, method) => {
+export const createSession = async (userId, method, req = null) => {
   const token = crypto.randomBytes(32).toString('hex');
 
   await pg('sessions')
@@ -25,7 +25,9 @@ export const createSession = async (userId, method) => {
   await pg('sessions').insert({
     user_id: userId,
     token_hash: hashToken(token),
-    expires_at: new Date(Date.now() + SESSION_MAX_AGE)
+    expires_at: new Date(Date.now() + SESSION_MAX_AGE),
+    method,
+    user_agent: (req?.get?.('user-agent') || '').slice(0, 512) || null
   });
 
   await recordLogin(userId, method);
@@ -49,7 +51,22 @@ export const deleteSession = async (token) => {
   await pg('sessions').where('token_hash', hashToken(token)).delete();
 };
 
-export const deleteExpiredSessions = () => pg('sessions').where('expires_at', '<', new Date()).delete();
+export const listUserSessions = (userId) => pg('sessions')
+  .where('user_id', userId)
+  .where('expires_at', '>', new Date())
+  .orderBy('created_at', 'desc')
+  .select('id', 'token_hash', 'method', 'user_agent', 'created_at', 'expires_at');
+
+export const deleteUserSession = (userId, sessionId) => pg('sessions')
+  .where({ user_id: userId, id: sessionId })
+  .delete();
+
+export const deleteOtherSessions = (userId, token) => pg('sessions')
+  .where('user_id', userId)
+  .whereNot('token_hash', hashToken(token))
+  .delete();
+
+export const deleteExpiredSessions =() => pg('sessions').where('expires_at', '<', new Date()).delete();
 
 export const setSessionCookie = (res, token, { sameSite = 'strict' } = {}) => {
   res.cookie('auth_token', token, {

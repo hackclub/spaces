@@ -287,7 +287,7 @@ router.get('/callback', async (req, res) => {
     }
 
     if (!hasSession) {
-      setSessionCookie(res, await createSession(user.id, 'hackclub'), { sameSite: 'lax' });
+      setSessionCookie(res, await createSession(user.id, 'hackclub', req), { sameSite: 'lax' });
     }
 
     res.redirect("/#oauth_success=true");

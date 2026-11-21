@@ -3,6 +3,93 @@
   import { API_BASE } from "../config.js";
   import { userData } from "../stores/user.svelte";
   import ExtensionPicker from "./ExtensionPicker.svelte";
+  import { themes } from "../themes.js";
+  import { currentTheme, setTheme } from "../stores/theme.js";
+
+  const THEME_PREVIEWS = {
+    darkGradient: "linear-gradient(135deg, #0a0f1a 0%, #1a2a3a 50%, #0f1a2a 100%)",
+    lgbtq: "linear-gradient(135deg, #e40303, #ff8c00, #ffed00, #008026, #24408e, #732982)",
+  };
+
+  const LOGIN_METHODS = {
+    hackclub: "Hack Club",
+    email: "an email code",
+    password: "a club password",
+  };
+
+  const formatDate = (value) =>
+    new Date(value).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+
+  let limits = null;
+  let limitsError = "";
+  let sessions = [];
+  let sessionsLoading = true;
+  let sessionsError = "";
+  let sessionsMessage = "";
+  let endingSession = null;
+  $: otherSessions = sessions.filter((session) => !session.current);
+
+  async function loadLimits() {
+    try {
+      const response = await fetch(`${API_BASE}/users/limits`, { credentials: "include" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      limits = data.data;
+    } catch (err) {
+      console.error(err);
+      limitsError = "Couldn't load your limits.";
+    }
+  }
+
+  async function loadSessions() {
+    try {
+      const response = await fetch(`${API_BASE}/users/sessions`, { credentials: "include" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      sessions = data.data;
+    } catch (err) {
+      console.error(err);
+      sessionsError = "Couldn't load where you're logged in.";
+    }
+    sessionsLoading = false;
+  }
+
+  async function endSession(id) {
+    sessionsError = "";
+    sessionsMessage = "";
+    endingSession = id;
+    try {
+      const response = await fetch(`${API_BASE}/users/sessions/${id}`, { method: "DELETE", credentials: "include" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Couldn't sign that session out.");
+      sessions = sessions.filter((session) => session.id !== id);
+      sessionsMessage = "Signed out.";
+    } catch (err) {
+      sessionsError = err.message;
+    }
+    endingSession = null;
+  }
+
+  async function endOtherSessions() {
+    sessionsError = "";
+    sessionsMessage = "";
+    endingSession = "others";
+    try {
+      const response = await fetch(`${API_BASE}/users/sessions/sign-out-others`, { method: "POST", credentials: "include" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Couldn't sign out your other sessions.");
+      sessions = sessions.filter((session) => session.current);
+      sessionsMessage = data.data.ended === 1 ? "Signed out 1 other session." : `Signed out ${data.data.ended} other sessions.`;
+    } catch (err) {
+      sessionsError = err.message;
+    }
+    endingSession = null;
+  }
+
+  onMount(() => {
+    loadLimits();
+    loadSessions();
+  });
 
   const dispatch = createEventDispatcher();
 
@@ -416,6 +503,92 @@
     </div>
   </section>
 
+  <section class="settings-section" aria-labelledby="limits-heading">
+    <div class="section-intro">
+      <h2 id="limits-heading">Limits</h2>
+      <p>How many spaces you can have, and how many can run at the same time.</p>
+    </div>
+
+    <div class="settings-panel">
+      {#if limitsError}
+        <div class="row"><p class="notice notice-error row-full" role="alert">{limitsError}</p></div>
+      {:else if !limits}
+        <div class="row"><p class="row-detail row-full">Loading…</p></div>
+      {:else}
+        {#each [
+          { label: "Spaces", used: limits.spaces, max: limits.max_spaces, full: "Delete a space to make a new one." },
+          { label: "Running at once", used: limits.running, max: limits.max_running, full: "Stop a running space to start another." },
+        ] as limit}
+          <div class="row row-stack">
+            <div class="meter-head">
+              <span class="row-label">{limit.label}</span>
+              <span class="meter-count"><strong>{limit.used}</strong> of {limit.max}</span>
+            </div>
+            <div
+              class="meter"
+              class:full={limit.used >= limit.max}
+              role="meter"
+              aria-label={limit.label}
+              aria-valuemin="0"
+              aria-valuemax={limit.max}
+              aria-valuenow={Math.min(limit.used, limit.max)}
+            >
+              <span style="width: {Math.min(100, (limit.used / Math.max(limit.max, 1)) * 100)}%"></span>
+            </div>
+            {#if limit.used >= limit.max}<p class="row-detail">You're at the limit. {limit.full}</p>{/if}
+          </div>
+        {/each}
+      {/if}
+    </div>
+  </section>
+
+  <section class="settings-section" aria-labelledby="sessions-heading">
+    <div class="section-intro">
+      <h2 id="sessions-heading">Sessions</h2>
+      <p>Everywhere you're logged in to Spaces. Each login lasts a week. If you don't recognise one, sign it out.</p>
+    </div>
+
+    <div class="settings-panel">
+      {#if sessionsLoading}
+        <div class="row"><p class="row-detail row-full">Loading…</p></div>
+      {:else}
+        {#each sessions as session (session.id)}
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">
+                {session.device || "Unknown device"}
+                {#if session.current}<span class="badge status-verified">This device</span>{/if}
+              </div>
+              <p class="row-detail">
+                {#if session.method}Logged in with {LOGIN_METHODS[session.method] || session.method} · {/if}{formatDate(session.created_at)} · ends {formatDate(session.expires_at)}
+              </p>
+            </div>
+            {#if !session.current}
+              <div class="row-actions">
+                <button class="btn btn-quiet-danger" on:click={() => endSession(session.id)} disabled={endingSession !== null}>
+                  {endingSession === session.id ? "Signing out…" : "Sign out"}
+                </button>
+              </div>
+            {/if}
+          </div>
+        {/each}
+      {/if}
+      {#if sessionsError || sessionsMessage || otherSessions.length}
+        <div class="panel-footer">
+          <div class="footer-status">
+            {#if sessionsMessage}<span class="text-success" role="status">{sessionsMessage}</span>{/if}
+            {#if sessionsError}<span class="text-error" role="alert">{sessionsError}</span>{/if}
+          </div>
+          {#if otherSessions.length}
+            <button class="btn btn-secondary" on:click={endOtherSessions} disabled={endingSession !== null}>
+              {endingSession === "others" ? "Signing out…" : "Sign out everywhere else"}
+            </button>
+          {/if}
+        </div>
+      {/if}
+    </div>
+  </section>
+
   <section class="settings-section" aria-labelledby="extensions-heading">
     <div class="section-intro">
       <h2 id="extensions-heading">VS Code extensions</h2>
@@ -443,6 +616,39 @@
         <button class="btn btn-primary" on:click={updateVSCodeSettings} disabled={!extensionsChanged || savingExtensions}>
           {savingExtensions ? "Saving…" : "Save extensions"}
         </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="settings-section" aria-labelledby="appearance-heading">
+    <div class="section-intro">
+      <h2 id="appearance-heading">Appearance</h2>
+      <p>Pick a theme for Spaces. It's saved in this browser.</p>
+    </div>
+
+    <div class="settings-panel">
+      <div class="row row-stack">
+        <div class="theme-grid" role="radiogroup" aria-labelledby="appearance-heading">
+          {#each Object.entries(themes) as [key, theme] (key)}
+            <button
+              type="button"
+              class="theme-card"
+              class:selected={$currentTheme === key}
+              role="radio"
+              aria-checked={$currentTheme === key}
+              on:click={() => setTheme(key)}
+            >
+              <span class="theme-preview" style="background: {THEME_PREVIEWS[key] || theme.colors['--snow']}">
+                <span class="theme-preview-panel" style="background: {theme.colors['--white']}; border-color: {theme.colors['--smoke']}">
+                  <span class="theme-preview-line" style="background: {theme.colors['--black']}"></span>
+                  <span class="theme-preview-line short" style="background: {theme.colors['--muted']}"></span>
+                  <span class="theme-preview-button" style="background: {theme.colors['--blue']}"></span>
+                </span>
+              </span>
+              <span class="theme-name">{theme.name}</span>
+            </button>
+          {/each}
+        </div>
       </div>
     </div>
   </section>
@@ -771,6 +977,136 @@
 
   .text-muted {
     color: var(--ui-text-secondary);
+  }
+
+  .meter-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .meter-count {
+    font-size: 14px;
+    color: var(--ui-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .meter-count strong {
+    color: var(--ui-text);
+  }
+
+  .meter {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--ui-surface-alt);
+    overflow: hidden;
+  }
+
+  .meter span {
+    display: block;
+    height: 100%;
+    min-width: 4px;
+    border-radius: inherit;
+    background: var(--ui-accent);
+    transition: width 0.3s ease;
+  }
+
+  .meter.full span {
+    background: var(--ui-warning);
+  }
+
+  .theme-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 12px;
+  }
+
+  .theme-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 6px 6px 10px;
+    border: 1px solid var(--ui-border);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ui-text);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .theme-card:hover {
+    border-color: var(--ui-text-muted);
+  }
+
+  .theme-card:focus-visible {
+    outline: 2px solid var(--ui-accent);
+    outline-offset: 2px;
+  }
+
+  .theme-card.selected {
+    border-color: var(--ui-accent);
+    box-shadow: 0 0 0 1px var(--ui-accent);
+  }
+
+  .theme-preview {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    height: 72px;
+    padding: 12px 12px 0;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .theme-preview-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 100%;
+    height: 100%;
+    padding: 8px;
+    border: 1px solid;
+    border-bottom: none;
+    border-radius: 5px 5px 0 0;
+  }
+
+  .theme-preview-line {
+    display: block;
+    width: 70%;
+    height: 5px;
+    border-radius: 3px;
+  }
+
+  .theme-preview-line.short {
+    width: 45%;
+    opacity: 0.8;
+  }
+
+  .theme-preview-button {
+    display: block;
+    width: 34px;
+    height: 10px;
+    margin-top: auto;
+    margin-bottom: 6px;
+    border-radius: 3px;
+  }
+
+  .theme-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 4px;
+  }
+
+  .theme-card.selected .theme-name::after {
+    content: "✓";
+    margin-left: auto;
+    color: var(--ui-accent);
   }
 
   @media (max-width: 860px) {

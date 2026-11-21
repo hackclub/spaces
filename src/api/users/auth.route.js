@@ -6,7 +6,8 @@ import { validateEmail, validateUsername, normalizeEmail, validateExtensionList 
 import { extractAuth } from '../../middlewares/auth.middleware.js';
 import { getUser } from '../../utils/user.js';
 import { resolveAccess, isStaffPermissionList, grantableRoles } from '../../utils/permissions.js';
-import { createSession, deleteSession, setSessionCookie } from '../../utils/sessions.js';
+import { createSession, deleteSession, setSessionCookie, hashToken, listUserSessions, deleteUserSession, deleteOtherSessions } from '../../utils/sessions.js';
+import { describeUserAgent } from '../../utils/user-agent.js';
 import { hackatimeOAuthConfigured, revokeHackatimeToken, decryptToken } from '../../utils/hackatime-oauth.js';
 
 const router = express.Router();
@@ -56,6 +57,102 @@ router.get("/me", async (req, res) => {
     })
   }
 })
+
+const signedInUser = async (req, res) => {
+  const user = req.authToken ? await getUser(req.authToken) : null;
+  if (!user) {
+    res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  return user;
+};
+
+router.get('/limits', async (req, res) => {
+  try {
+    const user = await signedInUser(req, res);
+    if (!user) return;
+
+    const counts = await pg('spaces')
+      .where('user_id', user.id)
+      .first(pg.raw('count(*)::int as spaces'), pg.raw('count(*) filter (where running)::int as running'));
+
+    res.json({
+      success: true,
+      data: {
+        spaces: counts.spaces,
+        max_spaces: user.max_spaces ?? 3,
+        running: counts.running,
+        max_running: user.max_running ?? 1
+      }
+    });
+  } catch (error) {
+    console.error('Error loading limits:', error);
+    res.status(500).json({ success: false, message: 'Failed to load your limits' });
+  }
+});
+
+router.get('/sessions', async (req, res) => {
+  try {
+    const user = await signedInUser(req, res);
+    if (!user) return;
+
+    const currentHash = hashToken(req.authToken);
+    const sessions = await listUserSessions(user.id);
+
+    res.json({
+      success: true,
+      data: sessions.map((session) => ({
+        id: session.id,
+        device: describeUserAgent(session.user_agent),
+        method: session.method,
+        created_at: session.created_at,
+        expires_at: session.expires_at,
+        current: session.token_hash === currentHash
+      }))
+    });
+  } catch (error) {
+    console.error('Error listing sessions:', error);
+    res.status(500).json({ success: false, message: 'Failed to load your sessions' });
+  }
+});
+
+router.delete('/sessions/:id', async (req, res) => {
+  try {
+    const user = await signedInUser(req, res);
+    if (!user) return;
+
+    const sessionId = Number.parseInt(req.params.id, 10);
+    if (!Number.isSafeInteger(sessionId)) {
+      return res.status(400).json({ success: false, message: 'Invalid session' });
+    }
+
+    const current = await pg('sessions').where({ id: sessionId, user_id: user.id }).first('token_hash');
+    if (!current) {
+      return res.status(404).json({ success: false, message: 'That session has already ended' });
+    }
+    if (current.token_hash === hashToken(req.authToken)) {
+      return res.status(400).json({ success: false, message: 'Use Sign out to end the session you are using' });
+    }
+
+    await deleteUserSession(user.id, sessionId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error ending session:', error);
+    res.status(500).json({ success: false, message: 'Failed to sign that session out' });
+  }
+});
+
+router.post('/sessions/sign-out-others', async (req, res) => {
+  try {
+    const user = await signedInUser(req, res);
+    if (!user) return;
+
+    const ended = await deleteOtherSessions(user.id, req.authToken);
+    res.json({ success: true, data: { ended } });
+  } catch (error) {
+    console.error('Error ending other sessions:', error);
+    res.status(500).json({ success: false, message: 'Failed to sign out your other sessions' });
+  }
+});
 
 router.post('/hackatime-prompt', async (req, res) => {
   try {
@@ -189,7 +286,7 @@ router.post('/signup', accountIpLimiter, authLimiter, async (req, res) => {
       })
       .returning(['id', 'email', 'username', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
 
-    setSessionCookie(res, await createSession(newUser.id, 'email'));
+    setSessionCookie(res, await createSession(newUser.id, 'email', req));
 
     res.status(201).json({
       success: true,
@@ -270,7 +367,7 @@ router.post('/login', accountIpLimiter, authLimiter, async (req, res) => {
       });
     }
 
-    setSessionCookie(res, await createSession(user.id, 'email'));
+    setSessionCookie(res, await createSession(user.id, 'email', req));
 
     res.status(200).json({
       success: true,

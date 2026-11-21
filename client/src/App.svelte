@@ -5,7 +5,6 @@
     import ClubMemberAuth from "./lib/ClubMemberAuth.svelte";
     import Dashboard from "./lib/Dashboard.svelte";
     import AdminPanel from "./lib/AdminPanel.svelte";
-    import ThemeSwitcher from "./lib/ThemeSwitcher.svelte";
     import Settings from "./lib/Settings.svelte";
     import Clubs from "./lib/Clubs.svelte";
     import { API_BASE } from "./config.js";
@@ -98,12 +97,11 @@
     }
 </script>
 
-<main class:has-theme-switcher={isAuthenticated && userData.user}>
+<main>
     {#if isAuthenticated && userData.user}
         {#if userData.user.hackatime_prompt && !hackatimePromptClosed && !showSettings}
             <HackatimePrompt on:close={() => (hackatimePromptClosed = true)} />
         {/if}
-        <ThemeSwitcher />
         {#if showAdminPanel && userData.user.is_admin}
             <div class="nav-header">
                 <button on:click={() => navigate("/")}
@@ -170,10 +168,6 @@
         width: 100%;
         min-height: 100vh;
         box-sizing: border-box;
-    }
-
-    main.has-theme-switcher {
-        padding-bottom: 76px;
     }
 
     .nav-header,

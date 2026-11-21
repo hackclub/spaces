@@ -159,9 +159,7 @@ input, textarea, select {
 [data-theme="lgbtq"] .create-form,
 [data-theme="lgbtq"] .space-card,
 [data-theme="lgbtq"] .admin-panel,
-[data-theme="lgbtq"] .settings-page,
-[data-theme="lgbtq"] .theme-menu,
-[data-theme="lgbtq"] .theme-toggle {
+[data-theme="lgbtq"] .settings-page {
   background: rgba(26, 6, 22, 0.7) !important;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
