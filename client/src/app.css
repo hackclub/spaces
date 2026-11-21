@@ -61,6 +61,8 @@
 
 :root {
   --ui-surface: var(--white);
+  --ui-panel: var(--white);
+  --ui-text-secondary: color-mix(in srgb, var(--black) 45%, var(--muted));
   --ui-surface-alt: color-mix(in srgb, var(--smoke) 45%, transparent);
   --ui-hover: color-mix(in srgb, var(--muted) 10%, transparent);
   --ui-border: color-mix(in srgb, var(--muted) 40%, transparent);
@@ -72,6 +74,16 @@
   --ui-success: color-mix(in srgb, var(--green) 70%, var(--black));
   --ui-warning: color-mix(in srgb, var(--orange) 75%, var(--black));
   --ui-danger: color-mix(in srgb, var(--red) 85%, var(--black));
+  --ui-on-accent: var(--white);
+}
+
+:root[data-theme="lgbtq"] {
+  --ui-accent: color-mix(in srgb, var(--blue) 45%, var(--black));
+  --ui-on-accent: #ffffff;
+}
+
+:root[data-theme="sunset"] {
+  --ui-on-accent: var(--black);
 }
 
 :root[data-theme]:not([data-theme="light"]):not([data-theme="sunset"]) {
@@ -147,7 +159,7 @@ input, textarea, select {
 [data-theme="lgbtq"] .create-form,
 [data-theme="lgbtq"] .space-card,
 [data-theme="lgbtq"] .admin-panel,
-[data-theme="lgbtq"] .settings-container,
+[data-theme="lgbtq"] .settings-page,
 [data-theme="lgbtq"] .theme-menu,
 [data-theme="lgbtq"] .theme-toggle {
   background: rgba(26, 6, 22, 0.7) !important;
@@ -156,7 +168,7 @@ input, textarea, select {
 }
 
 [data-theme="lgbtq"] .admin-panel,
-[data-theme="lgbtq"] .settings-container {
+[data-theme="lgbtq"] .settings-page {
   border-radius: 12px;
 }
 

@@ -9,10 +9,14 @@
   let newEmail = "";
   let oldEmailCode = "";
   let newEmailCode = "";
-  let emailStep = "input";
+  let emailStep = "idle";
 
   let message = "";
   let error = "";
+  let username = userData.user.username || "";
+  let savingProfile = false;
+  $: usernameChanged = username.trim() !== "" && username.trim() !== userData.user.username;
+  $: if (usernameChanged) message = "";
   let emailMessage = "";
   let emailError = "";
 
@@ -202,12 +206,12 @@
   function getVerificationStatusText(status) {
     const statusMap = {
       verified: "Verified",
-      verified_eligible: "Verified (Eligible for YSWS)",
-      verified_but_over_18: "Verified (Over 18)",
-      pending: "Pending Review",
-      needs_submission: "Needs Submission",
+      verified_eligible: "Verified (eligible for YSWS)",
+      verified_but_over_18: "Verified (over 18)",
+      pending: "Pending review",
+      needs_submission: "Needs submission",
       rejected: "Rejected",
-      not_found: "Not Found",
+      not_found: "Not found",
     };
     return statusMap[status] || status || "Unknown";
   }
@@ -225,6 +229,7 @@
   async function saveProfile() {
     message = "";
     error = "";
+    savingProfile = true;
 
     try {
       const response = await fetch(`${API_BASE}/users/update`, {
@@ -234,22 +239,25 @@
         },
         credentials: "include",
         body: JSON.stringify({
-          username: userData.user.username,
+          username: username.trim(),
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        message = "Profile updated successfully";
+        userData.user.username = data.data.username;
+        username = data.data.username;
+        message = "Username saved.";
         dispatch("update", data.data);
       } else {
-        error = data.message || "Failed to update profile";
+        error = data.message || "Couldn't save your username.";
       }
     } catch (err) {
-      error = "An error occurred. Please try again.";
+      error = "Couldn't save your username. Please try again.";
       console.error(err);
     }
+    savingProfile = false;
   }
 
   async function startEmailChange() {
@@ -357,11 +365,11 @@
       const data = await response.json();
 
       if (response.ok) {
-        emailMessage = "Email updated successfully";
+        emailMessage = "Email changed.";
         newEmail = "";
         oldEmailCode = "";
         newEmailCode = "";
-        emailStep = "input";
+        emailStep = "idle";
         dispatch("update", data.data);
       } else {
         emailError = data.message || "Failed to update email";
@@ -373,7 +381,8 @@
   }
 
   function cancelEmailChange() {
-    emailStep = "input";
+    emailStep = "idle";
+    newEmail = "";
     oldEmailCode = "";
     newEmailCode = "";
     emailMessage = "";
@@ -415,459 +424,622 @@
   }
 </script>
 
-<div class="settings-container">
-  <h2>Settings</h2>
+<div class="settings-page">
+  <header class="page-head">
+    <h1>Settings</h1>
+    <p>Your connections, account, and what goes into your VS Code spaces.</p>
+  </header>
 
-  <div class="section">
-    <h3>Profile</h3>
-    <div class="form-group">
-      <label for="username">Username</label>
-      <input
-        type="text"
-        id="username"
-        bind:value={userData.user.username}
-        placeholder="Enter username"
-      />
+  <section class="settings-section" aria-labelledby="connections-heading">
+    <div class="section-intro">
+      <h2 id="connections-heading">Connections</h2>
+      <p>You need a verified Hack Club account to create spaces. Hackatime logs the time you spend coding in them.</p>
     </div>
 
-    <div class="form-group">
-      <label for="hackatime">Hackatime</label>
-      <div class="connection-row">
-        {#if isHackatimeLinked}
-          <p class="connection-text">Connected. Your spaces log your coding time to Hackatime automatically.</p>
-          <button id="hackatime" class="danger" on:click={disconnectHackatime} disabled={hackatimeLoading}>
-            Disconnect
-          </button>
-        {:else if userData.user.hackatime_available}
-          <p class="connection-text">Connect Hackatime so your spaces log your coding time.</p>
-          <button id="hackatime" on:click={connectHackatime} disabled={hackatimeLoading}>
-            {hackatimeLoading ? "Redirecting…" : "Connect Hackatime"}
-          </button>
-        {:else}
-          <p class="connection-text">Connecting Hackatime isn't available yet.</p>
+    <div class="settings-panel">
+      <div class="row">
+        <div class="row-main">
+          <img src="https://assets.hackclub.com/icon-rounded.svg" alt="" class="row-icon" />
+          <div class="row-text">
+            <div class="row-title">
+              Hack Club
+              {#if isHackclubLinked}
+                <span class="badge {getVerificationStatusClass(verificationStatus)}">{getVerificationStatusText(verificationStatus)}</span>
+              {/if}
+            </div>
+            <p class="row-detail">
+              {#if isHackclubLinked}
+                Linked{#if userData.user.hackclub_id}&nbsp;·&nbsp;<span class="mono">{userData.user.hackclub_id}</span>{/if}
+              {:else}
+                Not linked. Link it to create spaces.
+              {/if}
+            </p>
+          </div>
+        </div>
+        <div class="row-actions">
+          {#if isHackclubLinked}
+            <button class="btn btn-secondary" on:click={refreshVerification} disabled={hackclubLoading}>
+              {hackclubLoading ? "Refreshing…" : "Refresh status"}
+            </button>
+            <button class="btn btn-quiet-danger" on:click={unlinkHackClub} disabled={hackclubLoading}>Unlink</button>
+          {:else}
+            <button class="btn btn-primary" on:click={linkHackClub} disabled={hackclubLoading}>
+              {hackclubLoading ? "Redirecting…" : "Link Hack Club"}
+            </button>
+          {/if}
+        </div>
+        {#if isHackclubLinked && !["verified", "verified_eligible", "verified_but_over_18"].includes(verificationStatus)}
+          <p class="notice notice-warning row-full">
+            Your Hack Club account isn't verified yet, so you can't create spaces. Finish verifying at
+            <a href="https://auth.hackclub.com" target="_blank" rel="noopener noreferrer">auth.hackclub.com</a>,
+            then refresh your status here.
+          </p>
         {/if}
+        {#if hackclubMessage}<p class="notice notice-success row-full" role="status">{hackclubMessage}</p>{/if}
+        {#if hackclubError}<p class="notice notice-error row-full" role="alert">{hackclubError}</p>{/if}
       </div>
-      {#if hackatimeMessage}<div class="success connection-message">{hackatimeMessage}</div>{/if}
-      {#if hackatimeError}<div class="error connection-message">{hackatimeError}</div>{/if}
-    </div>
 
-    {#if message}<div class="success">{message}</div>{/if}
-    {#if error}<div class="error">{error}</div>{/if}
-
-    <button on:click={saveProfile}>Save Profile</button>
-  </div>
-
-  <div class="section">
-    <h3>Change Email</h3>
-    <p>Current Email: <strong>{userData.user.email}</strong></p>
-
-    {#if emailStep === "input"}
-      <div class="form-group">
-        <label for="newEmail">New Email Address</label>
-        <input
-          type="email"
-          id="newEmail"
-          bind:value={newEmail}
-          placeholder="Enter new email"
-        />
-      </div>
-      <button on:click={startEmailChange}>Change Email</button>
-    {:else if emailStep === "verifyOld"}
-      <p class="step-info">Step 1 of 2: Verify your current email</p>
-      <div class="form-group">
-        <label for="oldEmailCode"
-          >Verification Code (sent to {userData.user.email})</label
-        >
-        <input
-          type="text"
-          id="oldEmailCode"
-          bind:value={oldEmailCode}
-          placeholder="Enter 6-digit code"
-        />
-      </div>
-      <div class="button-group">
-        <button on:click={verifyOldEmail}>Continue</button>
-        <button class="secondary" on:click={cancelEmailChange}>Cancel</button>
-      </div>
-    {:else if emailStep === "verifyNew"}
-      <p class="step-info">Step 2 of 2: Verify your new email</p>
-      <div class="form-group">
-        <label for="newEmailCode">Verification Code (sent to {newEmail})</label>
-        <input
-          type="text"
-          id="newEmailCode"
-          bind:value={newEmailCode}
-          placeholder="Enter 6-digit code"
-        />
-      </div>
-      <div class="button-group">
-        <button on:click={verifyNewEmailAndUpdate}>Update Email</button>
-        <button class="secondary" on:click={cancelEmailChange}>Cancel</button>
-      </div>
-    {/if}
-
-    {#if emailMessage}<div class="success">{emailMessage}</div>{/if}
-    {#if emailError}<div class="error">{emailError}</div>{/if}
-  </div>
-
-  <div class="section">
-    <h3>VS Code extensions</h3>
-    <p class="section-description">
-      These install in all your VS Code spaces, in the background each time a
-      space is created or started, so they can take a minute to show up.
-      Removing one here doesn't uninstall it from spaces that already have it.
-    </p>
-
-    <div class="form-group">
-      <label for="vscode-extensions">Add an extension</label>
-      <ExtensionPicker bind:value={vscodeExtensions} />
-      <small>
-        Extensions come from Open VSX, which has most of the VS Code
-        Marketplace. A few Microsoft ones, like Pylance, C/C++ and Live Share,
-        aren't on it.
-      </small>
-    </div>
-
-    {#if vscodeExtensionsMessage}<div class="success">{vscodeExtensionsMessage}</div>{/if}
-    {#if vscodeExtensionsError}<div class="error">{vscodeExtensionsError}</div>{/if}
-
-    <button on:click={updateVSCodeSettings} disabled={!extensionsChanged || savingExtensions}>
-      {savingExtensions ? "Saving…" : "Save extensions"}
-    </button>
-  </div>
-
-  <div class="section">
-    <h3>Hack Club Account</h3>
-    <p class="section-description">
-      Link your Hack Club account to access all features. A verified Hack Club
-      account is required to create spaces.
-    </p>
-
-    {#if isHackclubLinked}
-      <div class="hackclub-status">
-        <div class="status-row">
-          <span class="status-label">Status:</span>
-          <span
-            class="status-badge {getVerificationStatusClass(
-              verificationStatus,
-            )}"
-          >
-            {getVerificationStatusText(verificationStatus)}
+      <div class="row">
+        <div class="row-main">
+          <span class="row-icon row-icon-glyph" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
           </span>
+          <div class="row-text">
+            <div class="row-title">
+              Hackatime
+              {#if isHackatimeLinked}<span class="badge status-verified">Connected</span>{/if}
+            </div>
+            <p class="row-detail">
+              {#if isHackatimeLinked}
+                Your spaces log your coding time automatically.
+              {:else if userData.user.hackatime_available}
+                Connect it so your spaces log your coding time.
+              {:else}
+                Connecting Hackatime isn't available yet.
+              {/if}
+            </p>
+          </div>
         </div>
-        <div class="status-row">
-          <span class="status-label">Hack Club ID:</span>
-          <span class="status-value">{userData.user.hackclub_id}</span>
+        <div class="row-actions">
+          {#if isHackatimeLinked}
+            <button class="btn btn-quiet-danger" on:click={disconnectHackatime} disabled={hackatimeLoading}>Disconnect</button>
+          {:else if userData.user.hackatime_available}
+            <button class={isHackclubLinked ? "btn btn-primary" : "btn btn-secondary"} on:click={connectHackatime} disabled={hackatimeLoading}>
+              {hackatimeLoading ? "Redirecting…" : "Connect Hackatime"}
+            </button>
+          {/if}
         </div>
+        {#if hackatimeMessage}<p class="notice notice-success row-full" role="status">{hackatimeMessage}</p>{/if}
+        {#if hackatimeError}<p class="notice notice-error row-full" role="alert">{hackatimeError}</p>{/if}
       </div>
+    </div>
+  </section>
 
-      {#if !["verified", "verified_eligible", "verified_but_over_18"].includes(verificationStatus)}
-        <p class="verification-warning">
-          Your Hack Club account is not verified. Please complete verification
-          at
-          <a
-            href="https://auth.hackclub.com"
-            target="_blank"
-            rel="noopener noreferrer">auth.hackclub.com</a
-          >
-          to create spaces.
-        </p>
-      {/if}
+  <section class="settings-section" aria-labelledby="account-heading">
+    <div class="section-intro">
+      <h2 id="account-heading">Account</h2>
+      <p>Your username shows on your spaces. Login codes go to your email.</p>
+    </div>
 
-      <div class="button-group">
-        <button on:click={refreshVerification} disabled={hackclubLoading}>
-          {hackclubLoading ? "Refreshing..." : "Refresh Status"}
-        </button>
-        <button
-          class="secondary danger"
-          on:click={unlinkHackClub}
-          disabled={hackclubLoading}
-        >
-          Unlink Account
-        </button>
+    <div class="settings-panel">
+      <form class="row" on:submit|preventDefault={saveProfile}>
+        <label class="row-label" for="username">Username</label>
+        <div class="field-inline">
+          <input type="text" id="username" bind:value={username} autocomplete="username" spellcheck="false" />
+          <button type="submit" class="btn btn-primary" disabled={!usernameChanged || savingProfile}>
+            {savingProfile ? "Saving…" : "Save"}
+          </button>
+        </div>
+        {#if message}<p class="notice notice-success row-full" role="status">{message}</p>{/if}
+        {#if error}<p class="notice notice-error row-full" role="alert">{error}</p>{/if}
+      </form>
+
+      <div class="row">
+        <span class="row-label" id="email-label">Email</span>
+        {#if emailStep === "idle"}
+          <div class="field-inline">
+            <span class="value" aria-labelledby="email-label">{userData.user.email}</span>
+            <button class="btn btn-secondary" on:click={() => { emailMessage = ""; emailError = ""; emailStep = "input"; }}>Change email</button>
+          </div>
+        {:else}
+          <div class="email-flow">
+            <ol class="steps" aria-label="Changing your email">
+              <li class:current={emailStep === "input"} class:done={emailStep !== "input"}>New address</li>
+              <li class:current={emailStep === "verifyOld"} class:done={emailStep === "verifyNew"}>Code from current email</li>
+              <li class:current={emailStep === "verifyNew"}>Code from new email</li>
+            </ol>
+
+            {#if emailStep === "input"}
+              <form on:submit|preventDefault={startEmailChange}>
+                <label class="sub-label" for="newEmail">New email address</label>
+                <input type="email" id="newEmail" bind:value={newEmail} autocomplete="email" placeholder="you@example.com" />
+                <div class="flow-actions">
+                  <button type="submit" class="btn btn-primary">Send code</button>
+                  <button type="button" class="btn btn-quiet" on:click={cancelEmailChange}>Cancel</button>
+                </div>
+              </form>
+            {:else if emailStep === "verifyOld"}
+              <form on:submit|preventDefault={verifyOldEmail}>
+                <label class="sub-label" for="oldEmailCode">Code sent to {userData.user.email}</label>
+                <input type="text" id="oldEmailCode" bind:value={oldEmailCode} inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" />
+                <div class="flow-actions">
+                  <button type="submit" class="btn btn-primary">Continue</button>
+                  <button type="button" class="btn btn-quiet" on:click={cancelEmailChange}>Cancel</button>
+                </div>
+              </form>
+            {:else if emailStep === "verifyNew"}
+              <form on:submit|preventDefault={verifyNewEmailAndUpdate}>
+                <label class="sub-label" for="newEmailCode">Code sent to {newEmail}</label>
+                <input type="text" id="newEmailCode" bind:value={newEmailCode} inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" />
+                <div class="flow-actions">
+                  <button type="submit" class="btn btn-primary">Change email</button>
+                  <button type="button" class="btn btn-quiet" on:click={cancelEmailChange}>Cancel</button>
+                </div>
+              </form>
+            {/if}
+          </div>
+        {/if}
+        {#if emailMessage}<p class="notice notice-success row-full" role="status">{emailMessage}</p>{/if}
+        {#if emailError}<p class="notice notice-error row-full" role="alert">{emailError}</p>{/if}
       </div>
-    {:else}
-      <p class="not-linked-message">
-        No Hack Club account linked. Link your account to verify your identity
-        and create spaces.
+    </div>
+  </section>
+
+  <section class="settings-section" aria-labelledby="extensions-heading">
+    <div class="section-intro">
+      <h2 id="extensions-heading">VS Code extensions</h2>
+      <p>
+        These install in all your VS Code spaces, in the background each time a space is created or started, so they
+        can take a minute to show up. Removing one here doesn't uninstall it from spaces that already have it.
       </p>
-      <button class="hackclub-link-button" on:click={linkHackClub}>
-        <img
-          src="https://assets.hackclub.com/icon-rounded.svg"
-          alt=""
-          class="hackclub-icon"
-        />
-        Link Hack Club Account
-      </button>
-    {/if}
+      <p>
+        They come from Open VSX, which has most of the VS Code Marketplace. A few Microsoft ones, like Pylance, C/C++
+        and Live Share, aren't on it.
+      </p>
+    </div>
 
-    {#if hackclubMessage}<div class="success">{hackclubMessage}</div>{/if}
-    {#if hackclubError}<div class="error">{hackclubError}</div>{/if}
-  </div>
+    <div class="settings-panel">
+      <div class="row row-stack">
+        <label class="row-label" for="vscode-extensions">Add an extension</label>
+        <ExtensionPicker bind:value={vscodeExtensions} />
+      </div>
+      <div class="panel-footer">
+        <div class="footer-status">
+          {#if vscodeExtensionsMessage}<span class="text-success" role="status">{vscodeExtensionsMessage}</span>{/if}
+          {#if vscodeExtensionsError}<span class="text-error" role="alert">{vscodeExtensionsError}</span>{/if}
+          {#if extensionsChanged && !vscodeExtensionsError}<span class="text-muted">You have unsaved changes.</span>{/if}
+        </div>
+        <button class="btn btn-primary" on:click={updateVSCodeSettings} disabled={!extensionsChanged || savingExtensions}>
+          {savingExtensions ? "Saving…" : "Save extensions"}
+        </button>
+      </div>
+    </div>
+  </section>
 </div>
 
 <style>
-  .settings-container {
-    max-width: 600px;
+  .settings-page {
+    max-width: 1040px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 32px 24px 48px;
+    color: var(--ui-text);
   }
 
-  h2 {
-    margin-bottom: 20px;
-    color: var(--text);
+  .page-head {
+    margin-bottom: 8px;
   }
 
-  h3 {
-    margin-bottom: 15px;
-    color: var(--text);
-    border-bottom: 1px solid var(--smoke);
-    padding-bottom: 5px;
+  .page-head h1 {
+    margin: 0;
+    font-size: 28px;
   }
 
-  .section {
-    background: var(--snow);
-    padding: 20px;
+  .page-head p {
+    margin: 6px 0 0;
+    font-size: 15px;
+    color: var(--ui-text-secondary);
+  }
+
+  .settings-section {
+    display: grid;
+    grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+    gap: 32px 48px;
+    padding: 32px 0;
+    border-top: 1px solid var(--ui-border-soft);
+  }
+
+  .page-head + .settings-section {
+    border-top: none;
+  }
+
+  .section-intro h2 {
+    margin: 0 0 8px;
+    font-size: 18px;
+  }
+
+  .section-intro p {
+    margin: 0 0 10px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ui-text-secondary);
+  }
+
+  .settings-panel {
+    min-width: 0;
+    background: var(--ui-panel);
+    border: 1px solid var(--ui-border);
+    border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+  }
+
+  .row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px 16px;
+    margin: 0;
+    padding: 20px 24px;
+  }
+
+  .row + .row {
+    border-top: 1px solid var(--ui-border-soft);
+  }
+
+  .row-stack {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .row-full {
+    grid-column: 1 / -1;
+  }
+
+  .row-main {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  .row-icon {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
     border-radius: 8px;
-    margin-bottom: 20px;
-    border: 1px solid var(--smoke);
   }
 
-  .form-group {
-    margin-bottom: 15px;
+  .row-icon-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ui-accent);
+    background: color-mix(in srgb, var(--blue) 14%, transparent);
   }
 
-  label {
+  .row-text {
+    min-width: 0;
+  }
+
+  .row-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .row-detail {
+    margin: 2px 0 0;
+    font-size: 14px;
+    color: var(--ui-text-secondary);
+    overflow-wrap: anywhere;
+  }
+
+  .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+  }
+
+  .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .row-label {
+    grid-column: 1 / -1;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .sub-label {
     display: block;
-    margin-bottom: 5px;
-    font-weight: 500;
-    color: var(--text);
+    margin-bottom: 6px;
+    font-size: 14px;
+    color: var(--ui-text-secondary);
+  }
+
+  .field-inline {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .field-inline input {
+    flex: 1;
+  }
+
+  .value {
+    flex: 1;
+    min-width: 0;
+    font-size: 15px;
+    overflow-wrap: anywhere;
   }
 
   input {
     width: 100%;
     box-sizing: border-box;
+    min-height: 40px;
     padding: 8px 12px;
-    border: 1px solid var(--muted);
-    border-radius: 4px;
-    font-size: 14px;
-    background: var(--white);
-    color: var(--black);
+    border: 1px solid var(--ui-border);
+    border-radius: 6px;
+    font-size: 15px;
+    background: var(--ui-surface);
+    color: var(--ui-text);
   }
 
   input::placeholder {
-    color: var(--muted);
+    color: var(--ui-text-muted);
   }
 
   input:focus {
     outline: none;
-    border-color: var(--blue);
+    border-color: var(--ui-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 25%, transparent);
   }
 
-  small {
-    display: block;
-    margin-top: 5px;
-    color: var(--muted);
+  .email-flow {
+    grid-column: 1 / -1;
+  }
+
+  .steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin: 0 0 16px;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+    font-size: 13px;
+    color: var(--ui-text-muted);
+  }
+
+  .steps li {
+    counter-increment: step;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .steps li::before {
+    content: counter(step);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid var(--ui-border);
     font-size: 12px;
   }
 
-  button {
+  .steps li.current {
+    color: var(--ui-text);
+    font-weight: 700;
+  }
+
+  .steps li.current::before {
+    border-color: var(--ui-accent);
     background: var(--blue);
-    color: var(--white);
-    border: none;
-    padding: 10px 20px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background 0.2s;
+    color: var(--ui-on-accent);
   }
 
-  button:hover {
-    background: var(--cyan);
+  .steps li.done::before {
+    content: "✓";
+    border-color: var(--ui-success);
+    color: var(--ui-success);
   }
 
-  button.secondary {
-    background: var(--slate);
-    margin-left: 10px;
-  }
-
-  button.secondary:hover {
-    background: var(--muted);
-  }
-
-  .success {
-    color: var(--green);
-    margin-bottom: 15px;
-    padding: 10px;
-    background: rgba(51, 214, 166, 0.1);
-    border-radius: 4px;
-  }
-
-  .error {
-    color: var(--red);
-    margin-bottom: 15px;
-    padding: 10px;
-    background: rgba(236, 55, 80, 0.1);
-    border-radius: 4px;
-  }
-
-  .button-group {
+  .flow-actions {
     display: flex;
-    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
   }
 
-  .connection-row {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 16px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .btn:focus-visible {
+    outline: 2px solid var(--ui-accent);
+    outline-offset: 2px;
+  }
+
+  .btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .btn-primary {
+    background: var(--blue);
+    color: var(--ui-on-accent);
+  }
+
+  .btn-primary:not(:disabled):hover {
+    background: color-mix(in srgb, var(--blue) 85%, var(--black));
+  }
+
+  .btn-secondary {
+    background: transparent;
+    border-color: var(--ui-border);
+    color: var(--ui-text);
+  }
+
+  .btn-secondary:not(:disabled):hover {
+    background: var(--ui-hover);
+    border-color: var(--ui-text-muted);
+  }
+
+  .btn-quiet,
+  .btn-quiet-danger {
+    background: transparent;
+    padding: 0 12px;
+  }
+
+  .btn-quiet {
+    color: var(--ui-text-secondary);
+  }
+
+  .btn-quiet-danger {
+    color: var(--ui-danger);
+  }
+
+  .btn-quiet:not(:disabled):hover,
+  .btn-quiet-danger:not(:disabled):hover {
+    background: var(--ui-hover);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .status-verified {
+    color: var(--ui-success);
+    background: color-mix(in srgb, var(--green) 16%, transparent);
+  }
+
+  .status-pending {
+    color: var(--ui-warning);
+    background: color-mix(in srgb, var(--orange) 16%, transparent);
+  }
+
+  .status-unverified {
+    color: var(--ui-danger);
+    background: color-mix(in srgb, var(--red) 14%, transparent);
+  }
+
+  .notice {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .notice-success {
+    color: var(--ui-success);
+    background: color-mix(in srgb, var(--green) 12%, transparent);
+  }
+
+  .notice-error {
+    color: var(--ui-danger);
+    background: color-mix(in srgb, var(--red) 10%, transparent);
+  }
+
+  .notice a {
+    color: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .notice-warning {
+    color: var(--ui-text);
+    background: color-mix(in srgb, var(--orange) 14%, transparent);
+    border-left: 3px solid var(--ui-warning);
+  }
+
+  .panel-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    flex-wrap: wrap;
+    padding: 14px 24px;
+    border-top: 1px solid var(--ui-border-soft);
+    background: var(--ui-surface-alt);
   }
 
-  .connection-text {
-    flex: 1 1 240px;
-    margin: 0;
-    color: var(--muted);
+  .footer-status {
     font-size: 14px;
   }
 
-  .connection-row button {
-    flex-shrink: 0;
+  .text-success {
+    color: var(--ui-success);
   }
 
-  .connection-message {
-    margin: 12px 0 0;
-    padding: 8px 12px;
-    font-size: 13px;
+  .text-error {
+    color: var(--ui-danger);
   }
 
-  .step-info {
-    font-size: 14px;
-    color: var(--muted);
-    margin-bottom: 15px;
-    font-style: italic;
+  .text-muted {
+    color: var(--ui-text-secondary);
   }
 
-  .section-description {
-    color: var(--muted);
-    font-size: 14px;
-    margin-bottom: 15px;
+  @media (max-width: 860px) {
+    .settings-section {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
+      padding: 28px 0;
+    }
   }
 
-  .hackclub-status {
-    background: var(--white);
-    border: 1px solid var(--smoke);
-    border-radius: 6px;
-    padding: 15px;
-    margin-bottom: 15px;
-  }
+  @media (max-width: 560px) {
+    .settings-page {
+      padding: 24px 16px 40px;
+    }
 
-  .status-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-  }
+    .row {
+      grid-template-columns: minmax(0, 1fr);
+      padding: 18px 16px;
+    }
 
-  .status-row:last-child {
-    margin-bottom: 0;
-  }
+    .row-actions {
+      justify-content: flex-start;
+    }
 
-  .status-label {
-    font-weight: 500;
-    color: var(--text);
-    min-width: 100px;
-  }
+    .field-inline {
+      flex-wrap: wrap;
+    }
 
-  .status-value {
-    color: var(--muted);
-    font-family: monospace;
-    font-size: 13px;
-  }
+    .field-inline input,
+    .value {
+      flex-basis: 100%;
+    }
 
-  .status-badge {
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-
-  .status-verified {
-    background: rgba(51, 214, 166, 0.15);
-    color: var(--green);
-  }
-
-  .status-pending {
-    background: rgba(246, 173, 85, 0.15);
-    color: var(--orange);
-  }
-
-  .status-unverified {
-    background: rgba(236, 55, 80, 0.15);
-    color: var(--red);
-  }
-
-  .verification-warning {
-    color: var(--orange);
-    font-size: 14px;
-    margin-bottom: 15px;
-    padding: 10px;
-    background: rgba(246, 173, 85, 0.1);
-    border-radius: 4px;
-  }
-
-  .verification-warning a {
-    color: var(--blue);
-    text-decoration: underline;
-  }
-
-  .not-linked-message {
-    color: var(--muted);
-    font-size: 14px;
-    margin-bottom: 15px;
-  }
-
-  .hackclub-link-button {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--white);
-    border: 2px solid var(--smoke);
-    color: var(--text);
-    padding: 10px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition:
-      border-color 0.2s,
-      background 0.2s;
-  }
-
-  .hackclub-link-button:hover {
-    border-color: var(--red);
-    background: rgba(236, 55, 80, 0.05);
-  }
-
-  .hackclub-icon {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
-  }
-
-  button.danger {
-    background: transparent;
-    border: 1px solid var(--red);
-    color: var(--red);
-  }
-
-  button.danger:hover {
-    background: rgba(236, 55, 80, 0.1);
-  }
-
-  button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+    .panel-footer {
+      flex-direction: column-reverse;
+      align-items: stretch;
+      padding: 14px 16px;
+    }
   }
 </style>

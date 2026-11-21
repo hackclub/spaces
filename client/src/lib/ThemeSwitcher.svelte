@@ -44,7 +44,7 @@
 
 <style>
   .theme-switcher {
-    position: fixed;
+    position: absolute;
     bottom: 20px;
     left: 20px;
     z-index: 1000;

@@ -107,7 +107,7 @@
         {#if showAdminPanel && userData.user.is_admin}
             <div class="nav-header">
                 <button on:click={() => navigate("/")}
-                    >Back to Dashboard</button
+                    >Dashboard</button
                 >
             </div>
             {#key userData.user}
@@ -116,14 +116,14 @@
         {:else if showSettings}
             <div class="nav-header">
                 <button on:click={() => (showSettings = false)}
-                    >Back to Dashboard</button
+                    >Dashboard</button
                 >
             </div>
             <Settings on:update={handleUserUpdate} />
         {:else if showClubs}
             <div class="nav-header">
                 <button on:click={() => (showClubs = false)}
-                    >Back to Dashboard</button
+                    >Dashboard</button
                 >
             </div>
             <Clubs />
@@ -166,6 +166,7 @@
 
 <style>
     main {
+        position: relative;
         width: 100%;
         min-height: 100vh;
         box-sizing: border-box;
@@ -182,7 +183,35 @@
         border-bottom: 1px solid var(--smoke);
     }
 
-    .nav-header button,
+    .nav-header button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        margin-left: -10px;
+        background: transparent;
+        color: var(--ui-text);
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+
+    .nav-header button::before {
+        content: "←";
+    }
+
+    .nav-header button:hover {
+        background: var(--ui-hover);
+    }
+
+    .nav-header button:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+    }
+
     .admin-link button {
         padding: 8px 16px;
         background-color: var(--blue);
@@ -193,7 +222,6 @@
         transition: all 0.2s ease;
     }
 
-    .nav-header button:hover,
     .admin-link button:hover {
         background-color: var(--cyan);
         transform: translateY(-1px);

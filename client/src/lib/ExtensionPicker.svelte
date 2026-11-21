@@ -179,6 +179,8 @@
     {/if}
   </div>
 
+  <p class="count">{items.length} of {max} added</p>
+
   {#if items.length}
     <ul class="chips" aria-label="Extensions you've added">
       {#each items as item (key(item.id))}
@@ -192,14 +194,15 @@
             <span class="chip-name">{item.name || item.id}</span>
             <span class="chip-id">{item.missing ? "Not on Open VSX" : item.id}</span>
           </span>
-          <button type="button" class="chip-remove" aria-label={`Remove ${item.name || item.id}`} on:click={() => remove(item.id)}>×</button>
+          <button type="button" class="chip-remove" aria-label={`Remove ${item.name || item.id}`} on:click={() => remove(item.id)}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
         </li>
       {/each}
     </ul>
   {:else}
     <p class="empty">No extensions yet. Search above to add some.</p>
   {/if}
-  <p class="count">{items.length} of {max}</p>
 </div>
 
 <style>
@@ -216,10 +219,11 @@
   .search input {
     width: 100%;
     box-sizing: border-box;
+    min-height: 40px;
     padding: 8px 12px;
-    border: 1px solid var(--muted);
-    border-radius: 4px;
-    font-size: 14px;
+    border: 1px solid var(--ui-border);
+    border-radius: 6px;
+    font-size: 15px;
     background: var(--ui-surface);
     color: var(--ui-text);
   }
@@ -227,10 +231,11 @@
   .search input:focus {
     outline: none;
     border-color: var(--blue);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 25%, transparent);
   }
 
   .search input::placeholder {
-    color: var(--muted);
+    color: var(--ui-text-muted);
   }
 
   .results {
@@ -374,16 +379,17 @@
 
   .chip-remove {
     flex-shrink: 0;
-    width: 28px;
-    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
     margin: 0;
     padding: 0;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     background: transparent;
-    color: var(--ui-text-muted);
-    font-size: 18px;
-    line-height: 1;
+    color: var(--ui-text-secondary);
     cursor: pointer;
   }
 
@@ -397,10 +403,10 @@
   .count {
     margin: 0;
     font-size: 13px;
-    color: var(--ui-text-muted);
+    color: var(--ui-text-secondary);
   }
 
   .count {
-    text-align: right;
+    margin-top: -4px;
   }
 </style>
