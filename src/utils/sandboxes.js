@@ -226,7 +226,11 @@ export const setupGuiApp = async (sandbox, { image, build }) => {
     { sudo: true }
   );
   await run(sandbox, START_DOCKER, { sudo: true, timeoutMs: 2 * MINUTE });
-  await run(sandbox, 'docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull -q "$IMAGE"', { sudo: true, env: { IMAGE: image }, timeoutMs: 10 * MINUTE });
+  await run(
+    sandbox,
+    'docker image inspect "$IMAGE" >/dev/null 2>&1 && exit 0; for attempt in 1 2 3 4 5; do docker pull -q "$IMAGE" && exit 0; sleep $((attempt * 5)); done; exit 1',
+    { sudo: true, env: { IMAGE: image }, timeoutMs: 10 * MINUTE }
+  );
   await run(sandbox, 'mkdir -p "$CONFIG" && chown 1000:1000 "$CONFIG"', { sudo: true, env: { CONFIG: GUI_CONFIG_PATH } });
   if (build) {
     await run(
