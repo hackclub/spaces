@@ -72,7 +72,7 @@ document.cookie = "auth_token=w; path=/"
 | `HACKCLUB_CLUBS_API_KEY` | yes | Key for the Clubs API (club membership and leader lookups) |
 | `HACKATIME_CLIENT_ID`, `HACKATIME_CLIENT_SECRET` | no | Hackatime OAuth app (confidential, scopes `profile` and `read`). Without these, connecting Hackatime is hidden. Only the secret is sensitive. |
 | `HACKATIME_REDIRECT_URI` | with the above | Hackatime OAuth callback, `<site>/api/v1/oauth/hackatime/callback`. It must also be allowed in the OAuth app. |
-| `HACKATIME_TOKEN_KEY` | with the above | 32 random bytes in base64 (`openssl rand -base64 32`), used to encrypt the stored Hackatime tokens. Sensitive. Changing it disconnects everyone from Hackatime until they connect again. |
+| `HACKATIME_TOKEN_KEY` | with the above | 32 random bytes in base64 (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`), used to encrypt the stored Hackatime tokens. Sensitive. Changing it disconnects everyone from Hackatime until they connect again. |
 | `FRONTEND_URL` | yes | The website's address, used for CORS |
 | `CRON_SECRET` | production | Shared secret for the auto-stop cron job. Vercel sends it automatically. |
 | `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID` | local only | Credentials for creating sandboxes outside Vercel. On Vercel, sandboxes use the deployment's built-in OIDC login, so leave these unset there. |
@@ -190,7 +190,7 @@ Creating a space needs a verified Hack Club account or a club membership. Each u
 | `freecad` | CAD software | `linuxserver/freecad` in Docker |
 | `godot` | Godot Engine | a Godot desktop image built on `linuxserver/baseimage-selkies`, in Docker |
 | `love2d` | LÖVE 2D | Cupid and its Node server in the sandbox |
-| `renpy` | Ren'Py | a Ren'Py SDK and VSCodium (with WakaTime and the Ren'Py language extension) desktop image built on `linuxserver/baseimage-selkies`, in Docker; projects are saved in `/config/projects` |
+| `renpy` | Ren'Py | a Ren'Py SDK and VSCodium (with the [Hackatime extension](https://github.com/hackclub/vscode-hackatime) and the Ren'Py language extension) desktop image built on `linuxserver/baseimage-selkies`, in Docker; projects are saved in `/config/projects` |
 
 ### Clubs API (`/api/v1/clubs`)
 

@@ -35,7 +35,7 @@ const RENPY_SHA256 = "4d76d88f690ff7d600218dad3941dfddb88e2104e107367a0600a17364
 // From GitHub releases: VSCodium's apt key is on GitLab, which answers scripts with a Cloudflare challenge.
 const VSCODIUM_VERSION = "1.143.17232";
 const VSCODIUM_SHA256 = "988330df203f4d2dbfb9ee0052a0356a27af7c0a2a7ff606424c531ae4a7b538";
-const RENPY_EXTENSIONS = ["WakaTime.vscode-wakatime", "LuqueDaniel.languague-renpy"];
+const RENPY_EXTENSIONS = ["hackatime.hackatime-time-tracker", "LuqueDaniel.languague-renpy"];
 
 
 const sanitizeWorkspaceDir = (homeDir) => {
@@ -437,18 +437,19 @@ export const spaceConfigs = {
     label: "Ren'Py",
     title: "Ren'Py",
     summary: "Visual novel engine",
-    about: "Ren'Py is a free and open-source engine for making visual novels and story-driven games in its own Python-based scripting language. This space has the Ren'Py launcher and VSCodium with the Ren'Py language extension and WakaTime, so the time you spend writing your game is tracked on Hackatime.",
+    about: "Ren'Py is a free and open-source engine for making visual novels and story-driven games in its own Python-based scripting language. This space has the Ren'Py launcher and VSCodium with the Ren'Py language extension and the Hackatime extension, so the time you spend writing your game is tracked on Hackatime.",
     description: "Ren'Py Visual Novel Engine",
     vcpus: 4,
     hackatime: true,
     versions: [
       { name: "Ren'Py", current: RENPY_VERSION, latestUrl: "https://www.renpy.org/latest.html" },
       { name: "VSCodium", current: VSCODIUM_VERSION, latestUrl: "https://github.com/VSCodium/vscodium/releases/latest" },
+      { name: "Hackatime extension", current: "latest from Open VSX", note: "installed when the space starts", latestUrl: "https://open-vsx.org/extension/hackatime/hackatime-time-tracker" },
       { name: "wakatime-cli", current: WAKATIME_CLI_VERSION, latestUrl: "https://github.com/wakatime/wakatime-cli/releases/latest" },
       { name: "Desktop base", current: "baseimage-selkies:debiantrixie", latestUrl: "https://github.com/linuxserver/docker-baseimage-selkies/releases" }
     ],
     build: {
-      tag: `spaces-renpy:${RENPY_VERSION}-2`,
+      tag: `spaces-renpy:${RENPY_VERSION}-3`,
       dockerfile: [
         "FROM ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
         `ARG RENPY_VERSION=${RENPY_VERSION}`,
