@@ -8,7 +8,8 @@
 
   const THEME_PREVIEWS = {
     darkGradient: "linear-gradient(135deg, #0a0f1a 0%, #1a2a3a 50%, #0f1a2a 100%)",
-    lgbtq: "linear-gradient(135deg, #e40303, #ff8c00, #ffed00, #008026, #24408e, #732982)",
+    lgbtq: "linear-gradient(90deg, #ff5c6c 0 16.66%, #ff9f43 16.66% 33.33%, #ffd84d 33.33% 50%, #3ddc84 50% 66.66%, #4cc9f0 66.66% 83.33%, #c084fc 83.33% 100%) top / 100% 5px no-repeat, radial-gradient(70% 80% at 0% 100%, rgba(192, 132, 252, 0.25), transparent 70%), radial-gradient(70% 80% at 100% 100%, rgba(76, 201, 240, 0.2), transparent 70%), #0f0a15",
+    sunset: "linear-gradient(180deg, #fff1e6 0%, #ffe6d8 55%, #fddbd6 100%)",
   };
 
   const LOGIN_METHODS = {

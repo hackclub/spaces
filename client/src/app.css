@@ -77,15 +77,6 @@
   --ui-on-accent: var(--white);
 }
 
-:root[data-theme="lgbtq"] {
-  --ui-accent: color-mix(in srgb, var(--blue) 45%, var(--black));
-  --ui-on-accent: #ffffff;
-}
-
-:root[data-theme="sunset"] {
-  --ui-on-accent: var(--black);
-}
-
 :root[data-theme]:not([data-theme="light"]):not([data-theme="sunset"]) {
   color-scheme: dark;
 }
@@ -141,39 +132,49 @@ input, textarea, select {
 }
 
 [data-theme="lgbtq"] body {
-  position: relative;
   background:
-    radial-gradient(circle at 20% 80%, rgba(228, 3, 3, 0.8) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(255, 140, 0, 0.8) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(255, 237, 0, 0.8) 0%, transparent 40%),
-    radial-gradient(circle at 80% 80%, rgba(0, 128, 38, 0.8) 0%, transparent 50%),
-    radial-gradient(circle at 20% 20%, rgba(36, 64, 142, 0.8) 0%, transparent 50%),
-    radial-gradient(circle at 60% 60%, rgba(115, 41, 130, 0.8) 0%, transparent 40%),
-    linear-gradient(135deg, #1a0616 0%, #2a0a26 100%);
-  background-size: 200% 200%;
-  animation: prideShift 30s ease infinite;
+    radial-gradient(55% 45% at 0% 0%, rgba(255, 92, 108, 0.16), transparent 70%),
+    radial-gradient(45% 40% at 100% 0%, rgba(255, 216, 77, 0.11), transparent 70%),
+    radial-gradient(50% 45% at 100% 100%, rgba(76, 201, 240, 0.13), transparent 70%),
+    radial-gradient(55% 50% at 0% 100%, rgba(192, 132, 252, 0.16), transparent 70%),
+    #0f0a15;
+  background-attachment: fixed;
+}
+
+[data-theme="lgbtq"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 4px;
+  z-index: 2000;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    #ff5c6c 0 16.66%,
+    #ff9f43 16.66% 33.33%,
+    #ffd84d 33.33% 50%,
+    #3ddc84 50% 66.66%,
+    #4cc9f0 66.66% 83.33%,
+    #c084fc 83.33% 100%);
 }
 
 [data-theme="lgbtq"] .dashboard,
 [data-theme="lgbtq"] .auth-container,
 [data-theme="lgbtq"] .create-form,
-[data-theme="lgbtq"] .space-card,
-[data-theme="lgbtq"] .admin-panel,
-[data-theme="lgbtq"] .settings-page {
-  background: rgba(26, 6, 22, 0.7) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-[data-theme="lgbtq"] .admin-panel,
-[data-theme="lgbtq"] .settings-page {
-  border-radius: 12px;
+[data-theme="lgbtq"] .space-card {
+  background: rgba(21, 15, 28, 0.72) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 [data-theme="lgbtq"] .auth-form-panel {
-  background: rgba(26, 6, 22, 0.8) !important;
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
+  background: rgba(21, 15, 28, 0.82) !important;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+[data-theme="sunset"] body {
+  background: linear-gradient(180deg, #fff1e6 0%, #ffe6d8 55%, #fddbd6 100%);
+  background-attachment: fixed;
 }
 
 @keyframes gradientShift {
@@ -182,20 +183,5 @@ input, textarea, select {
   }
   50% {
     background-position: 100% 50%;
-  }
-}
-
-@keyframes prideShift {
-  0%, 100% {
-    background-position: 0% 0%;
-  }
-  25% {
-    background-position: 100% 0%;
-  }
-  50% {
-    background-position: 100% 100%;
-  }
-  75% {
-    background-position: 0% 100%;
   }
 }
