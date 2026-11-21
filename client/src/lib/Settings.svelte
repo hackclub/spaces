@@ -2,6 +2,7 @@
   import { createEventDispatcher, onMount } from "svelte";
   import { API_BASE } from "../config.js";
   import { userData } from "../stores/user.svelte";
+  import ExtensionPicker from "./ExtensionPicker.svelte";
 
   const dispatch = createEventDispatcher();
 
@@ -29,7 +30,10 @@
 
   let vscodeExtensionsMessage = "";
   let vscodeExtensionsError = "";
-  $: vscodeExtensions = userData.user.vscode_extensions;
+  let savingExtensions = false;
+  let vscodeExtensions = userData.user.vscode_extensions;
+  $: extensionsChanged = (vscodeExtensions || "") !== (userData.user.vscode_extensions || "");
+  $: if (extensionsChanged) vscodeExtensionsMessage = "";
 
   const HACKATIME_ERRORS = {
     denied: "You cancelled connecting Hackatime.",
@@ -379,6 +383,7 @@
   async function updateVSCodeSettings() {
     vscodeExtensionsMessage = "";
     vscodeExtensionsError = "";
+    savingExtensions = true;
 
     try {
       const response = await fetch(`${API_BASE}/users/update`, {
@@ -395,15 +400,18 @@
       const data = await response.json();
 
       if (response.ok) {
-        vscodeExtensionsMessage = "Extensions updated successfully";
+        userData.user.vscode_extensions = data.data.vscode_extensions;
+        vscodeExtensions = data.data.vscode_extensions;
+        vscodeExtensionsMessage = "Saved. Your VS Code spaces will install these next time they start.";
         dispatch("update", data.data);
       } else {
-        vscodeExtensionsError = data.message || "Failed to update Extensions";
+        vscodeExtensionsError = data.message || "Couldn't save your extensions.";
       }
     } catch (err) {
-      vscodeExtensionsError = "An error occurred. Please try again.";
+      vscodeExtensionsError = "Couldn't save your extensions. Please try again.";
       console.error(err);
     }
+    savingExtensions = false;
   }
 </script>
 
@@ -503,39 +511,29 @@
   </div>
 
   <div class="section">
-    <h3>VSCode customization</h3>
+    <h3>VS Code extensions</h3>
     <p class="section-description">
-      Customize which extensions are installed and which settings are applied
-      when a new VSCode Space is created. If you already have a VSCode space
-      running, you'll have to make a new one for the settings to apply.
+      These install in all your VS Code spaces, in the background each time a
+      space is created or started, so they can take a minute to show up.
+      Removing one here doesn't uninstall it from spaces that already have it.
     </p>
 
     <div class="form-group">
-      <label for="vscode-extensions">Extensions</label>
-      <textarea
-        id="vscode-extensions"
-        bind:value={vscodeExtensions}
-        placeholder="Enter the IDs of extensions with one extension per line
-Example:
-eamodio.gitlens
-svelte.svelte-vscode
-astro-build.astro-vscode
-"
-      ></textarea>
-      <small
-        >Not sure how to find extension IDs? Read this
-        <a
-          href="https://i.sstatic.net/F9GWv.png"
-          target="_blank"
-          rel="noopener noreferrer">guide</a
-        ></small
-      >
+      <label for="vscode-extensions">Add an extension</label>
+      <ExtensionPicker bind:value={vscodeExtensions} />
+      <small>
+        Extensions come from Open VSX, which has most of the VS Code
+        Marketplace. A few Microsoft ones, like Pylance, C/C++ and Live Share,
+        aren't on it.
+      </small>
     </div>
 
-    {#if vscodeExtensionsMessage}<div class="success">{message}</div>{/if}
-    {#if vscodeExtensionsError}<div class="error">{error}</div>{/if}
+    {#if vscodeExtensionsMessage}<div class="success">{vscodeExtensionsMessage}</div>{/if}
+    {#if vscodeExtensionsError}<div class="error">{vscodeExtensionsError}</div>{/if}
 
-    <button on:click={updateVSCodeSettings}>Update VSCode settings</button>
+    <button on:click={updateVSCodeSettings} disabled={!extensionsChanged || savingExtensions}>
+      {savingExtensions ? "Saving…" : "Save extensions"}
+    </button>
   </div>
 
   <div class="section">
@@ -646,15 +644,7 @@ astro-build.astro-vscode
     color: var(--text);
   }
 
-  textarea {
-    resize: none;
-    height: 16rem;
-    font-family: inherit;
-    line-height: 1.5;
-  }
-
-  input,
-  textarea {
+  input {
     width: 100%;
     box-sizing: border-box;
     padding: 8px 12px;
@@ -665,13 +655,11 @@ astro-build.astro-vscode
     color: var(--black);
   }
 
-  input::placeholder,
-  textarea::placeholder {
+  input::placeholder {
     color: var(--muted);
   }
 
-  input:focus,
-  textarea:focus {
+  input:focus {
     outline: none;
     border-color: var(--blue);
   }

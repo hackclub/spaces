@@ -43,3 +43,27 @@ export function validatePassword(password) {
   }
   return { valid: true };
 }
+
+export const EXTENSION_ID_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9_-]*\.[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+export const MAX_EXTENSIONS = 30;
+
+export function validateExtensionList(value) {
+  if (value === null || value === '') return { valid: true, normalized: null };
+  if (typeof value !== 'string') return { valid: false, message: 'Extensions must be a list of IDs' };
+  const seen = new Set();
+  const ids = [];
+  for (const line of value.split(/\r?\n/)) {
+    const id = line.trim();
+    if (!id) continue;
+    if (id.length > 128 || !EXTENSION_ID_REGEX.test(id)) {
+      return { valid: false, message: `"${id.slice(0, 60)}" isn't an extension ID. IDs look like publisher.name` };
+    }
+    if (seen.has(id.toLowerCase())) continue;
+    seen.add(id.toLowerCase());
+    ids.push(id);
+  }
+  if (ids.length > MAX_EXTENSIONS) {
+    return { valid: false, message: `You can add up to ${MAX_EXTENSIONS} extensions` };
+  }
+  return { valid: true, normalized: ids.length ? ids.join('\n') : null };
+}

@@ -20,6 +20,7 @@ import {
   findSandbox,
   setupCodeServer,
   startCodeServer,
+  installUserExtensions,
   setupGuiApp,
   startGuiApp,
   startLoveApp,
@@ -774,13 +775,15 @@ export const createContainer = async (password, type, authorization, name, repo 
       await setupCodeServer(sandbox, {
         workspacePath: toSandboxPath(workspaceDir),
         hackatimeApiKey: user.hackatime_api_key,
-        extensions: user.vscode_extensions,
         hackatimeMachine: hackatimeMachineFor(reservedId),
         repoUrl: githubRepo?.url
       });
     }
 
     const access_url = await startSpaceApp(sandbox, { type: typeLower, workspace_dir: workspaceDir, name: spaceName }, password);
+    if (isEditor) {
+      await installUserExtensions(sandbox, user.vscode_extensions);
+    }
 
     const [newSpace] = await pg('spaces')
       .where('id', reservedId)
@@ -894,6 +897,9 @@ export const startContainer = async (spaceId, authorization) => {
 
     if (config?.kind === "editor" && user.hackatime_api_key) {
       await ensureHackatime(sandbox, user.hackatime_api_key, hackatimeMachineFor(space.id));
+    }
+    if (config?.kind === "editor") {
+      await installUserExtensions(sandbox, user.vscode_extensions);
     }
 
     await pg('spaces')

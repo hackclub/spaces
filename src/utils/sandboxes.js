@@ -88,10 +88,37 @@ const run = async (sandbox, script, { env, sudo = false, timeoutMs = 5 * MINUTE 
   return result;
 };
 
-const sanitizeExtensions = (extensions) => (extensions || "")
+const sanitizeExtensions = (extensions) => [...new Set((extensions || "")
   .split(/\r?\n/)
-  .map((extension) => extension.trim().replace(/[^a-zA-Z0-9.-]/g, ""))
-  .filter(Boolean);
+  .map((extension) => extension.trim().replace(/[^a-zA-Z0-9._-]/g, ""))
+  .filter((extension) => /^[a-zA-Z0-9][a-zA-Z0-9_-]*\.[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(extension)))];
+
+const INSTALL_MISSING_EXTENSIONS = [
+  `installed=" $(code-server --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr '\\n' ' ') "`,
+  "for ext in $EXTENSIONS; do",
+  `  lower=$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')`,
+  `  case "$installed" in *" $lower "*) continue ;; esac`,
+  `  code-server --install-extension "$ext" >>/tmp/spaces-extensions.log 2>&1 || echo "couldn't install $ext" >>/tmp/spaces-extensions.log`,
+  "done"
+].join("\n");
+
+export const installUserExtensions = async (sandbox, extensions) => {
+  const list = sanitizeExtensions(extensions);
+  if (!list.length) {
+    return;
+  }
+
+  try {
+    await sandbox.runCommand({
+      cmd: "bash",
+      args: ["-lc", INSTALL_MISSING_EXTENSIONS],
+      env: { EXTENSIONS: list.join(" ") },
+      detached: true
+    });
+  } catch (err) {
+    console.error("Failed to start installing extensions:", err.message);
+  }
+};
 
 const sanitizeHackatimeKey = (apiKey) => (apiKey || "").replace(/[^a-zA-Z0-9\-_]/g, "");
 
@@ -150,7 +177,7 @@ const cloneRepo = async (sandbox, { repoUrl, workspacePath }) => {
   }
 };
 
-export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey, extensions, hackatimeMachine = "", repoUrl = null }) => {
+export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey, hackatimeMachine = "", repoUrl = null }) => {
   await run(sandbox, INSTALL_CODE_SERVER, { sudo: true });
   if (repoUrl) {
     await cloneRepo(sandbox, { repoUrl, workspacePath });
@@ -162,10 +189,6 @@ export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey,
   if (sanitizeHackatimeKey(hackatimeApiKey)) {
     await ensureHackatime(sandbox, hackatimeApiKey, hackatimeMachine);
     await installExtension(sandbox, "wakatime.vscode-wakatime");
-  }
-
-  for (const extension of sanitizeExtensions(extensions)) {
-    await installExtension(sandbox, extension);
   }
 };
 

@@ -2,7 +2,7 @@ import express from 'express';
 import { sendEmail, verifyCode, consumeCode } from '../../utils/airtable.js';
 import pg from '../../utils/db.js';
 import { sendCodeIpLimiter, sendCodeGlobalLimiter, authLimiter, accountIpLimiter } from '../../middlewares/rate-limit.middleware.js';
-import { validateEmail, validateUsername, normalizeEmail } from '../../utils/validation.js';
+import { validateEmail, validateUsername, normalizeEmail, validateExtensionList } from '../../utils/validation.js';
 import { extractAuth } from '../../middlewares/auth.middleware.js';
 import { getUser } from '../../utils/user.js';
 import { resolveAccess, isStaffPermissionList, grantableRoles } from '../../utils/permissions.js';
@@ -384,7 +384,14 @@ router.put('/update', async (req, res) => {
     }
 
     if (vscode_extensions !== undefined) {
-      updates.vscode_extensions = vscode_extensions;
+      const extensionsValidation = validateExtensionList(vscode_extensions);
+      if (!extensionsValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: extensionsValidation.message
+        });
+      }
+      updates.vscode_extensions = extensionsValidation.normalized;
     }
 
     if (Object.keys(updates).length > 0) {
