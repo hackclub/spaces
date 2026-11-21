@@ -1,7 +1,5 @@
 import pg from './db.js';
-import { EMAIL_REGEX, EMAIL_MAX_LENGTH, validateUsername } from './validation.js';
 import { findSessionUser } from './sessions.js';
-import { revokeHackatimeToken, decryptToken } from './hackatime-oauth.js';
 
 export const getUser = async (authorization) => {
   if (!authorization) return null;
@@ -72,92 +70,5 @@ export const ensureHackclubVerified = async (user) => {
       return user.hackclub_verification_status;
     }
     return user.hackclub_verification_status || 'unknown';
-  }
-};
-
-export const updateUser = async (authorization, updateData) => {
-  if (!authorization) {
-    throw new Error("Authorization token is required");
-  }
-
-  try {
-    const user = await getUser(authorization);
-
-    if (!user) {
-      const error = new Error("User not found");
-      error.statusCode = 404;
-      throw error;
-    }
-
-    const updates = {};
-    
-    if (updateData.email !== undefined) {
-      if (typeof updateData.email !== 'string' || updateData.email.length > EMAIL_MAX_LENGTH || !EMAIL_REGEX.test(updateData.email)) {
-        const error = new Error("Invalid email format");
-        error.statusCode = 400;
-        throw error;
-      }
-      
-      const existingEmail = await pg('users')
-        .where('email', updateData.email)
-        .whereNot('id', user.id)
-        .first();
-      
-      if (existingEmail) {
-        const error = new Error("Email already in use");
-        error.statusCode = 409;
-        throw error;
-      }
-      
-      updates.email = updateData.email;
-    }
-    
-    if (updateData.username !== undefined && updateData.username !== user.username) {
-      const usernameValidation = validateUsername(updateData.username);
-      if (!usernameValidation.valid) {
-        const error = new Error(usernameValidation.message);
-        error.statusCode = 400;
-        throw error;
-      }
-      
-      const existingUsername = await pg('users')
-        .where('username', usernameValidation.normalized)
-        .whereNot('id', user.id)
-        .first();
-      
-      if (existingUsername) {
-        const error = new Error("Username already taken");
-        error.statusCode = 409;
-        throw error;
-      }
-      
-      updates.username = usernameValidation.normalized;
-    }
-    
-    if (updateData.hackatime_api_key !== undefined) {
-      updates.hackatime_api_key = updateData.hackatime_api_key;
-      if (updateData.hackatime_api_key !== user.hackatime_api_key) {
-        updates.hackatime_user_id = null;
-        updates.hackatime_linked_at = null;
-        updates.hackatime_token = null;
-        revokeHackatimeToken(decryptToken(user.hackatime_token));
-      }
-    }
-
-    if (Object.keys(updates).length === 0) {
-      const error = new Error("No valid fields to update");
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const [updatedUser] = await pg('users')
-      .where('id', user.id)
-      .update(updates)
-      .returning(['id', 'email', 'username', 'hackatime_api_key']);
-
-    return updatedUser;
-  } catch (error) {
-    console.error('Error updating user:', error);
-    throw error;
   }
 };

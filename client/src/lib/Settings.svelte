@@ -6,10 +6,6 @@
 
   const dispatch = createEventDispatcher();
 
-  let newEmail = "";
-  let oldEmailCode = "";
-  let newEmailCode = "";
-  let emailStep = "idle";
 
   let message = "";
   let error = "";
@@ -17,8 +13,6 @@
   let savingProfile = false;
   $: usernameChanged = username.trim() !== "" && username.trim() !== userData.user.username;
   $: if (usernameChanged) message = "";
-  let emailMessage = "";
-  let emailError = "";
 
   let hackatimeMessage = "";
   let hackatimeError = "";
@@ -260,135 +254,6 @@
     savingProfile = false;
   }
 
-  async function startEmailChange() {
-    emailMessage = "";
-    emailError = "";
-
-    if (!newEmail) {
-      emailError = "Please enter a new email address";
-      return;
-    }
-
-    if (newEmail === userData.user.email) {
-      emailError = "New email must be different from current email";
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE}/users/send`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: userData.user.email,
-          mode: "update",
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        emailMessage =
-          "Verification code sent to your current email (" +
-          userData.user.email +
-          ")";
-        emailStep = "verifyOld";
-      } else {
-        emailError = data.message || "Failed to send code";
-      }
-    } catch (err) {
-      emailError = "An error occurred. Please try again.";
-      console.error(err);
-    }
-  }
-
-  async function verifyOldEmail() {
-    emailMessage = "";
-    emailError = "";
-
-    if (!oldEmailCode) {
-      emailError = "Please enter the verification code";
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE}/users/send`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: newEmail,
-          mode: "update",
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        emailMessage =
-          "Verification code sent to your new email (" + newEmail + ")";
-        emailStep = "verifyNew";
-      } else {
-        emailError = data.message || "Failed to send code to new email";
-      }
-    } catch (err) {
-      emailError = "An error occurred. Please try again.";
-      console.error(err);
-    }
-  }
-
-  async function verifyNewEmailAndUpdate() {
-    emailMessage = "";
-    emailError = "";
-
-    if (!newEmailCode) {
-      emailError = "Please enter the verification code";
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE}/users/update/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          email: newEmail,
-          oldEmailVerificationCode: parseInt(oldEmailCode),
-          emailVerificationCode: parseInt(newEmailCode),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        emailMessage = "Email changed.";
-        newEmail = "";
-        oldEmailCode = "";
-        newEmailCode = "";
-        emailStep = "idle";
-        dispatch("update", data.data);
-      } else {
-        emailError = data.message || "Failed to update email";
-      }
-    } catch (err) {
-      emailError = "An error occurred. Please try again.";
-      console.error(err);
-    }
-  }
-
-  function cancelEmailChange() {
-    emailStep = "idle";
-    newEmail = "";
-    oldEmailCode = "";
-    newEmailCode = "";
-    emailMessage = "";
-    emailError = "";
-  }
-
   async function updateVSCodeSettings() {
     vscodeExtensionsMessage = "";
     vscodeExtensionsError = "";
@@ -536,51 +401,17 @@
 
       <div class="row">
         <span class="row-label" id="email-label">Email</span>
-        {#if emailStep === "idle"}
-          <div class="field-inline">
-            <span class="value" aria-labelledby="email-label">{userData.user.email}</span>
-            <button class="btn btn-secondary" on:click={() => { emailMessage = ""; emailError = ""; emailStep = "input"; }}>Change email</button>
-          </div>
-        {:else}
-          <div class="email-flow">
-            <ol class="steps" aria-label="Changing your email">
-              <li class:current={emailStep === "input"} class:done={emailStep !== "input"}>New address</li>
-              <li class:current={emailStep === "verifyOld"} class:done={emailStep === "verifyNew"}>Code from current email</li>
-              <li class:current={emailStep === "verifyNew"}>Code from new email</li>
-            </ol>
-
-            {#if emailStep === "input"}
-              <form on:submit|preventDefault={startEmailChange}>
-                <label class="sub-label" for="newEmail">New email address</label>
-                <input type="email" id="newEmail" bind:value={newEmail} autocomplete="email" placeholder="you@example.com" />
-                <div class="flow-actions">
-                  <button type="submit" class="btn btn-primary">Send code</button>
-                  <button type="button" class="btn btn-quiet" on:click={cancelEmailChange}>Cancel</button>
-                </div>
-              </form>
-            {:else if emailStep === "verifyOld"}
-              <form on:submit|preventDefault={verifyOldEmail}>
-                <label class="sub-label" for="oldEmailCode">Code sent to {userData.user.email}</label>
-                <input type="text" id="oldEmailCode" bind:value={oldEmailCode} inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" />
-                <div class="flow-actions">
-                  <button type="submit" class="btn btn-primary">Continue</button>
-                  <button type="button" class="btn btn-quiet" on:click={cancelEmailChange}>Cancel</button>
-                </div>
-              </form>
-            {:else if emailStep === "verifyNew"}
-              <form on:submit|preventDefault={verifyNewEmailAndUpdate}>
-                <label class="sub-label" for="newEmailCode">Code sent to {newEmail}</label>
-                <input type="text" id="newEmailCode" bind:value={newEmailCode} inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" />
-                <div class="flow-actions">
-                  <button type="submit" class="btn btn-primary">Change email</button>
-                  <button type="button" class="btn btn-quiet" on:click={cancelEmailChange}>Cancel</button>
-                </div>
-              </form>
-            {/if}
-          </div>
-        {/if}
-        {#if emailMessage}<p class="notice notice-success row-full" role="status">{emailMessage}</p>{/if}
-        {#if emailError}<p class="notice notice-error row-full" role="alert">{emailError}</p>{/if}
+        <p class="value row-full">{userData.user.email}</p>
+        <p class="row-detail row-full">
+          {#if isHackclubLinked}
+            This comes from your Hack Club account. To change it, change it at
+            <a href="https://auth.hackclub.com" target="_blank" rel="noopener noreferrer">auth.hackclub.com</a>,
+            then log in to Spaces with Hack Club.
+          {:else}
+            Link your Hack Club account above to use its email instead. You can change that email at
+            <a href="https://auth.hackclub.com" target="_blank" rel="noopener noreferrer">auth.hackclub.com</a>.
+          {/if}
+        </p>
       </div>
     </div>
   </section>
@@ -754,12 +585,6 @@
     font-weight: 700;
   }
 
-  .sub-label {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 14px;
-    color: var(--ui-text-secondary);
-  }
 
   .field-inline {
     grid-column: 1 / -1;
@@ -775,6 +600,7 @@
   .value {
     flex: 1;
     min-width: 0;
+    margin: 0;
     font-size: 15px;
     overflow-wrap: anywhere;
   }
@@ -801,63 +627,13 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 25%, transparent);
   }
 
-  .email-flow {
-    grid-column: 1 / -1;
-  }
 
-  .steps {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 18px;
-    margin: 0 0 16px;
-    padding: 0;
-    list-style: none;
-    counter-reset: step;
-    font-size: 13px;
-    color: var(--ui-text-muted);
-  }
 
-  .steps li {
-    counter-increment: step;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
 
-  .steps li::before {
-    content: counter(step);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 1px solid var(--ui-border);
-    font-size: 12px;
-  }
 
-  .steps li.current {
-    color: var(--ui-text);
-    font-weight: 700;
-  }
 
-  .steps li.current::before {
-    border-color: var(--ui-accent);
-    background: var(--blue);
-    color: var(--ui-on-accent);
-  }
 
-  .steps li.done::before {
-    content: "✓";
-    border-color: var(--ui-success);
-    color: var(--ui-success);
-  }
 
-  .flow-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-  }
 
   .btn {
     display: inline-flex;
@@ -905,21 +681,12 @@
     border-color: var(--ui-text-muted);
   }
 
-  .btn-quiet,
   .btn-quiet-danger {
     background: transparent;
     padding: 0 12px;
-  }
-
-  .btn-quiet {
-    color: var(--ui-text-secondary);
-  }
-
-  .btn-quiet-danger {
     color: var(--ui-danger);
   }
 
-  .btn-quiet:not(:disabled):hover,
   .btn-quiet-danger:not(:disabled):hover {
     background: var(--ui-hover);
   }
@@ -966,7 +733,8 @@
     background: color-mix(in srgb, var(--red) 10%, transparent);
   }
 
-  .notice a {
+  .notice a,
+  .row-detail a {
     color: inherit;
     font-weight: 700;
     text-decoration: underline;

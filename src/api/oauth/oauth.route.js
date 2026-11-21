@@ -5,6 +5,7 @@ import { getUser } from '../../utils/user.js';
 import { extractAuth } from '../../middlewares/auth.middleware.js';
 import { createSession, setSessionCookie } from '../../utils/sessions.js';
 import { oauthLoginLimiter } from '../../middlewares/rate-limit.middleware.js';
+import { normalizeEmail } from '../../utils/validation.js';
 
 const router = express.Router();
 router.use(extractAuth);
@@ -196,7 +197,7 @@ router.get('/callback', async (req, res) => {
     const identity = meData.identity || meData;
 
     const hackclubId = identity.id;
-    const email = identity.primary_email || identity.email;
+    const email = normalizeEmail(identity.primary_email || identity.email);
     const firstName = identity.first_name || 'User';
     const verificationStatus = identity.verification_status || 'needs_submission';
 
@@ -274,6 +275,14 @@ router.get('/callback', async (req, res) => {
           .returning(['id', 'email', 'username', 'is_admin', 'hackatime_api_key', 'hackclub_id', 'hackclub_verification_status']);
 
         user = newUser;
+      }
+    }
+
+    if (user.email !== email) {
+      const emailTaken = await pg('users').where({ email }).whereNot({ id: user.id }).first();
+      if (!emailTaken) {
+        await pg('users').where({ id: user.id }).update({ email });
+        user.email = email;
       }
     }
 
