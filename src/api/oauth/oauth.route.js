@@ -142,7 +142,7 @@ router.get('/callback', async (req, res) => {
 
     const stateRow = await pg('oauth_states')
       .where({ state })
-      .where((query) => query.whereNull('mode').orWhereNot('mode', 'hackatime'))
+      .where((query) => query.whereNull('mode').orWhereNotIn('mode', ['hackatime', 'github']))
       .first();
     if (!stateRow) {
       return res.redirect('/?error=oauth_invalid_state');

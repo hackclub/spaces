@@ -1,10 +1,11 @@
 import pg from "./db.js";
 import { getUser, ensureHackclubVerified } from "./user.js";
-import { getUserPrimaryMembership } from "./clubs.js";
+import { getUserPrimaryMembership, getSpaceShareStatus } from "./clubs.js";
 import { recordRunStart, recordRunStop } from "./space-runs.js";
 import { findTemplate } from "./templates.js";
 import { hasPermission } from "./permissions.js";
 import { currentHackatimeKey } from "./hackatime-oauth.js";
+import { currentGithubLogin } from "./github-oauth.js";
 import path from "path";
 import crypto from "crypto";
 import {
@@ -27,12 +28,8 @@ import {
   ensureHackatime,
   writeHackatimeConfig,
   hackatimeMachineFor,
-  startGithubLogin,
-  githubLoginPending,
-  getGithubAccount,
-  configureGitForGithub,
-  githubLogout,
-  GITHUB_DEVICE_URL
+  signInGithub,
+  signOutGithub
 } from "./sandboxes.js";
 
 const DEFAULT_WORKSPACE_DIR = "/config/workspace";
@@ -532,6 +529,26 @@ export const startSpaceApp = (sandbox, space, password) => {
   return startCodeServer(sandbox, { password, workspacePath: toSandboxPath(space.workspace_dir) });
 };
 
+const syncSpaceGithub = async (sandbox, user, spaceId) => {
+  const shared = Boolean(await getSpaceShareStatus(spaceId));
+  const github = shared ? null : await currentGithubLogin(user);
+  if (github) {
+    await signInGithub(sandbox, github);
+  } else {
+    await signOutGithub(sandbox);
+  }
+};
+
+export const signOutSharedSpace = async (space) => {
+  if (!space?.running || configFor(space.type)?.kind !== "editor") return;
+  try {
+    const sandbox = await findSandbox(space.container_id);
+    if (sandbox) await signOutGithub(sandbox);
+  } catch (err) {
+    console.error(`Failed to sign shared space ${space.id} out of GitHub:`, err.message);
+  }
+};
+
 const writeSpaceHackatime = (sandbox, config, apiKey, spaceId) =>
   writeHackatimeConfig(sandbox, apiKey, hackatimeMachineFor(spaceId), { inHome: config.kind !== "gui" });
 
@@ -695,71 +712,6 @@ const reserveSpaceSlot = (user, { spaceId = null, placeholder = null }) => pg.tr
   return reservedId;
 });
 
-const runningEditorSpace = async (spaceId, authorization) => {
-  const user = await getUser(authorization);
-  if (!user) {
-    throw limitError("Invalid authorization token", 401);
-  }
-
-  const space = await pg('spaces').where({ id: spaceId, user_id: user.id }).where('creating', false).first();
-  if (!space) {
-    throw limitError("Space not found or not owned by user", 404);
-  }
-  if (space.locked_at) {
-    throw lockedError(space, "used");
-  }
-  if (configFor(space.type)?.kind !== "editor") {
-    throw limitError("GitHub can only be connected in VS Code spaces.", 400);
-  }
-  if (!space.running) {
-    throw limitError("Start this space first.", 409);
-  }
-
-  const sandbox = await findSandbox(space.container_id);
-  if (!sandbox || sandbox.status !== "running") {
-    throw limitError("Start this space first.", 409);
-  }
-
-  return { user, space, sandbox };
-};
-
-export const getGithubConnection = async (spaceId, authorization) => {
-  const { user, sandbox } = await runningEditorSpace(spaceId, authorization);
-  const account = await getGithubAccount(sandbox);
-  if (!account) {
-    return { connected: false, pending: await githubLoginPending(sandbox) };
-  }
-
-  await configureGitForGithub(sandbox, account);
-  if (user.github_username !== account.login) {
-    await pg('users').where('id', user.id).update({ github_username: account.login });
-  }
-  return { connected: true, login: account.login };
-};
-
-export const connectGithub = async (spaceId, authorization) => {
-  const { sandbox } = await runningEditorSpace(spaceId, authorization);
-  const account = await getGithubAccount(sandbox);
-  if (account) {
-    return getGithubConnection(spaceId, authorization);
-  }
-
-  const code = await startGithubLogin(sandbox).catch((err) => {
-    console.error(`Failed to start GitHub login in space ${spaceId}:`, err.message);
-    return null;
-  });
-  if (!code) {
-    throw limitError("Couldn't start the GitHub login. Try again in a moment.", 502);
-  }
-  return { connected: false, pending: true, code, url: GITHUB_DEVICE_URL };
-};
-
-export const disconnectGithub = async (spaceId, authorization) => {
-  const { sandbox } = await runningEditorSpace(spaceId, authorization);
-  await githubLogout(sandbox);
-  return { connected: false, pending: false };
-};
-
 export const createContainer = async (password, type, authorization, name, repo = null) => {
   if (process.env.SPACES_CREATION_PAUSED === 'true') {
     const error = new Error("Space creation is temporarily paused for maintenance. Your existing spaces are unaffected.");
@@ -847,7 +799,8 @@ export const createContainer = async (password, type, authorization, name, repo 
         workspacePath: toSandboxPath(workspaceDir),
         hackatimeApiKey: user.hackatime_api_key,
         hackatimeMachine: hackatimeMachineFor(reservedId),
-        repoUrl: githubRepo?.url
+        repoUrl: githubRepo?.url,
+        github: await currentGithubLogin(user)
       });
     }
 
@@ -970,6 +923,7 @@ export const startContainer = async (spaceId, authorization) => {
       await ensureHackatime(sandbox, user.hackatime_api_key, hackatimeMachineFor(space.id));
     }
     if (config?.kind === "editor") {
+      await syncSpaceGithub(sandbox, user, space.id);
       await installUserExtensions(sandbox, user.vscode_extensions);
     }
 

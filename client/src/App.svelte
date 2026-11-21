@@ -50,7 +50,7 @@
 
         isAuthenticated = await userData.refresh();
 
-        if (isAuthenticated && /(^|[#&])hackatime(_error)?=/.test(window.location.hash)) {
+        if (isAuthenticated && /(^|[#&])(hackatime|github)(_error)?=/.test(window.location.hash)) {
             showSettings = true;
         }
     });

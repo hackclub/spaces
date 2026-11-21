@@ -9,9 +9,7 @@ import {
   changeSpacePassword,
   availableSpaceTypes,
   spaceConfigs,
-  getGithubConnection,
-  connectGithub,
-  disconnectGithub
+  signOutSharedSpace
 } from "../../utils/spaces.js";
 import { getUser } from "../../utils/user.js";
 import { readyTemplateTypes, templateVersions } from "../../utils/templates.js";
@@ -98,29 +96,6 @@ router.post("/start/:spaceId", containerOpsLimiter, async (req, res) => {
   }
 });
 
-router.get("/github/:spaceId", containerOpsLimiter, async (req, res) => {
-  try {
-    res.json(await getGithubConnection(req.params.spaceId, req.authToken));
-  } catch (err) {
-    sendError(res, err);
-  }
-});
-
-router.post("/github/:spaceId/connect", containerOpsLimiter, async (req, res) => {
-  try {
-    res.json(await connectGithub(req.params.spaceId, req.authToken));
-  } catch (err) {
-    sendError(res, err);
-  }
-});
-
-router.post("/github/:spaceId/disconnect", containerOpsLimiter, async (req, res) => {
-  try {
-    res.json(await disconnectGithub(req.params.spaceId, req.authToken));
-  } catch (err) {
-    sendError(res, err);
-  }
-});
 
 router.post("/stop/:spaceId", containerOpsLimiter, async (req, res) => {
   const { spaceId } = req.params;
@@ -294,6 +269,7 @@ router.post("/:spaceId/share/club", spaceShareLimiter, async (req, res) => {
       }
 
       await shareSpaceWithClub(space.id, membership.club_id, user.id);
+      await signOutSharedSpace(space);
       res.status(200).json({
         success: true,
         message: 'Space shared with your club leaders',

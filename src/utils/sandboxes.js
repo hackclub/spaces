@@ -172,13 +172,16 @@ const cloneRepo = async (sandbox, { repoUrl, workspacePath }) => {
   } catch (err) {
     console.error(`Failed to clone ${repoUrl}:`, err.message);
     const error = new Error(`Couldn't clone ${repoUrl}`);
-    error.userMessage = "Couldn't copy that repo. Check the link, and make sure the repo is public.";
+    error.userMessage = "Couldn't copy that repo. Check the link. For a private repo, connect GitHub in Settings first.";
     throw error;
   }
 };
 
-export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey, hackatimeMachine = "", repoUrl = null }) => {
+export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey, hackatimeMachine = "", repoUrl = null, github = null }) => {
   await run(sandbox, INSTALL_CODE_SERVER, { sudo: true });
+  if (github) {
+    await signInGithub(sandbox, github);
+  }
   if (repoUrl) {
     await cloneRepo(sandbox, { repoUrl, workspacePath });
   } else {
@@ -192,44 +195,48 @@ export const setupCodeServer = async (sandbox, { workspacePath, hackatimeApiKey,
   }
 };
 
-const GITHUB_LOGIN_LOG = "/tmp/spaces-github-login.log";
-export const GITHUB_DEVICE_URL = "https://github.com/login/device";
+const SIGN_IN_GITHUB = [
+  "set -e",
+  "if command -v gh >/dev/null 2>&1; then",
+  `  printf '%s' "$GITHUB_LOGIN_TOKEN" | gh auth login --hostname github.com --git-protocol https --with-token`,
+  "  gh auth setup-git --hostname github.com",
+  "else",
+  "  git config --global credential.https://github.com.helper store",
+  `  ( umask 077; printf 'https://x-access-token:%s@github.com\\n' "$GITHUB_LOGIN_TOKEN" > "$HOME/.git-credentials" )`,
+  "fi",
+  'git config --global user.name "$GIT_NAME"',
+  'git config --global user.email "$GIT_EMAIL"'
+].join("\n");
 
-export const startGithubLogin = async (sandbox) => {
-  await run(sandbox, `pkill -f "[g]h auth login" || true; rm -f ${GITHUB_LOGIN_LOG}`);
-  await sandbox.runCommand({
-    cmd: "bash",
-    args: ["-lc", `gh auth login --hostname github.com --git-protocol https --web --skip-ssh-key < /dev/null > ${GITHUB_LOGIN_LOG} 2>&1`],
-    env: { BROWSER: "true" },
-    detached: true
-  });
-  const result = await run(
-    sandbox,
-    `for i in $(seq 1 60); do grep -oE "code: [A-Z0-9]{4}-[A-Z0-9]{4}" ${GITHUB_LOGIN_LOG} && exit 0; sleep 0.25; done; exit 1`,
-    { timeoutMs: 30000 }
-  );
-  return (await result.stdout()).match(/[A-Z0-9]{4}-[A-Z0-9]{4}/)?.[0] ?? null;
+const SIGN_OUT_GITHUB = [
+  "gh auth logout --hostname github.com >/dev/null 2>&1 || true",
+  'rm -f "$HOME/.git-credentials"',
+  "git config --global --unset-all credential.https://github.com.helper >/dev/null 2>&1 || true"
+].join("\n");
+
+export const signInGithub = async (sandbox, { token, login, id, name }) => {
+  try {
+    await run(sandbox, SIGN_IN_GITHUB, {
+      env: {
+        GITHUB_LOGIN_TOKEN: token,
+        GIT_NAME: name || login,
+        GIT_EMAIL: `${id}+${login}@users.noreply.github.com`
+      }
+    });
+    return true;
+  } catch (err) {
+    console.error("Failed to sign the space in to GitHub:", err.message.split("\n")[0]);
+    return false;
+  }
 };
 
-export const githubLoginPending = async (sandbox) => {
-  const result = await sandbox.runCommand({ cmd: "bash", args: ["-lc", 'pgrep -f "[g]h auth login" >/dev/null'] });
-  return result.exitCode === 0;
+export const signOutGithub = async (sandbox) => {
+  try {
+    await run(sandbox, SIGN_OUT_GITHUB);
+  } catch (err) {
+    console.error("Failed to sign the space out of GitHub:", err.message.split("\n")[0]);
+  }
 };
-
-export const getGithubAccount = async (sandbox) => {
-  const result = await sandbox.runCommand({ cmd: "bash", args: ["-lc", "gh api user --jq '[.login, (.id | tostring), (.name // \"\")] | @tsv' 2>/dev/null"] });
-  if (result.exitCode !== 0) return null;
-  const [login, id, name] = (await result.stdout()).trim().split("\t");
-  return login && id ? { login, id, name } : null;
-};
-
-export const configureGitForGithub = (sandbox, { login, id, name }) => run(
-  sandbox,
-  'gh auth setup-git --hostname github.com && git config --global user.name "$NAME" && git config --global user.email "$EMAIL"',
-  { env: { NAME: name || login, EMAIL: `${id}+${login}@users.noreply.github.com` } }
-);
-
-export const githubLogout = (sandbox) => run(sandbox, `pkill -f "[g]h auth login" || true; gh auth logout --hostname github.com >/dev/null 2>&1 || true`);
 
 export const startCodeServer = async (sandbox, { password, workspacePath }) => {
   await run(sandbox, INSTALL_CODE_SERVER, { sudo: true });

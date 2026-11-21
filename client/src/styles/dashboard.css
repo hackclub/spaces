@@ -620,34 +620,6 @@
   color: var(--red);
 }
 
-.action-btn.github {
-  background: var(--darkless);
-  color: var(--white);
-}
-
-.connect-after {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 24px;
-  cursor: pointer;
-  color: var(--black);
-  font-size: 15px;
-}
-
-.connect-after input {
-  width: 18px;
-  height: 18px;
-  margin-top: 2px;
-  accent-color: var(--red);
-  flex-shrink: 0;
-}
-
-.connect-after .form-hint {
-  display: block;
-  margin-top: 2px;
-}
-
 .optional-mark {
   font-weight: normal;
   color: var(--slate);

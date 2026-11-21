@@ -16,7 +16,9 @@ class UserData {
         hackclub_id: string,
         hackclub_verification_status: string,
         vscode_extensions: string,
-        github_username: string | null
+        github_username: string | null,
+        github_available: boolean,
+        github_linked: boolean
     }>()
 
     async refresh() {

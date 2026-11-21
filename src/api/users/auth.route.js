@@ -8,6 +8,7 @@ import { getUser } from '../../utils/user.js';
 import { resolveAccess, isStaffPermissionList, grantableRoles } from '../../utils/permissions.js';
 import { createSession, deleteSession, setSessionCookie, hashToken, listUserSessions, deleteUserSession, deleteOtherSessions } from '../../utils/sessions.js';
 import { describeUserAgent } from '../../utils/user-agent.js';
+import { githubOAuthConfigured } from '../../utils/github-oauth.js';
 import { hackatimeOAuthConfigured, revokeHackatimeToken, decryptToken } from '../../utils/hackatime-oauth.js';
 
 const router = express.Router();
@@ -49,7 +50,9 @@ router.get("/me", async (req, res) => {
         hackclub_id: user.hackclub_id,
         hackclub_verification_status: user.hackclub_verification_status,
         vscode_extensions: user.vscode_extensions,
-        github_username: user.github_username ?? null
+        github_username: user.github_linked_at ? user.github_username : null,
+        github_available: githubOAuthConfigured(),
+        github_linked: Boolean(user.github_linked_at)
       }
     })
   } catch (_) {

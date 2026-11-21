@@ -7,7 +7,6 @@
   import FlagIcon from "../assets/flag.svg?raw";
   import ShareWithClubToggle from "./ShareWithClubToggle.svelte";
   import ProgressNotice from "./ProgressNotice.svelte";
-  import GithubConnect from "./GithubConnect.svelte";
   import { userData } from "../stores/user.svelte";
   import { createConfirm } from "./confirm.js";
   import { findLegacyGodotProjects, downloadLegacyGodotProjects } from "./godot-legacy.js";
@@ -26,8 +25,6 @@
   let newSpaceName = "";
   let newSpaceRepo = "";
   let nameFromRepo = "";
-  let githubSpace = null;
-  let connectGithubAfter = false;
   let githubRepos = [];
   let githubReposFor = "";
   let error = "";
@@ -414,19 +411,20 @@
     return match ? match[1] : "";
   }
 
-  $: if (showCreateForm && userData.user?.github_username && githubReposFor !== userData.user.github_username) {
+  $: if (showCreateForm && userData.user?.github_linked && githubReposFor !== userData.user.github_username) {
     loadGithubRepos(userData.user.github_username);
   }
 
   async function loadGithubRepos(login) {
     githubReposFor = login;
     try {
-      const response = await fetch(`https://api.github.com/users/${encodeURIComponent(login)}/repos?per_page=100&sort=pushed`, {
-        headers: { Accept: "application/vnd.github+json" },
-      });
-      const repos = response.ok ? await response.json() : [];
-      githubRepos = Array.isArray(repos)
-        ? repos.filter((repo) => !repo.private).map((repo) => ({ value: repo.full_name, label: repo.description || "" }))
+      const response = await fetch(`${API_BASE}/oauth/github/repos`, { credentials: "include" });
+      const data = response.ok ? await response.json() : null;
+      githubRepos = Array.isArray(data?.data)
+        ? data.data.map((repo) => ({
+            value: repo.name,
+            label: [repo.private ? "Private" : "", repo.description].filter(Boolean).join(" · "),
+          }))
         : [];
     } catch (err) {
       githubRepos = [];
@@ -479,10 +477,6 @@
         newSpaceRepo = "";
         nameFromRepo = "";
         await loadSpaces();
-        if (connectGithubAfter && !userData.user?.github_username) {
-          githubSpace = spaces.find((space) => space.id === data.spaceId) ?? null;
-        }
-        connectGithubAfter = false;
       } else {
         if (
           response.status === 403 &&
@@ -967,7 +961,7 @@
                   bind:value={newSpaceRepo}
                   on:input={handleRepoInput}
                   list="spaceRepoList"
-                  placeholder={userData.user.github_username ? `${userData.user.github_username}/project` : "https://github.com/you/project"}
+                  placeholder={userData.user.github_linked ? `${userData.user.github_username}/project` : "https://github.com/you/project"}
                   aria-describedby="spaceRepoHint"
                 />
                 <datalist id="spaceRepoList">
@@ -976,20 +970,15 @@
                   {/each}
                 </datalist>
                 <p class="form-hint" id="spaceRepoHint">
-                  {userData.user.github_username
-                    ? "Start typing to pick one of your public repos, or paste a link to any public repo."
-                    : "Public repos only. It's copied into your space so you can keep working on it."}
+                  {#if userData.user.github_linked}
+                    Start typing to pick one of your repos, private ones too, or paste a link. Your space can push to GitHub as you.
+                  {:else if userData.user.github_available}
+                    Public repos only. <button type="button" class="link-button" on:click={() => dispatch("settings")}>Connect GitHub in Settings</button> to use private repos and push your work.
+                  {:else}
+                    Public repos only. It's copied into your space so you can keep working on it.
+                  {/if}
                 </p>
               </div>
-              {#if !userData.user.github_username}
-                <label class="connect-after">
-                  <input type="checkbox" bind:checked={connectGithubAfter} disabled={loading} />
-                  <span>
-                    <strong>Connect GitHub after creating</strong>
-                    <span class="form-hint">So you can push your work, and start future spaces from your repos.</span>
-                  </span>
-                </label>
-              {/if}
             {/if}
 
             {#if error}
@@ -1358,16 +1347,6 @@
                       </button>
                     {/if}
 
-                    {#if !isGuiType(space.type) && space.access_url}
-                      <button
-                        type="button"
-                        class="action-btn github"
-                        on:click={() => (githubSpace = space)}
-                      >
-                        GitHub
-                      </button>
-                    {/if}
-
                     <button
                       type="button"
                       class="action-btn stop"
@@ -1436,8 +1415,4 @@
       </div>
     </div>
   </div>
-{/if}
-
-{#if githubSpace}
-  <GithubConnect space={githubSpace} on:close={() => (githubSpace = null)} />
 {/if}

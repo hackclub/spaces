@@ -1,5 +1,5 @@
-import crypto from 'crypto';
 import pg from './db.js';
+import { createTokenCrypto } from './token-crypto.js';
 
 const HACKATIME_URL = process.env.HACKATIME_URL || 'https://hackatime.hackclub.com';
 
@@ -10,39 +10,17 @@ const REVOKE_URL = new URL('/oauth/revoke', HACKATIME_URL).toString();
 const ME_URL = new URL('/api/v1/authenticated/me', HACKATIME_URL).toString();
 const API_KEYS_URL = new URL('/api/v1/authenticated/api_keys', HACKATIME_URL).toString();
 
-const tokenKey = () => {
-  const raw = process.env.HACKATIME_TOKEN_KEY || '';
-  const key = Buffer.from(raw, 'base64');
-  return key.length === 32 ? key : null;
-};
+const hackatimeTokens = createTokenCrypto('HACKATIME_TOKEN_KEY');
 
 export const hackatimeOAuthConfigured = () => Boolean(
   process.env.HACKATIME_CLIENT_ID
   && process.env.HACKATIME_CLIENT_SECRET
   && process.env.HACKATIME_REDIRECT_URI
-  && tokenKey()
+  && hackatimeTokens.configured()
 );
 
-export const encryptToken = (token) => {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', tokenKey(), iv);
-  const data = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
-  return ['v1', iv.toString('base64'), cipher.getAuthTag().toString('base64'), data.toString('base64')].join('.');
-};
-
-export const decryptToken = (stored) => {
-  const key = tokenKey();
-  if (!key || typeof stored !== 'string') return null;
-  const [version, iv, tag, data] = stored.split('.');
-  if (version !== 'v1' || !iv || !tag || !data) return null;
-  try {
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64'));
-    decipher.setAuthTag(Buffer.from(tag, 'base64'));
-    return Buffer.concat([decipher.update(Buffer.from(data, 'base64')), decipher.final()]).toString('utf8');
-  } catch {
-    return null;
-  }
-};
+export const encryptToken = hackatimeTokens.encrypt;
+export const decryptToken = hackatimeTokens.decrypt;
 
 const authorizedGet = async (url, accessToken, timeoutMs) => {
   const response = await fetch(url, {

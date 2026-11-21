@@ -73,6 +73,9 @@ document.cookie = "auth_token=w; path=/"
 | `HACKATIME_CLIENT_ID`, `HACKATIME_CLIENT_SECRET` | no | Hackatime OAuth app (confidential, scopes `profile` and `read`). Without these, connecting Hackatime is hidden. Only the secret is sensitive. |
 | `HACKATIME_REDIRECT_URI` | with the above | Hackatime OAuth callback, `<site>/api/v1/oauth/hackatime/callback`. It must also be allowed in the OAuth app. |
 | `HACKATIME_TOKEN_KEY` | with the above | 32 random bytes in base64 (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`), used to encrypt the stored Hackatime tokens. Sensitive. Changing it disconnects everyone from Hackatime until they connect again. |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | no | GitHub OAuth app. Spaces asks for the `repo`, `read:org` and `workflow` scopes and signs VS Code spaces in to `gh` and git with the token. Without these, connecting GitHub is hidden. Only the secret is sensitive. |
+| `GITHUB_REDIRECT_URI` | with the above | GitHub OAuth callback, `<site>/api/v1/oauth/github/callback`. It must match the app's callback URL. |
+| `GITHUB_TOKEN_KEY` | with the above | 32 random bytes in base64, made the same way as `HACKATIME_TOKEN_KEY` but a different value. Encrypts the stored GitHub tokens. Sensitive. Changing it disconnects everyone from GitHub until they connect again. |
 | `FRONTEND_URL` | yes | The website's address, used for CORS |
 | `CRON_SECRET` | production | Shared secret for the auto-stop cron job. Vercel sends it automatically. |
 | `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID` | local only | Credentials for creating sandboxes outside Vercel. On Vercel, sandboxes use the deployment's built-in OIDC login, so leave these unset there. |
