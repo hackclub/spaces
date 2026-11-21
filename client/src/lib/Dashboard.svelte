@@ -34,7 +34,7 @@
   let startDone = {};
   const holdFinishedBar = () => new Promise((resolve) => setTimeout(resolve, 800));
 
-  const GUI_TYPES = ["kicad", "blender", "freecad", "godot"];
+  const GUI_TYPES = ["kicad", "blender", "freecad", "godot", "renpy"];
   const WEB_TYPES = ["love2d"];
   $: kindOf = (type) => {
     const value = (type || "").toLowerCase();
@@ -280,15 +280,61 @@
     }).catch((err) => console.error("Failed to record opening the space:", err));
   }
 
-  function openSpace(event, space) {
-    recordOpen(space);
+  let switchPromptSpace = null;
+  let switchConnecting = false;
+  let switchError = "";
 
-    if (space.login_username || !space.password || !space.access_url) {
+  const opensDirectly = (space) => Boolean(space.login_username || !space.password || !space.access_url);
+
+  function openSpace(event, space) {
+    if (userData.user?.hackatime_needs_switch) {
+      event.preventDefault();
+      switchError = "";
+      switchPromptSpace = space;
       return;
     }
 
-    event.preventDefault();
+    recordOpen(space);
+    if (opensDirectly(space)) return;
 
+    event.preventDefault();
+    loginToSpace(space);
+  }
+
+  function openWithoutSwitching() {
+    const space = switchPromptSpace;
+    switchPromptSpace = null;
+    if (!space) return;
+    recordOpen(space);
+    if (opensDirectly(space)) {
+      if (space.access_url) window.open(space.access_url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    loginToSpace(space);
+  }
+
+  async function connectHackatimeFromPrompt() {
+    switchError = "";
+    switchConnecting = true;
+    try {
+      const response = await fetch(`${API_BASE}/oauth/hackatime/link`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (response.ok && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      switchError = data.message || "Couldn't start connecting Hackatime. Please try again.";
+    } catch (err) {
+      console.error(err);
+      switchError = "Couldn't start connecting Hackatime. Please try again.";
+    }
+    switchConnecting = false;
+  }
+
+  function loginToSpace(space) {
     const tab = window.open("", "_blank");
     if (!tab) {
       window.location.href = space.access_url;
@@ -849,9 +895,13 @@
               <p class="type-summary-note">This space type is in beta, so things may still change or break.</p>
             {/if}
 
-            {#if selectedType.tracksHackatime && !userData.user.hackatime_api_key}
+            {#if selectedType.tracksHackatime && userData.user.hackatime_available && !userData.user.hackatime_linked}
               <div class="warn-message">
-                Add your Hackatime API key in Settings to track the time you spend in this space.
+                Connect Hackatime in Settings to track the time you spend in this space.
+              </div>
+            {:else if selectedType.tracksHackatime && !userData.user.hackatime_api_key}
+              <div class="warn-message">
+                Hackatime tracking isn't set up for your account yet.
               </div>
             {:else if selectedType.tracksHackatime}
               <p class="type-summary-note">Time you spend in this space is tracked on Hackatime.</p>
@@ -1309,3 +1359,24 @@
     </div>
   </div>
 </div>
+
+<svelte:window on:keydown={(e) => e.key === "Escape" && switchPromptSpace && !switchConnecting && (switchPromptSpace = null)} />
+
+{#if switchPromptSpace}
+  <div class="switch-overlay" role="presentation" on:click|self={() => !switchConnecting && (switchPromptSpace = null)}>
+    <div class="switch-modal" role="dialog" aria-modal="true" aria-labelledby="switch-title">
+      <h2 id="switch-title">Connect Hackatime to keep tracking your time</h2>
+      <p>
+        Spaces now connects to Hackatime directly instead of using a pasted API key.
+        It takes one click, and your key stays up to date by itself.
+      </p>
+      {#if switchError}<p class="error-message small">{switchError}</p>{/if}
+      <div class="switch-actions">
+        <button class="btn-secondary" on:click={openWithoutSwitching} disabled={switchConnecting}>Not now</button>
+        <button class="btn-primary" on:click={connectHackatimeFromPrompt} disabled={switchConnecting}>
+          {switchConnecting ? "Redirecting…" : "Connect Hackatime"}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

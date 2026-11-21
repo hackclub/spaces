@@ -1,6 +1,7 @@
 import pg from './db.js';
 import { EMAIL_REGEX, EMAIL_MAX_LENGTH, validateUsername } from './validation.js';
 import { findSessionUser } from './sessions.js';
+import { revokeHackatimeToken, decryptToken } from './hackatime-oauth.js';
 
 export const getUser = async (authorization) => {
   if (!authorization) return null;
@@ -135,6 +136,12 @@ export const updateUser = async (authorization, updateData) => {
     
     if (updateData.hackatime_api_key !== undefined) {
       updates.hackatime_api_key = updateData.hackatime_api_key;
+      if (updateData.hackatime_api_key !== user.hackatime_api_key) {
+        updates.hackatime_user_id = null;
+        updates.hackatime_linked_at = null;
+        updates.hackatime_token = null;
+        revokeHackatimeToken(decryptToken(user.hackatime_token));
+      }
     }
 
     if (Object.keys(updates).length === 0) {

@@ -70,6 +70,9 @@ document.cookie = "auth_token=w; path=/"
 | `HACKCLUB_CLIENT_SECRET` | yes | Hack Club Auth OAuth app secret |
 | `HACKCLUB_REDIRECT_URI` | yes | OAuth callback, `<site>/api/v1/oauth/callback`. It must also be allowed in the OAuth app. |
 | `HACKCLUB_CLUBS_API_KEY` | yes | Key for the Clubs API (club membership and leader lookups) |
+| `HACKATIME_CLIENT_ID`, `HACKATIME_CLIENT_SECRET` | no | Hackatime OAuth app (confidential, scopes `profile` and `read`). Without these, connecting Hackatime is hidden. Only the secret is sensitive. |
+| `HACKATIME_REDIRECT_URI` | with the above | Hackatime OAuth callback, `<site>/api/v1/oauth/hackatime/callback`. It must also be allowed in the OAuth app. |
+| `HACKATIME_TOKEN_KEY` | with the above | 32 random bytes in base64 (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`), used to encrypt the stored Hackatime tokens. Sensitive. Changing it disconnects everyone from Hackatime until they connect again. |
 | `FRONTEND_URL` | yes | The website's address, used for CORS |
 | `CRON_SECRET` | production | Shared secret for the auto-stop cron job. Vercel sends it automatically. |
 | `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID` | local only | Credentials for creating sandboxes outside Vercel. On Vercel, sandboxes use the deployment's built-in OIDC login, so leave these unset there. |
@@ -103,8 +106,9 @@ Logging in sets an `auth_token` cookie, which the website sends automatically. O
 | POST | `/signup` | Create an account. Body: `{ "email", "username", "verificationCode" }` |
 | POST | `/login` | Log in. Body: `{ "email", "verificationCode" }` |
 | POST | `/signout` | Sign out and replace the login token |
-| GET | `/me` | The logged-in user |
-| PUT | `/update` | Change username, Hackatime API key or VS Code extensions. Body: any of `{ "username", "hackatime_api_key", "vscode_extensions" }` |
+| GET | `/me` | The logged-in user, including `hackatime_available` (connecting Hackatime is set up), `hackatime_linked` (connected through Hackatime), `hackatime_prompt` (show the first-login popup) and `hackatime_needs_switch` (has a pasted API key but hasn't connected) |
+| POST | `/hackatime-prompt` | Record that the user answered the first-login Hackatime popup |
+| PUT | `/update` | Change username, Hackatime API key or VS Code extensions. Body: any of `{ "username", "hackatime_api_key", "vscode_extensions" }`. A new key disconnects Hackatime. |
 | POST | `/update` | Change email. Body: `{ "email", "oldEmailVerificationCode", "emailVerificationCode" }`, with codes sent to both the current and the new address |
 | POST | `/club-member/check` | Whether an email is in a club. Body: `{ "email" }`. Returns `isMember`, `isLeader`, `hasExistingAccount` and `hasPasswordAuth`, but not the club's name. |
 | POST | `/club-member/signup` | Create an account as a club member. Body: `{ "email", "username", "password", "verificationCode" }`. Club leaders must use Hack Club Auth. |
@@ -119,6 +123,11 @@ Codes allow five wrong guesses, expire after 5 minutes and work once.
 | GET | `/hackclub/login` | Start logging in with Hack Club |
 | POST | `/hackclub/link` | Start linking a Hack Club account to the logged-in user. Returns `{ "url" }` to send the browser to. |
 | GET | `/callback` | Where Hack Club sends the browser back. The `state` must match the cookie set by the request that started the flow. |
+| POST | `/hackatime/link` | Start connecting Hackatime for the logged-in user. Returns `{ "url" }` to send the browser to. |
+| GET | `/hackatime/callback` | Where Hackatime sends the browser back. Saves the user's API key, Hackatime user ID and encrypted token, then returns to the website with `#hackatime=linked` or `#hackatime_error=<reason>`. |
+| POST | `/hackatime/unlink` | Disconnect Hackatime: revokes the token and removes the key |
+
+When a space is created or started, Spaces asks Hackatime for the user's current API key with the stored token, so a key regenerated on Hackatime keeps working. If the token was revoked on Hackatime, the user is shown as disconnected again.
 | GET | `/status` | Whether the user's Hack Club account is linked, and its verification status |
 | POST | `/refresh-verification` | Re-check the verification status with Hack Club |
 | POST | `/unlink` | Unlink the Hack Club account |
@@ -181,6 +190,7 @@ Creating a space needs a verified Hack Club account or a club membership. Each u
 | `freecad` | CAD software | `linuxserver/freecad` in Docker |
 | `godot` | Godot Engine | a Godot desktop image built on `linuxserver/baseimage-selkies`, in Docker |
 | `love2d` | LÖVE 2D | Cupid and its Node server in the sandbox |
+| `renpy` | Ren'Py | a Ren'Py SDK and VSCodium (with the [Hackatime extension](https://github.com/hackclub/vscode-hackatime) and the Ren'Py language extension) desktop image built on `linuxserver/baseimage-selkies`, in Docker; projects are saved in `/config/projects` |
 
 ### Clubs API (`/api/v1/clubs`)
 

@@ -7,6 +7,7 @@ import { extractAuth } from '../../middlewares/auth.middleware.js';
 import { getUser } from '../../utils/user.js';
 import { resolveAccess, isStaffPermissionList, grantableRoles } from '../../utils/permissions.js';
 import { createSession, deleteSession, setSessionCookie } from '../../utils/sessions.js';
+import { hackatimeOAuthConfigured, revokeHackatimeToken, decryptToken } from '../../utils/hackatime-oauth.js';
 
 const router = express.Router();
 router.use(extractAuth);
@@ -26,6 +27,8 @@ router.get("/me", async (req, res) => {
 
     const access = await resolveAccess(user, req);
     const permissions = [...access.permissions];
+    const hackatimeAvailable = hackatimeOAuthConfigured();
+    const hackatimeLinked = Boolean(user.hackatime_linked_at);
 
     return res.status(200).json({
       success: true,
@@ -38,6 +41,10 @@ router.get("/me", async (req, res) => {
         grantable_roles: await grantableRoles(access.grants),
         viewing_as: access.viewingAs,
         hackatime_api_key: user.hackatime_api_key,
+        hackatime_available: hackatimeAvailable,
+        hackatime_linked: hackatimeLinked,
+        hackatime_prompt: hackatimeAvailable && !hackatimeLinked && !user.hackatime_api_key && !user.hackatime_prompt_answered_at,
+        hackatime_needs_switch: hackatimeAvailable && !hackatimeLinked && Boolean(user.hackatime_api_key),
         hackclub_id: user.hackclub_id,
         hackclub_verification_status: user.hackclub_verification_status,
         vscode_extensions: user.vscode_extensions
@@ -49,6 +56,26 @@ router.get("/me", async (req, res) => {
     })
   }
 })
+
+router.post('/hackatime-prompt', async (req, res) => {
+  try {
+    const user = req.authToken ? await getUser(req.authToken) : null;
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    await pg('users')
+      .where({ id: user.id })
+      .whereNull('hackatime_prompt_answered_at')
+      .update({ hackatime_prompt_answered_at: new Date() });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving Hackatime prompt answer:', error);
+    res.status(500).json({ success: false, message: 'Failed to save your answer' });
+  }
+});
+
 
 router.get('/send', (req, res) => {
   res.status(200).json({
@@ -348,8 +375,12 @@ router.put('/update', async (req, res) => {
       updates.username = newUsername;
     }
 
-    if (hackatime_api_key !== undefined) {
+    if (hackatime_api_key !== undefined && hackatime_api_key !== user.hackatime_api_key) {
       updates.hackatime_api_key = hackatime_api_key;
+      updates.hackatime_user_id = null;
+      updates.hackatime_linked_at = null;
+      updates.hackatime_token = null;
+      revokeHackatimeToken(decryptToken(user.hackatime_token));
     }
 
     if (vscode_extensions !== undefined) {

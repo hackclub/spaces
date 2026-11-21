@@ -5,8 +5,6 @@
 
   const dispatch = createEventDispatcher();
 
-  let hackatimeApiKey = userData.user.hackatime_api_key || "";
-
   let newEmail = "";
   let oldEmailCode = "";
   let newEmailCode = "";
@@ -16,6 +14,11 @@
   let error = "";
   let emailMessage = "";
   let emailError = "";
+
+  let hackatimeMessage = "";
+  let hackatimeError = "";
+  let hackatimeLoading = false;
+  $: isHackatimeLinked = !!userData.user.hackatime_linked;
 
   let hackclubMessage = "";
   let hackclubError = "";
@@ -27,6 +30,16 @@
   let vscodeExtensionsMessage = "";
   let vscodeExtensionsError = "";
   $: vscodeExtensions = userData.user.vscode_extensions;
+
+  const HACKATIME_ERRORS = {
+    denied: "You cancelled connecting Hackatime.",
+    invalid_state: "That Hackatime link didn't start in this browser. Please try again.",
+    state_expired: "Connecting Hackatime took too long. Please try again.",
+    user_mismatch: "You're logged into a different Spaces account than the one that started connecting. Log in again and retry.",
+    token_failed: "Hackatime didn't accept the login. Please try again.",
+    key_failed: "Couldn't get your API key from Hackatime. Please try again.",
+    failed: "Something went wrong connecting Hackatime. Please try again.",
+  };
 
   async function linkHackClub() {
     hackclubError = "";
@@ -55,6 +68,64 @@
       console.error(err);
       hackclubLoading = false;
     }
+  }
+
+  onMount(() => {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const errorCode = params.get("hackatime_error");
+    if (params.get("hackatime") === "linked") {
+      hackatimeMessage = "Hackatime connected. New and restarted spaces will track your time.";
+    }
+    if (errorCode) hackatimeError = HACKATIME_ERRORS[errorCode] || HACKATIME_ERRORS.failed;
+    if (params.has("hackatime") || errorCode) {
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  });
+
+  async function connectHackatime() {
+    hackatimeError = "";
+    hackatimeMessage = "";
+    hackatimeLoading = true;
+    try {
+      const response = await fetch(`${API_BASE}/oauth/hackatime/link`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (response.ok && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      hackatimeError = data.message || "Failed to start connecting Hackatime";
+    } catch (err) {
+      console.error(err);
+      hackatimeError = "An error occurred. Please try again.";
+    }
+    hackatimeLoading = false;
+  }
+  
+  async function disconnectHackatime() {
+    if (!confirm("Disconnect Hackatime? New spaces will stop tracking your time.")) return;
+    hackatimeError = "";
+    hackatimeMessage = "";
+    hackatimeLoading = true;
+    try {
+      const response = await fetch(`${API_BASE}/oauth/hackatime/unlink`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (response.ok) {
+        hackatimeMessage = "Hackatime disconnected";
+        dispatch("update");
+      } else {
+        hackatimeError = data.message || "Failed to disconnect Hackatime";
+      }
+    } catch (err) {
+      console.error(err);
+      hackatimeError = "An error occurred. Please try again.";
+    }
+    hackatimeLoading = false;
   }
 
   async function unlinkHackClub() {
@@ -160,7 +231,6 @@
         credentials: "include",
         body: JSON.stringify({
           username: userData.user.username,
-          hackatime_api_key: hackatimeApiKey,
         }),
       });
 
@@ -353,21 +423,22 @@
     </div>
 
     <div class="form-group">
-      <label for="hackatime">Hackatime API Key</label>
-      <input
-        type="text"
-        id="hackatime"
-        bind:value={hackatimeApiKey}
-        placeholder="Enter Hackatime API Key"
-      />
-      <small
-        >This key is used for integration with Hackatime. Find your hackatime
-        API key <a
-          href="https://hackatime.hackclub.com/api-key"
-          target="_blank"
-          rel="noopener noreferrer">here</a
-        > (Click the key to copy it and paste it here)</small
-      >
+      <label for="hackatime">Hackatime</label>
+      {#if isHackatimeLinked}
+        <small>Connected. Your spaces log your coding time to Hackatime automatically.</small>
+        <button id="hackatime" class="secondary danger" on:click={disconnectHackatime} disabled={hackatimeLoading}>
+          Disconnect Hackatime
+        </button>
+      {:else if userData.user.hackatime_available}
+        <small>Connect Hackatime so your spaces log your coding time.</small>
+        <button id="hackatime" on:click={connectHackatime} disabled={hackatimeLoading}>
+          {hackatimeLoading ? "Redirecting…" : "Connect Hackatime"}
+        </button>
+      {:else}
+        <small>Connecting Hackatime isn't available yet.</small>
+      {/if}
+      {#if hackatimeMessage}<div class="success">{hackatimeMessage}</div>{/if}
+      {#if hackatimeError}<div class="error">{hackatimeError}</div>{/if}
     </div>
 
     {#if message}<div class="success">{message}</div>{/if}
