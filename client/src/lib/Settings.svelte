@@ -424,21 +424,23 @@
 
     <div class="form-group">
       <label for="hackatime">Hackatime</label>
-      {#if isHackatimeLinked}
-        <small>Connected. Your spaces log your coding time to Hackatime automatically.</small>
-        <button id="hackatime" class="secondary danger" on:click={disconnectHackatime} disabled={hackatimeLoading}>
-          Disconnect Hackatime
-        </button>
-      {:else if userData.user.hackatime_available}
-        <small>Connect Hackatime so your spaces log your coding time.</small>
-        <button id="hackatime" on:click={connectHackatime} disabled={hackatimeLoading}>
-          {hackatimeLoading ? "Redirecting…" : "Connect Hackatime"}
-        </button>
-      {:else}
-        <small>Connecting Hackatime isn't available yet.</small>
-      {/if}
-      {#if hackatimeMessage}<div class="success">{hackatimeMessage}</div>{/if}
-      {#if hackatimeError}<div class="error">{hackatimeError}</div>{/if}
+      <div class="connection-row">
+        {#if isHackatimeLinked}
+          <p class="connection-text">Connected. Your spaces log your coding time to Hackatime automatically.</p>
+          <button id="hackatime" class="danger" on:click={disconnectHackatime} disabled={hackatimeLoading}>
+            Disconnect
+          </button>
+        {:else if userData.user.hackatime_available}
+          <p class="connection-text">Connect Hackatime so your spaces log your coding time.</p>
+          <button id="hackatime" on:click={connectHackatime} disabled={hackatimeLoading}>
+            {hackatimeLoading ? "Redirecting…" : "Connect Hackatime"}
+          </button>
+        {:else}
+          <p class="connection-text">Connecting Hackatime isn't available yet.</p>
+        {/if}
+      </div>
+      {#if hackatimeMessage}<div class="success connection-message">{hackatimeMessage}</div>{/if}
+      {#if hackatimeError}<div class="error connection-message">{hackatimeError}</div>{/if}
     </div>
 
     {#if message}<div class="success">{message}</div>{/if}
@@ -716,6 +718,31 @@ astro-build.astro-vscode
   .button-group {
     display: flex;
     align-items: center;
+  }
+
+  .connection-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .connection-text {
+    flex: 1 1 240px;
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .connection-row button {
+    flex-shrink: 0;
+  }
+
+  .connection-message {
+    margin: 12px 0 0;
+    padding: 8px 12px;
+    font-size: 13px;
   }
 
   .step-info {
