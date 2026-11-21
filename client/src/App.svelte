@@ -18,6 +18,7 @@
     let spaces = [];
     let url = window.location.pathname + window.location.search;
     $: showAdminPanel = url === "/admin" || url.startsWith("/admin/") || url.startsWith("/admin?");
+    $: showSettings = url === "/settings" || url.startsWith("/settings?");
 
     function navigate(to) {
         if (to !== window.location.pathname + window.location.search) {
@@ -25,7 +26,6 @@
         }
         url = to;
     }
-    let showSettings = false;
     let showClubs = false;
     let showAuth = false;
     let showClubMemberAuth = false;
@@ -50,8 +50,9 @@
 
         isAuthenticated = await userData.refresh();
 
-        if (isAuthenticated && /(^|[#&])(hackatime|github)(_error)?=/.test(window.location.hash)) {
-            showSettings = true;
+        if (isAuthenticated && !showSettings && /(^|[#&])(hackatime|github)(_error)?=/.test(window.location.hash)) {
+            history.replaceState(null, "", `/settings${window.location.hash}`);
+            url = "/settings";
         }
     });
 
@@ -60,9 +61,6 @@
         loadSpaces();
     }
 
-    async function handleUserUpdate(event) {
-        await userData.refresh();
-    }
 
     async function loadSpaces() {
         if (!userData.user) return;
@@ -113,11 +111,11 @@
             {/key}
         {:else if showSettings}
             <div class="nav-header">
-                <button on:click={() => (showSettings = false)}
+                <button on:click={() => navigate("/")}
                     >Dashboard</button
                 >
             </div>
-            <Settings on:update={handleUserUpdate} />
+            <Settings />
         {:else if showClubs}
             <div class="nav-header">
                 <button on:click={() => (showClubs = false)}
@@ -126,19 +124,14 @@
             </div>
             <Clubs />
         {:else}
-            {#if userData.user.is_admin}
-                <div class="admin-link">
-                    <button on:click={() => navigate("/admin")}
-                        >Admin Panel</button
-                    >
-                </div>
-            {/if}
             <Dashboard
                 bind:spaces
                 username={userData.user.username}
+                isAdmin={userData.user.is_admin}
                 on:signout={handleSignOut}
-                on:settings={() => (showSettings = true)}
+                on:settings={() => navigate("/settings")}
                 on:clubs={() => (showClubs = true)}
+                on:admin={() => navigate("/admin")}
             />
         {/if}
     {:else if showClubMemberAuth}
@@ -170,8 +163,7 @@
         box-sizing: border-box;
     }
 
-    .nav-header,
-    .admin-link {
+    .nav-header {
         padding: 10px 20px;
         background-color: var(--snow);
         border-bottom: 1px solid var(--smoke);
@@ -206,18 +198,4 @@
         outline-offset: 2px;
     }
 
-    .admin-link button {
-        padding: 8px 16px;
-        background-color: var(--blue);
-        color: var(--white);
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-
-    .admin-link button:hover {
-        background-color: var(--cyan);
-        transform: translateY(-1px);
-    }
 </style>

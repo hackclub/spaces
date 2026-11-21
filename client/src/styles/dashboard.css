@@ -115,8 +115,32 @@
   transform: scale(1);
 }
 
+.admin-button {
+  padding: 12px 24px;
+  background: transparent;
+  border: 2px solid var(--blue);
+  border-radius: 99999px;
+  color: var(--blue);
+  font-size: 16px;
+  font-weight: bold;
+  font-family: Phantom Sans, sans-serif;
+  cursor: pointer;
+  transition: transform 0.125s ease-in-out, box-shadow 0.125s ease-in-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.admin-button:hover {
+  transform: scale(1.0625);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.125);
+}
+
+.admin-button:active {
+  transform: scale(1);
+}
+
 .header-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: center;
 }

@@ -16,6 +16,7 @@
 
   export let spaces = [];
   export let username = "";
+  export let isAdmin = false;
 
   const dispatch = createEventDispatcher();
 
@@ -769,6 +770,9 @@
       </div>
     </div>
     <div class="header-actions">
+      {#if isAdmin}
+        <button class="admin-button" on:click={() => dispatch("admin")}>Admin</button>
+      {/if}
       <button class="clubs-button" on:click={handleClubs}>My Club</button>
       <button class="settings-button" on:click={handleSettings}>Settings</button
       >

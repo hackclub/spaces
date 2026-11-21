@@ -28,7 +28,7 @@ const STATE_COOKIE_OPTIONS = {
   maxAge: STATE_TTL_MS
 };
 
-const finish = (res, params) => res.redirect(`/#${new URLSearchParams(params)}`);
+const finish = (res, params) => res.redirect(`/settings#${new URLSearchParams(params)}`);
 
 const stateMatchesCookie = (req, state) => {
   const cookie = req.cookies?.[STATE_COOKIE];
