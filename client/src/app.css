@@ -60,40 +60,25 @@
 }
 
 :root {
-  --ui-surface: #ffffff;
-  --ui-surface-alt: #f5f5f5;
-  --ui-hover: rgba(0, 0, 0, 0.03);
-  --ui-border: #dddddd;
-  --ui-border-soft: #eeeeee;
-  --ui-text: #222222;
-  --ui-text-muted: #666666;
-  --ui-accent: #007bff;
-  --ui-chart: #338eda;
-  --ui-success: #1e7e34;
-  --ui-warning: #b45309;
-  --ui-danger: #c82333;
-}
-
-:root[data-theme]:not([data-theme="light"]) {
   --ui-surface: var(--white);
-  --ui-surface-alt: color-mix(in srgb, var(--smoke) 55%, var(--white));
+  --ui-surface-alt: color-mix(in srgb, var(--smoke) 45%, transparent);
   --ui-hover: color-mix(in srgb, var(--muted) 10%, transparent);
-  --ui-border: color-mix(in srgb, var(--muted) 35%, var(--white));
-  --ui-border-soft: color-mix(in srgb, var(--muted) 18%, var(--white));
+  --ui-border: color-mix(in srgb, var(--muted) 40%, transparent);
+  --ui-border-soft: color-mix(in srgb, var(--muted) 20%, transparent);
   --ui-text: var(--black);
   --ui-text-muted: var(--muted);
   --ui-accent: var(--blue);
   --ui-chart: var(--blue);
-  --ui-success: var(--green);
-  --ui-warning: var(--orange);
-  --ui-danger: var(--red);
+  --ui-success: color-mix(in srgb, var(--green) 70%, var(--black));
+  --ui-warning: color-mix(in srgb, var(--orange) 75%, var(--black));
+  --ui-danger: color-mix(in srgb, var(--red) 85%, var(--black));
 }
 
 :root[data-theme]:not([data-theme="light"]):not([data-theme="sunset"]) {
   color-scheme: dark;
 }
 
-:root[data-theme]:not([data-theme="light"]) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
   background-color: var(--ui-surface);
   color: var(--ui-text);
   border-color: var(--ui-border);
@@ -161,11 +146,18 @@ input, textarea, select {
 [data-theme="lgbtq"] .auth-container,
 [data-theme="lgbtq"] .create-form,
 [data-theme="lgbtq"] .space-card,
+[data-theme="lgbtq"] .admin-panel,
+[data-theme="lgbtq"] .settings-container,
 [data-theme="lgbtq"] .theme-menu,
 [data-theme="lgbtq"] .theme-toggle {
   background: rgba(26, 6, 22, 0.7) !important;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+}
+
+[data-theme="lgbtq"] .admin-panel,
+[data-theme="lgbtq"] .settings-container {
+  border-radius: 12px;
 }
 
 [data-theme="lgbtq"] .auth-form-panel {
