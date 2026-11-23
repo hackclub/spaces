@@ -360,6 +360,8 @@ const ONSHAPE_LAUNCHER = [
   "done"
 ].join("\n");
 
+const LINUX_DESKTOP_PACKAGES = ["foot", "thunar", "mousepad", "xdg-utils", "git", "curl", "nano", "htop", "unzip"];
+
 export const spaceConfigs = {
   "code-server": {
     kind: "editor",
@@ -587,6 +589,37 @@ export const spaceConfigs = {
       SELKIES_UI_SIDEBAR_SHOW_WEBCAM: "false|locked"
     },
     resetFiles: [".config/openbox/autostart", ".config/openbox/menu.xml", ".config/openbox/menu.xml.bak"]
+  },
+  "linux-desktop": {
+    kind: "gui",
+    beta: true,
+    category: "Desktop",
+    image: "ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
+    label: "Linux desktop",
+    title: "Linux desktop",
+    summary: "A Debian desktop with sudo",
+    about: "A Debian Linux desktop with an app launcher, a terminal, a file manager and a text editor. You have sudo, so you can install anything else with sudo apt.",
+    description: "Linux Desktop",
+    versions: [
+      { name: "Desktop base", current: "baseimage-selkies:debiantrixie", latestUrl: "https://github.com/linuxserver/docker-baseimage-selkies/releases" }
+    ],
+    build: {
+      tag: "spaces-linux-desktop:1",
+      dockerfile: [
+        "FROM ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
+        `RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ${LINUX_DESKTOP_PACKAGES.join(" ")} && rm -rf /var/lib/apt/lists/*`,
+        `RUN echo ${base64("foot")} | base64 -d > /defaults/autostart_wayland`
+      ].join("\n")
+    },
+    env: {
+      PIXELFLUX_WAYLAND: "true",
+      SELKIES_DESKTOP: "true",
+      FILE_MANAGER_PATH: "/config",
+      NO_STEAM: "true",
+      NO_GAMEPAD: "true",
+      NO_WEBCAM: "true"
+    },
+    resetFiles: [".config/labwc/autostart"]
   },
 
 };
