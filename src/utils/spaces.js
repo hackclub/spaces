@@ -316,6 +316,49 @@ const RENPY_CODIUM_EDITOR = [
   "        subprocess.Popen([\"codium\", \"--no-sandbox\", \"--disable-gpu\", \"--reuse-window\"] + self.args)"
 ].join("\n");
 
+const ONSHAPE_URL = "https://cad.onshape.com";
+
+const ONSHAPE_POLICIES = JSON.stringify({
+  URLBlocklist: ["*"],
+  URLAllowlist: [
+    "onshape.com",
+    "about:blank",
+    ".accounts.google.com",
+    ".accounts.youtube.com",
+    ".www.google.com/recaptcha",
+    ".www.recaptcha.net",
+    ".appleid.apple.com",
+    ".login.microsoftonline.com",
+    ".login.live.com"
+  ],
+  HomepageLocation: ONSHAPE_URL,
+  HomepageIsNewTabPage: false,
+  NewTabPageLocation: ONSHAPE_URL,
+  RestoreOnStartup: 4,
+  RestoreOnStartupURLs: [ONSHAPE_URL],
+  ShowHomeButton: true,
+  DeveloperToolsAvailability: 2,
+  IncognitoModeAvailability: 1,
+  BrowserGuestModeEnabled: false,
+  BrowserAddPersonEnabled: false,
+  ExtensionInstallBlocklist: ["*"],
+  DefaultBrowserSettingEnabled: false,
+  MetricsReportingEnabled: false,
+  TranslateEnabled: false,
+  BookmarkBarEnabled: false,
+  DownloadDirectory: "/config/Downloads",
+  PromptForDownloadLocation: false
+}, null, 2);
+
+const ONSHAPE_LAUNCHER = [
+  "#!/bin/sh",
+  "mkdir -p \"$HOME/Downloads\"",
+  "while true; do",
+  "  rm -f \"$HOME/.config/chromium/SingletonLock\" \"$HOME/.config/chromium/SingletonSocket\" \"$HOME/.config/chromium/SingletonCookie\"",
+  `  chromium --no-sandbox --test-type --no-first-run --no-default-browser-check --password-store=basic --start-maximized --ignore-gpu-blocklist --enable-unsafe-swiftshader ${ONSHAPE_URL}`,
+  "  sleep 1",
+  "done"
+].join("\n");
 
 export const spaceConfigs = {
   "code-server": {
@@ -476,6 +519,51 @@ export const spaceConfigs = {
         "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates curl bzip2 unzip xdg-utils libgl1 libegl1 libglx-mesa0 libgl1-mesa-dri libfontconfig1 libxcursor1 libxinerama1 libxrandr2 libxi6 libasound2t64 libpulse0 && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/codium.deb \"https://github.com/VSCodium/vscodium/releases/download/${VSCODIUM_VERSION}/codium_${VSCODIUM_VERSION}_amd64.deb\" && echo \"${VSCODIUM_SHA256}  /tmp/codium.deb\" | sha256sum -c - && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends /tmp/codium.deb && rm -rf /tmp/codium.deb /var/lib/apt/lists/*",
         "RUN mkdir -p /opt/renpy /opt/wakatime && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/renpy.tar.bz2 \"https://www.renpy.org/dl/${RENPY_VERSION}/renpy-${RENPY_VERSION}-sdk.tar.bz2\" && echo \"${RENPY_SHA256}  /tmp/renpy.tar.bz2\" | sha256sum -c - && tar -xjf /tmp/renpy.tar.bz2 -C /opt/renpy && mv /opt/renpy/renpy-*-sdk /opt/renpy/sdk && chown -R 1000:1000 /opt/renpy/sdk && curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/wakatime.zip \"https://github.com/wakatime/wakatime-cli/releases/download/${WAKATIME_CLI_VERSION}/wakatime-cli-linux-amd64.zip\" && unzip -q /tmp/wakatime.zip -d /opt/wakatime && chmod 755 /opt/wakatime/wakatime-cli-linux-amd64 && rm -f /tmp/renpy.tar.bz2 /tmp/wakatime.zip",
         `RUN echo ${base64(RENPY_LAUNCHER)} | base64 -d > /opt/renpy/run && echo ${base64(RENPY_CODIUM_EDITOR)} | base64 -d > /opt/renpy/codium.edit.py && chmod 755 /opt/renpy/run && chmod 644 /opt/renpy/codium.edit.py && echo /opt/renpy/run > /defaults/autostart && echo ${base64('<?xml version="1.0" encoding="utf-8"?>\n<openbox_menu xmlns="http://openbox.org/3.4/menu"><menu id="root-menu" label="MENU"></menu></openbox_menu>')} | base64 -d > /defaults/menu.xml`
+      ].join("\n")
+    },
+    env: {
+      DISABLE_OPEN_TOOLS: "true",
+      SELKIES_COMMAND_ENABLED: "false",
+      SELKIES_PRINTING_ENABLED: "false",
+      HARDEN_OPENBOX: "true",
+      RESTART_APP: "false",
+      FILE_MANAGER_PATH: "/config",
+      SELKIES_UI_SIDEBAR_SHOW_APPS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_VIDEO_SETTINGS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_SCREEN_SETTINGS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_AUDIO_SETTINGS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_STATS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_SHORTCUTS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_SHARING: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_GAMEPADS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_SOFT_BUTTONS: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_GAMING_MODE: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_TRACKPAD: "false|locked",
+      SELKIES_UI_SIDEBAR_SHOW_WEBCAM: "false|locked"
+    },
+    resetFiles: [".config/openbox/autostart", ".config/openbox/menu.xml", ".config/openbox/menu.xml.bak"]
+  },
+  "onshape": {
+    kind: "gui",
+    beta: true,
+    category: "CAD design",
+    image: "ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
+    label: "Onshape",
+    title: "Onshape",
+    summary: "CAD in the browser",
+    about: "Onshape is a browser-based parametric 3D CAD tool for designing parts and assemblies, free for students and hobbyists. This space opens Onshape in a browser that only goes to Onshape and its sign-in pages. You'll need your own Onshape account.",
+    description: "Onshape CAD",
+    vcpus: 4,
+    versions: [
+      { name: "Chromium", note: "Debian's package, installed when its template builds", latestUrl: "https://packages.debian.org/trixie/chromium" },
+      { name: "Desktop base", current: "baseimage-selkies:debiantrixie", latestUrl: "https://github.com/linuxserver/docker-baseimage-selkies/releases" }
+    ],
+    build: {
+      tag: "spaces-onshape:1",
+      dockerfile: [
+        "FROM ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
+        "RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends chromium fonts-liberation libgl1-mesa-dri && rm -rf /var/lib/apt/lists/*",
+        `RUN mkdir -p /etc/chromium/policies/managed /opt/onshape && echo ${base64(ONSHAPE_POLICIES)} | base64 -d > /etc/chromium/policies/managed/spaces.json && chmod 644 /etc/chromium/policies/managed/spaces.json && echo ${base64(ONSHAPE_LAUNCHER)} | base64 -d > /opt/onshape/run && chmod 755 /opt/onshape/run && echo /opt/onshape/run > /defaults/autostart && echo ${base64('<?xml version="1.0" encoding="utf-8"?>\n<openbox_menu xmlns="http://openbox.org/3.4/menu"><menu id="root-menu" label="MENU"></menu></openbox_menu>')} | base64 -d > /defaults/menu.xml`
       ].join("\n")
     },
     env: {
