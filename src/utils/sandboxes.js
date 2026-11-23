@@ -490,12 +490,12 @@ export const startGuiApp = async (sandbox, { image, password, build, env: typeEn
   const env = { ...GUI_STREAM_ENV, ...typeEnv };
   const extraEnv = Object.keys(env).map((name) => `-e ${name}="$${name}"`).join(" ");
 
-  await run(
+await run(
     sandbox,
     [
       `docker rm -f ${GUI_CONTAINER} >/dev/null 2>&1 || true`,
       ...resetFiles.map((file) => `dir=$(realpath -m "$(dirname "$CONFIG"/${JSON.stringify(file)})"); case "$dir/" in "$(realpath -m "$CONFIG")"/*) rm -f "$dir"/${JSON.stringify(file.split("/").pop())} ;; esac`),
-      `docker run -d --name ${GUI_CONTAINER} -p 127.0.0.1:${DESKTOP_TARGET_PORT}:3000 -e PUID=1000 -e PGID=1000 -e PASSWORD="$SPACE_PASSWORD" -e SELKIES_FILE_TRANSFERS=upload,download -e SELKIES_UI_SIDEBAR_SHOW_FILES=True --shm-size=1g ${extraEnv} -v "$CONFIG":/config "$IMAGE" >/dev/null`
+      `docker run -d --name ${GUI_CONTAINER} -p 127.0.0.1:${DESKTOP_TARGET_PORT}:3000 -e PUID=1000 -e PGID=1000 -e PASSWORD="$SPACE_PASSWORD" -e SELKIES_DESKTOP=true -e SELKIES_FILE_TRANSFERS=upload,download -e SELKIES_ UI_SIDEBAR_SHOW_FILES=True --shm-size=1g ${extraEnv} -v "$CONFIG":/config "$IMAGE" >/dev/null`
     ].join("; "),
     { sudo: true, env: { ...env, SPACE_PASSWORD: password, CONFIG: GUI_CONFIG_PATH, IMAGE: runImage }, timeoutMs: 2 * MINUTE }
   );
