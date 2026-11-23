@@ -17,7 +17,7 @@
   "author": "Charmunk",
   "license": "MIT",
   "dependencies": {
-    "@vercel/sandbox": "^3.9.1",
+    "@vercel/sandbox": "^4.0.0",
     "airtable": "^0.12.2",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
