@@ -547,7 +547,6 @@ export const spaceConfigs = {
   },
   "onshape": {
     kind: "gui",
-    beta: true,
     category: "CAD design",
     image: "ghcr.io/linuxserver/baseimage-selkies:debiantrixie",
     label: "Onshape",
